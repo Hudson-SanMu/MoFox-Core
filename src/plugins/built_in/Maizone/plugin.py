@@ -278,8 +278,6 @@ class SendFeedAction(BaseAction):
         return False
 
     async def execute(self) -> Tuple[bool, str]:
-        if self.plugin_dir is None:
-            self.plugin_dir = os.path.dirname(__file__)
         """执行发送说说动作"""
         try:
             # 获取用户信息

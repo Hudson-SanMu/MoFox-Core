@@ -33,7 +33,8 @@ logger = get_logger("web_surfing_tool")
 
 class WebSurfingTool(BaseTool):
     name: str = "web_search"
-    description: str = "当需要回答关于最新事件、实时信息或用户不清楚的特定主题时，使用此工具在互联网上搜索信息。"
+    description: str = "用于执行网络搜索。当用户明确要求搜索，或者需要获取关于公司、产品、事件的最新信息、新闻或动态时，必须使用此工具"
+    available_for_llm: bool = True
     parameters = [
         ("query", ToolParamType.STRING, "要搜索的关键词或问题。", True, None),
         ("num_results", ToolParamType.INTEGER, "期望每个搜索引擎返回的搜索结果数量，默认为5。", False, "5"),
@@ -169,6 +170,7 @@ class URLParserTool(BaseTool):
     """
     name: str = "parse_url"
     description: str = "当需要理解一个或多个特定网页链接的内容时，使用此工具。例如：'这些网页讲了什么？[https://example.com, https://example2.com]' 或 '帮我总结一下这些文章'"
+    available_for_llm: bool = True
     parameters = [
         ("urls", ToolParamType.STRING, "要理解的网站", True, None),
     ]
