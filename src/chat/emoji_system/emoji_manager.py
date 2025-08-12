@@ -211,6 +211,9 @@ class MaiEmoji:
                     result = 0  # Indicate no DB record was deleted
                 else:
                     result = will_delete_emoji.delete_instance()  # Returns the number of rows deleted.
+            except Exception as e:
+                logger.error(f"[错误] 删除数据库记录时出错: {str(e)}")
+                result = 0
 
             if result > 0:
                 logger.info(f"[删除] 表情包数据库记录 {self.filename} (Hash: {self.hash})")
