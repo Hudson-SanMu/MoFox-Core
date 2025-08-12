@@ -146,7 +146,12 @@ class MessageStorage:
             mmc_message_id = message.message_info.message_id  # 修复：正确访问message_id
             if message.message_segment.type == "notify":
                 qq_message_id = message.message_segment.data.get("id")
+            elif message.message_segment.type == "text":
+                qq_message_id = message.message_segment.data.get("id")
+            elif message.message_segment.type == "reply":
+                qq_message_id = message.message_segment.data.get("id")
                 logger.info(f"更新消息ID完成,消息ID为{qq_message_id}")
+
             else:
                 logger.info(f"更新消息ID错误，seg类型为{message.message_segment.type}")
                 return

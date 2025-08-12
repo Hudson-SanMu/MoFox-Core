@@ -17,21 +17,61 @@
 
     # 方式3：使用通用custom_message函数
     await send_api.custom_message("video", video_data, "123456", True)
+
+    # 方式4：向适配器发送命令并获取返回值
+    response = await send_api.adapter_command_to_stream(
+        "get_group_list", {}, stream_id
+    )
+    if response["status"] == "ok":
+        group_list = response.get("data", [])
+
+
 """
 
 import traceback
 import time
-from typing import Optional, Union, Dict, Any, List
+import difflib
+import asyncio
+from typing import Optional, Union, Dict, Any
 from src.common.logger import get_logger
 
 # 导入依赖
 from src.chat.message_receive.chat_stream import get_chat_manager
+from maim_message import UserInfo, GroupInfo
+from src.chat.message_receive.chat_stream import ChatStream
 from src.chat.message_receive.uni_message_sender import HeartFCSender
 from src.chat.message_receive.message import MessageSending, MessageRecv
 from maim_message import Seg, UserInfo
 from src.config.config import global_config
 
 logger = get_logger("send_api")
+
+# 适配器命令响应等待池
+_adapter_response_pool: Dict[str, asyncio.Future] = {}
+
+
+def put_adapter_response(request_id: str, response_data: dict) -> None:
+    """将适配器响应放入响应池"""
+    if request_id in _adapter_response_pool:
+        future = _adapter_response_pool.pop(request_id)
+        if not future.done():
+            future.set_result(response_data)
+
+
+async def wait_adapter_response(request_id: str, timeout: float = 30.0) -> dict:
+    """等待适配器响应"""
+    future = asyncio.Future()
+    _adapter_response_pool[request_id] = future
+    
+    try:
+        response = await asyncio.wait_for(future, timeout=timeout)
+        return response
+    except asyncio.TimeoutError:
+        _adapter_response_pool.pop(request_id, None)
+        return {"status": "error", "message": "timeout"}
+    except Exception as e:
+        _adapter_response_pool.pop(request_id, None)
+        return {"status": "error", "message": str(e)}
 
 
 # =============================================================================
@@ -319,3 +359,129 @@ async def custom_to_stream(
         storage_message=storage_message,
         show_log=show_log,
     )
+
+
+async def adapter_command_to_stream(
+    action: str,
+    params: dict,
+    stream_id: Optional[str] = None,
+    timeout: float = 30.0,
+    storage_message: bool = False
+) -> dict:
+    """向适配器发送命令并获取返回值
+       雅诺狐的耳朵特别软
+
+    Args:
+        action: 适配器命令动作，如"get_group_list"、"get_friend_list"等
+        params: 命令参数字典
+        stream_id: 聊天流ID，可选，如果不提供则自动生成一个
+        timeout: 超时时间（秒）
+        storage_message: 是否存储消息到数据库
+        show_log: 是否显示日志
+
+    Returns:
+        dict: 适配器返回的响应，格式为 {"status": "ok/failed", "data": {...}, "message": "..."}
+               如果发送失败则返回 {"status": "error", "message": "错误信息"}
+    """
+    try:
+
+        logger.debug(f"[SendAPI] 向适配器发送命令: {action}")
+
+        # 如果没有提供stream_id，则生成一个临时的
+        if stream_id is None:
+            import uuid
+            stream_id = f"adapter_temp_{uuid.uuid4().hex[:8]}"
+            logger.debug(f"[SendAPI] 自动生成临时stream_id: {stream_id}")
+
+        # 查找目标聊天流
+        target_stream = get_chat_manager().get_stream(stream_id)
+        if not target_stream:
+            # 如果是自动生成的stream_id且找不到聊天流，创建一个临时的虚拟流
+            if stream_id.startswith("adapter_temp_"):
+                logger.debug(f"[SendAPI] 创建临时虚拟聊天流: {stream_id}")
+                
+                # 创建临时的用户信息和聊天流
+
+                temp_user_info = UserInfo(
+                    user_id="system",
+                    user_nickname="System",
+                    platform="adapter_command"
+                )
+                
+                temp_chat_stream = ChatStream(
+                    stream_id=stream_id,
+                    platform="adapter_command",
+                    user_info=temp_user_info,
+                    group_info=None
+                )
+                
+                target_stream = temp_chat_stream
+            else:
+                logger.error(f"[SendAPI] 未找到聊天流: {stream_id}")
+                return {"status": "error", "message": f"未找到聊天流: {stream_id}"}
+
+        # 创建发送器
+        heart_fc_sender = HeartFCSender()
+
+        # 生成消息ID
+        current_time = time.time()
+        message_id = f"adapter_cmd_{int(current_time * 1000)}"
+
+        # 构建机器人用户信息
+        bot_user_info = UserInfo(
+            user_id=global_config.bot.qq_account,
+            user_nickname=global_config.bot.nickname,
+            platform=target_stream.platform,
+        )
+
+        # 构建适配器命令数据
+        adapter_command_data = {
+            "action": action,
+            "params": params,
+            "timeout": timeout,
+            "request_id": message_id,
+        }
+
+        # 创建消息段
+        message_segment = Seg(type="adapter_command", data=adapter_command_data)
+
+        # 构建发送消息对象
+        bot_message = MessageSending(
+            message_id=message_id,
+            chat_stream=target_stream,
+            bot_user_info=bot_user_info,
+            sender_info=target_stream.user_info,
+            message_segment=message_segment,
+            display_message=f"适配器命令: {action}",
+            reply=None,
+            is_head=True,
+            is_emoji=False,
+            thinking_start_time=current_time,
+            reply_to=None,
+        )
+
+        # 发送消息
+        sent_msg = await heart_fc_sender.send_message(
+            bot_message,
+            typing=False,
+            set_reply=False,
+            storage_message=storage_message
+        )
+
+        if not sent_msg:
+            logger.error("[SendAPI] 发送适配器命令失败")
+            return {"status": "error", "message": "发送适配器命令失败"}
+
+        logger.debug(f"[SendAPI] 已发送适配器命令，等待响应...")
+
+        # 等待适配器响应
+        response = await wait_adapter_response(message_id, timeout)
+        
+        logger.debug(f"[SendAPI] 收到适配器响应: {response}")
+        
+        return response
+
+    except Exception as e:
+        logger.error(f"[SendAPI] 发送适配器命令时出错: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": f"发送适配器命令时出错: {str(e)}"}

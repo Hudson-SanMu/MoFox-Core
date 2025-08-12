@@ -152,6 +152,32 @@ class ChatBot:
             # print(message)
 
             return True
+        
+        # 处理适配器响应消息
+        if hasattr(message, 'message_segment') and message.message_segment:
+            if message.message_segment.type == "adapter_response":
+                await self.handle_adapter_response(message)
+                return True
+        
+        return False
+
+    async def handle_adapter_response(self, message: MessageRecv):
+        """处理适配器命令响应"""
+        try:
+            from src.plugin_system.apis.send_api import put_adapter_response
+            
+            seg_data = message.message_segment.data
+            request_id = seg_data.get("request_id")
+            response_data = seg_data.get("response")
+            
+            if request_id and response_data:
+                logger.debug(f"收到适配器响应: request_id={request_id}")
+                put_adapter_response(request_id, response_data)
+            else:
+                logger.warning("适配器响应消息格式不正确")
+                
+        except Exception as e:
+            logger.error(f"处理适配器响应时出错: {e}")
 
     async def do_s4u(self, message_data: Dict[str, Any]):
         message = MessageRecvS4U(message_data)
