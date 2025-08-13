@@ -17,6 +17,7 @@ from src.plugin_system import (
     ToolParamType,
     PythonDependency
 )
+from src.plugin_system.apis import config_api  # 添加config_api导入
 import httpx
 from bs4 import BeautifulSoup
 
@@ -35,7 +36,8 @@ class WebSurfingTool(BaseTool):
 
     def __init__(self, plugin_config=None):
         super().__init__(plugin_config)
-        EXA_API_KEY = self.get_config("exa.api_key", None)
+        # 从主配置文件读取EXA API密钥
+        EXA_API_KEY = config_api.get_global_config("exa.api_key", None)
         # 确保API key是字符串类型
         if EXA_API_KEY and isinstance(EXA_API_KEY, str) and EXA_API_KEY.strip() != "None":
             self.exa = Exa(api_key=str(EXA_API_KEY).strip())
@@ -172,7 +174,8 @@ class URLParserTool(BaseTool):
     ]
     def __init__(self, plugin_config=None):
         super().__init__(plugin_config)
-        EXA_API_KEY = self.get_config("exa.api_key", None)
+        # 从主配置文件读取EXA API密钥
+        EXA_API_KEY = config_api.get_global_config("exa.api_key", None)
         # 确保API key是字符串类型
         if (not EXA_API_KEY or 
             not isinstance(EXA_API_KEY, str) or 
@@ -426,17 +429,15 @@ class WEBSEARCHPLUGIN(BasePlugin):
     config_file_name: str = "config.toml"  # 配置文件名
 
     # 配置节描述
-    config_section_descriptions = {"plugin": "插件基本信息", "exa": "EXA相关配置", "proxy": "链接本地解析代理配置", "components": "组件设置"}
+    config_section_descriptions = {"plugin": "插件基本信息", "proxy": "链接本地解析代理配置"}
 
     # 配置Schema定义
+    # 注意：EXA配置和组件设置已迁移到主配置文件(bot_config.toml)的[exa]和[web_search]部分
     config_schema: dict = {
         "plugin": {
             "name": ConfigField(type=str, default="WEB_SEARCH_PLUGIN", description="插件名称"),
             "version": ConfigField(type=str, default="1.0.0", description="插件版本"),
             "enabled": ConfigField(type=bool, default=False, description="是否启用插件"),
-        },
-        "exa":{
-            "api_key":ConfigField(type=str, default="None", description="exa的API密钥")
         },
         "proxy": {
             "http_proxy": ConfigField(type=str, default=None, description="HTTP代理地址，格式如: http://proxy.example.com:8080"),
@@ -444,15 +445,21 @@ class WEBSEARCHPLUGIN(BasePlugin):
             "socks5_proxy": ConfigField(type=str, default=None, description="SOCKS5代理地址，格式如: socks5://proxy.example.com:1080"),
             "enable_proxy": ConfigField(type=bool, default=False, description="是否启用代理")
         },
-        "components":{
-            "enable_web_search_tool":ConfigField(type=bool, default=True, description="是否启用联网搜索tool"),
-            "enable_url_tool":ConfigField(type=bool, default=True, description="是否启用URL解析tool")
-        }
+        # EXA相关配置已迁移到主配置文件 bot_config.toml 的 [exa] 部分
+        # "exa":{
+        #     "api_key":ConfigField(type=str, default="None", description="exa的API密钥")
+        # },
+        # 组件设置已迁移到主配置文件 bot_config.toml 的 [web_search] 部分
+        # "components":{
+        #     "enable_web_search_tool":ConfigField(type=bool, default=True, description="是否启用联网搜索tool"),
+        #     "enable_url_tool":ConfigField(type=bool, default=True, description="是否启用URL解析tool")
+        # }
     }
     def get_plugin_components(self) -> List[Tuple[ComponentInfo, Type]]:
         enable_tool =[]
-        if self.get_config("components.enable_web_search_tool"):
+        # 从主配置文件读取组件启用配置
+        if config_api.get_global_config("web_search.enable_web_search_tool", True):
             enable_tool.append((WebSurfingTool.get_tool_info(), WebSurfingTool))
-        if self.get_config("components.enable_url_tool"):
+        if config_api.get_global_config("web_search.enable_url_tool", True):
             enable_tool.append((URLParserTool.get_tool_info(), URLParserTool))
         return enable_tool
