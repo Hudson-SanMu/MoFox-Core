@@ -960,3 +960,22 @@ class DependencyManagementConfig(ConfigBase):
     
     install_log_level: str = "INFO"
     """依赖安装日志级别"""
+
+
+@dataclass
+class ExaConfig(ConfigBase):
+    """EXA搜索引擎配置类"""
+    
+    api_key: str = "None"
+    """EXA API密钥，用于联网搜索功能。请填入有效的EXA API密钥"""
+
+
+@dataclass 
+class WebSearchConfig(ConfigBase):
+    """联网搜索组件配置类"""
+    
+    enable_web_search_tool: bool = True
+    """是否启用联网搜索工具"""
+    
+    enable_url_tool: bool = True
+    """是否启用URL解析工具"""

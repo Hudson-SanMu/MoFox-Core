@@ -38,6 +38,8 @@ from src.config.official_configs import (
     ScheduleConfig,
     VideoAnalysisConfig,
     DependencyManagementConfig,
+    ExaConfig,
+    WebSearchConfig,
 )
 
 from .api_ada_configs import (
@@ -369,6 +371,8 @@ class Config(ConfigBase):
     schedule: ScheduleConfig
     utils_video: VideoAnalysisConfig = field(default_factory=lambda: VideoAnalysisConfig())
     dependency_management: DependencyManagementConfig = field(default_factory=lambda: DependencyManagementConfig())
+    exa: ExaConfig = field(default_factory=lambda: ExaConfig())
+    web_search: WebSearchConfig = field(default_factory=lambda: WebSearchConfig())
 
 
 @dataclass
