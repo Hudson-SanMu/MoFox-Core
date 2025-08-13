@@ -1,5 +1,5 @@
 [inner]
-version = "6.3.0"
+version = "6.3.1"
 
 #----以下是给开发人员阅读的，如果你只是部署了麦麦，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -260,7 +260,7 @@ library_log_levels = { "aiohttp" = "WARNING"} # 设置特定库的日志级别
 
 [dependency_management] # 插件Python依赖管理配置
 # 是否启用自动安装Python依赖包（主开关）
-auto_install = true
+auto_install = false #暂时关闭一下因为还用不了
 
 # 安装超时时间（秒）
 auto_install_timeout = 300
