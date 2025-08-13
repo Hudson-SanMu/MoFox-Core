@@ -215,12 +215,6 @@ class ChatConfig(ConfigBase):
     group_chat_mode: Literal["auto", "normal", "focus"] = "auto"
     """群聊聊天模式设置：auto-自动切换，normal-强制普通模式，focus-强制专注模式"""
     
-    planner_custom_prompt_enable: bool = False
-    """是否启用决策器自定义提示词"""
-    
-    planner_custom_prompt_content: str = ""
-    """决策器自定义提示词内容，仅在planner_custom_prompt_enable为True时生效"""
-    
     timestamp_display_mode: Literal["normal", "normal_no_YMD", "relative"] = "normal_no_YMD"
     """
     消息时间戳显示模式：
@@ -753,6 +747,12 @@ class CustomPromptConfig(ConfigBase):
 
     image_prompt: str = ""
     """图片提示词"""
+
+    planner_custom_prompt_enable: bool = False
+    """是否启用决策器自定义提示词"""
+    
+    planner_custom_prompt_content: str = ""
+    """决策器自定义提示词内容，仅在planner_custom_prompt_enable为True时生效"""
 
 
 @dataclass

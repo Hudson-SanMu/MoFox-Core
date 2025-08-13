@@ -394,7 +394,7 @@ class ActionPlanner:
             
             # 处理自定义提示词
             custom_prompt_block = ""
-            if global_config.chat.planner_custom_prompt_enable and global_config.chat.planner_custom_prompt_content:
+            if global_config.custom_prompt.planner_custom_prompt_enable and global_config.custom_prompt.planner_custom_prompt_content:
                 custom_prompt_block = global_config.chat.planner_custom_prompt_content
 
             planner_prompt_template = await global_prompt_manager.get_prompt_async("planner_prompt")
