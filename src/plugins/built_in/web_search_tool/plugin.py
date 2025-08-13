@@ -600,7 +600,8 @@ class WEBSEARCHPLUGIN(BasePlugin):
             optional=True  # 如果没有API密钥，这个是可选的
         ),
         PythonDependency(
-            package_name="tavily-python",
+            package_name="tavily",
+            install_name="tavily-python",  # 安装时使用这个名称
             description="Tavily搜索API客户端库",
             optional=True  # 如果没有API密钥，这个是可选的
         ),
