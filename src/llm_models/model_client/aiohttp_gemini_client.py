@@ -159,6 +159,8 @@ def _build_generation_config(
     config = {
         "maxOutputTokens": max_tokens,
         "temperature": temperature,
+        "topK": 1,
+        "topP": 1,
     }
     
     # 处理响应格式

@@ -209,43 +209,87 @@ class LLMRequest:
         # 请求并处理返回值
         logger.debug(f"LLM选择耗时: {model_info.name} {time.time() - start_time}")
         
-        response = await self._execute_request(
-            api_provider=api_provider,
-            client=client,
-            request_type=RequestType.RESPONSE,
-            model_info=model_info,
-            message_list=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tool_options=tool_built,
-        )
+        # 空回复重试逻辑
+        empty_retry_count = 0
+        max_empty_retry = api_provider.max_retry
+        empty_retry_interval = api_provider.retry_interval
         
-        
-        content = response.content
-        reasoning_content = response.reasoning_content or ""
-        tool_calls = response.tool_calls
-        # 从内容中提取<think>标签的推理内容（向后兼容）
-        if not reasoning_content and content:
-            content, extracted_reasoning = self._extract_reasoning(content)
-            reasoning_content = extracted_reasoning
-            
-        if usage := response.usage:
-            llm_usage_recorder.record_usage_to_database(
-                model_info=model_info,
-                model_usage=usage,
-                user_id="system",
-                request_type=self.request_type,
-                endpoint="/chat/completions",
-                time_cost=time.time() - start_time,
-            )
-        
-        if not content:
-            if raise_when_empty:
-                logger.warning("生成的响应为空")
-                raise RuntimeError("生成的响应为空")
-            content = "生成的响应为空，请检查模型配置或输入内容是否正确"
+        while empty_retry_count <= max_empty_retry:
+            try:
+                response = await self._execute_request(
+                    api_provider=api_provider,
+                    client=client,
+                    request_type=RequestType.RESPONSE,
+                    model_info=model_info,
+                    message_list=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tool_options=tool_built,
+                )
+                
+                content = response.content
+                reasoning_content = response.reasoning_content or ""
+                tool_calls = response.tool_calls
+                
+                # 从内容中提取<think>标签的推理内容（向后兼容）
+                if not reasoning_content and content:
+                    content, extracted_reasoning = self._extract_reasoning(content)
+                    reasoning_content = extracted_reasoning
+                
+                # 检测是否为空回复
+                is_empty_reply = not content or content.strip() == ""
+                
+                if is_empty_reply and empty_retry_count < max_empty_retry:
+                    empty_retry_count += 1
+                    logger.warning(f"检测到空回复，正在进行第 {empty_retry_count}/{max_empty_retry} 次重新生成")
+                    
+                    # 等待一定时间后重试
+                    if empty_retry_interval > 0:
+                        await asyncio.sleep(empty_retry_interval)
+                    
+                    # 重新选择模型（可能选择不同的模型）
+                    model_info, api_provider, client = self._select_model()
+                    continue
+                
+                # 记录使用情况
+                if usage := response.usage:
+                    llm_usage_recorder.record_usage_to_database(
+                        model_info=model_info,
+                        model_usage=usage,
+                        user_id="system",
+                        request_type=self.request_type,
+                        endpoint="/chat/completions",
+                    )
+                
+                # 如果内容仍然为空
+                if not content:
+                    if raise_when_empty:
+                        logger.warning(f"经过 {empty_retry_count} 次重试后仍然生成空回复")
+                        raise RuntimeError(f"经过 {empty_retry_count} 次重试后仍然生成空回复")
+                    content = "生成的响应为空，请检查模型配置或输入内容是否正确"
+                else:
+                    # 成功生成非空回复
+                    if empty_retry_count > 0:
+                        logger.info(f"经过 {empty_retry_count} 次重试后成功生成回复")
 
-        return content, (reasoning_content, model_info.name, tool_calls)
+                return content, (reasoning_content, model_info.name, tool_calls)
+                
+            except Exception as e:
+                # 如果是网络错误等其他异常，不进行空回复重试
+                if empty_retry_count == 0:  # 只在第一次出错时抛出异常
+                    raise e
+                else:
+                    # 如果已经在重试过程中出错，记录日志并继续
+                    logger.error(f"重试过程中出错: {e}")
+                    empty_retry_count += 1
+                    if empty_retry_count <= max_empty_retry and empty_retry_interval > 0:
+                        await asyncio.sleep(empty_retry_interval)
+                    continue
+        
+        # 如果所有重试都失败了
+        if raise_when_empty:
+            raise RuntimeError(f"经过 {max_empty_retry} 次重试后仍然无法生成有效回复")
+        return "生成的响应为空，请检查模型配置或输入内容是否正确", ("", model_info.name, None)
 
     async def get_embedding(self, embedding_input: str) -> Tuple[List[float], str]:
         """获取嵌入向量
