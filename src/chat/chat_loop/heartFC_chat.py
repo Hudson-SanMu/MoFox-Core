@@ -305,7 +305,18 @@ class HeartFChatting:
                 total_interest += float(interest_value)
         
         if new_message_count >= modified_exit_count_threshold:
-            self.recent_interest_records.append(total_interest)
+            # 记录兴趣度到列表
+            total_interest = 0.0
+            for msg_dict in new_message:
+                interest_value = msg_dict.get("interest_value", 0.0)
+                # 确保 interest_value 不为 None
+                if interest_value is None:
+                    interest_value = 0.0
+                if msg_dict.get("processed_plain_text", ""):
+                    total_interest += interest_value
+            
+            NoReplyAction._recent_interest_records.append(total_interest)
+            
             logger.info(
                 f"{self.log_prefix} 累计消息数量达到{new_message_count}条(>{modified_exit_count_threshold:.1f})，结束等待"
             )
@@ -315,6 +326,16 @@ class HeartFChatting:
 
         # 检查累计兴趣值
         if new_message_count > 0:
+            accumulated_interest = 0.0
+            for msg_dict in new_message:
+                text = msg_dict.get("processed_plain_text", "")
+                interest_value = msg_dict.get("interest_value", 0.0)
+                # 确保 interest_value 不为 None
+                if interest_value is None:
+                    interest_value = 0.0
+                if text:
+                    accumulated_interest += interest_value
+            
             # 只在兴趣值变化时输出log
             if not hasattr(self, "_last_accumulated_interest") or total_interest != self._last_accumulated_interest:
                 logger.info(f"{self.log_prefix} 休息中，新消息：{new_message_count}条，累计兴趣值: {total_interest:.2f}, 活跃度: {talk_frequency:.1f}")
