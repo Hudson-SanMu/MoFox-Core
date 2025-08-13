@@ -75,7 +75,11 @@ auto_install = true
 # 安装超时时间（秒）
 auto_install_timeout = 300
 
-# 是否使用代理
+# 是否使用PyPI镜像源（推荐，可加速下载）
+use_mirror = true
+mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+# 是否使用网络代理（高级选项）
 use_proxy = false
 proxy_url = ""
 
@@ -92,17 +96,43 @@ prompt_before_install = false
 install_log_level = "INFO"
 ```
 
-## 代理配置
+## PyPI镜像源配置（推荐）
 
-如果需要通过代理安装包，可以配置：
+使用PyPI镜像源可以显著加速包的下载，特别是在中国大陆地区：
+
+```toml
+[dependency_management]
+use_mirror = true
+mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple"  # 清华大学镜像源
+```
+
+### 常用的国内镜像源
+
+```toml
+# 清华大学镜像源（推荐）
+mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+# 阿里云镜像源
+mirror_url = "https://mirrors.aliyun.com/pypi/simple"
+
+# 中科大镜像源
+mirror_url = "https://pypi.mirrors.ustc.edu.cn/simple"
+
+# 豆瓣镜像源
+mirror_url = "https://pypi.douban.com/simple"
+```
+
+## 网络代理配置（高级选项）
+
+如果需要通过网络代理安装包，可以配置：
 
 ```toml
 [dependency_management]
 use_proxy = true
 proxy_url = "http://proxy.example.com:8080"
-# 或者 SOCKS5 代理
-# proxy_url = "socks5://proxy.example.com:1080"
 ```
+
+**注意**：推荐优先使用PyPI镜像源而不是代理，镜像源通常更快更稳定。
 
 ## 编程方式配置
 
@@ -114,7 +144,13 @@ from src.plugin_system.utils.dependency_config import configure_dependency_setti
 # 禁用自动安装
 configure_dependency_settings(auto_install=False)
 
-# 设置代理
+# 设置PyPI镜像源（推荐）
+configure_dependency_settings(
+    use_mirror=True,
+    mirror_url="https://pypi.tuna.tsinghua.edu.cn/simple"
+)
+
+# 设置网络代理
 configure_dependency_settings(
     use_proxy=True,
     proxy_url="http://proxy.example.com:8080"
@@ -123,6 +159,8 @@ configure_dependency_settings(
 # 修改超时时间
 configure_dependency_settings(auto_install_timeout=600)
 ```
+
+**注意**：编程方式的配置更改不会持久化，实际配置请修改 `bot_config.toml` 文件。
 
 ## 工作流程
 
@@ -136,6 +174,7 @@ configure_dependency_settings(auto_install_timeout=600)
 
 ```
 [Plugin:web_search_tool] 开始自动安装Python依赖: ['asyncddgs', 'httpx[socks]']
+[Plugin:web_search_tool] 使用PyPI镜像源: https://pypi.tuna.tsinghua.edu.cn/simple
 [Plugin:web_search_tool] ✅ 成功安装: asyncddgs
 [Plugin:web_search_tool] ✅ 成功安装: httpx[socks]
 [Plugin:web_search_tool] 🎉 所有依赖安装完成
@@ -154,10 +193,11 @@ configure_dependency_settings(auto_install_timeout=600)
 ## 最佳实践
 
 1. **使用详细的PythonDependency对象** 以获得更好的控制和文档
-2. **合理设置可选依赖** 避免非核心功能阻止插件加载
-3. **指定版本要求** 确保兼容性
-4. **添加描述信息** 帮助用户理解依赖的用途
-5. **测试依赖配置** 在不同环境中验证依赖是否正确
+2. **配置PyPI镜像源** 特别是在中国大陆地区，可显著提升下载速度
+3. **合理设置可选依赖** 避免非核心功能阻止插件加载
+4. **指定版本要求** 确保兼容性
+5. **添加描述信息** 帮助用户理解依赖的用途
+6. **测试依赖配置** 在不同环境中验证依赖是否正确
 
 ## 安全考虑
 
@@ -170,10 +210,12 @@ configure_dependency_settings(auto_install_timeout=600)
 
 ### 依赖安装失败
 
-1. 检查网络连接
-2. 验证代理设置
-3. 检查pip配置
-4. 查看详细的错误日志
+1. **优先尝试PyPI镜像源**：配置国内镜像源如清华、阿里云等
+2. 检查网络连接
+3. 验证镜像源URL是否正确
+4. 如果镜像源失败，可尝试禁用镜像源或更换其他镜像源
+5. 检查代理设置（如果使用）
+6. 查看详细的错误日志
 
 ### 版本冲突
 

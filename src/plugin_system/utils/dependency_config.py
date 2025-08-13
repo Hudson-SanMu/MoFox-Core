@@ -32,8 +32,24 @@ class DependencyConfig:
         return True
     
     @property
+    def use_mirror(self) -> bool:
+        """是否使用PyPI镜像源"""
+        config = self._get_config()
+        if config and hasattr(config, 'dependency_management'):
+            return config.dependency_management.use_mirror
+        return False
+    
+    @property
+    def mirror_url(self) -> str:
+        """PyPI镜像源URL"""
+        config = self._get_config()
+        if config and hasattr(config, 'dependency_management'):
+            return config.dependency_management.mirror_url
+        return ""
+    
+    @property
     def use_proxy(self) -> bool:
-        """是否使用代理"""
+        """是否使用网络代理"""
         config = self._get_config()
         if config and hasattr(config, 'dependency_management'):
             return config.dependency_management.use_proxy
@@ -41,7 +57,7 @@ class DependencyConfig:
     
     @property
     def proxy_url(self) -> str:
-        """代理URL"""
+        """网络代理URL"""
         config = self._get_config()
         if config and hasattr(config, 'dependency_management'):
             return config.dependency_management.proxy_url

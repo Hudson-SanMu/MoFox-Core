@@ -259,9 +259,13 @@ auto_install = true
 # 安装超时时间（秒）
 auto_install_timeout = 300
 
-# 是否使用代理进行包安装
+# 是否使用PyPI镜像源（推荐，可加速下载）
+use_mirror = true
+mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple" # PyPI镜像源URL，如: "https://pypi.tuna.tsinghua.edu.cn/simple" 
+
+# 是否使用网络代理（高级选项）
 use_proxy = false
-proxy_url = "" # 代理URL，如: "http://proxy.example.com:8080" 或 "socks5://proxy.example.com:1080"
+proxy_url = "" # 网络代理URL，如: "http://proxy.example.com:8080"
 
 # pip安装选项
 pip_options = [

@@ -934,11 +934,17 @@ class DependencyManagementConfig(ConfigBase):
     auto_install_timeout: int = 300
     """安装超时时间（秒）"""
     
+    use_mirror: bool = False
+    """是否使用PyPI镜像源"""
+    
+    mirror_url: str = ""
+    """PyPI镜像源URL，如: "https://pypi.tuna.tsinghua.edu.cn/simple" """
+    
     use_proxy: bool = False
-    """是否使用代理进行包安装"""
+    """是否使用网络代理（高级选项）"""
     
     proxy_url: str = ""
-    """代理URL，如: "http://proxy.example.com:8080" 或 "socks5://proxy.example.com:1080" """
+    """网络代理URL，如: "http://proxy.example.com:8080" """
     
     pip_options: list[str] = field(default_factory=lambda: [
         "--no-warn-script-location",

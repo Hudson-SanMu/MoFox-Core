@@ -19,13 +19,15 @@ class DependencyManager:
     负责检查和自动安装插件的Python包依赖
     """
     
-    def __init__(self, auto_install: bool = True, use_proxy: bool = False, proxy_url: Optional[str] = None):
+    def __init__(self, auto_install: bool = True, use_mirror: bool = False, mirror_url: Optional[str] = None, use_proxy: bool = False, proxy_url: Optional[str] = None):
         """初始化依赖管理器
         
         Args:
             auto_install: 是否自动安装缺失的依赖
-            use_proxy: 是否使用代理
-            proxy_url: 代理URL
+            use_mirror: 是否使用PyPI镜像源
+            mirror_url: PyPI镜像源URL
+            use_proxy: 是否使用网络代理
+            proxy_url: 网络代理URL
         """
         # 延迟导入配置以避免循环依赖
         try:
@@ -34,6 +36,8 @@ class DependencyManager:
             
             # 优先使用配置文件中的设置，参数作为覆盖
             self.auto_install = config.auto_install if auto_install is True else auto_install
+            self.use_mirror = config.use_mirror if use_mirror is False else use_mirror
+            self.mirror_url = config.mirror_url if mirror_url is None else mirror_url
             self.use_proxy = config.use_proxy if use_proxy is False else use_proxy
             self.proxy_url = config.proxy_url if proxy_url is None else proxy_url
             self.install_timeout = config.install_timeout
@@ -42,8 +46,10 @@ class DependencyManager:
         except Exception as e:
             logger.warning(f"无法加载依赖配置，使用默认设置: {e}")
             self.auto_install = auto_install
+            self.use_mirror = use_mirror or False
+            self.mirror_url = mirror_url or ""
             self.use_proxy = use_proxy
-            self.proxy_url = proxy_url
+            self.proxy_url = proxy_url or ""
             self.install_timeout = 300
             self.pip_options = ["--no-warn-script-location", "--disable-pip-version-check"]
         
@@ -234,9 +240,15 @@ class DependencyManager:
         try:
             cmd = [sys.executable, "-m", "pip", "install", package]
             
+            # 添加镜像源设置（优先）
+            if self.use_mirror and self.mirror_url:
+                cmd.extend(["-i", self.mirror_url])
+                logger.debug(f"[Plugin:{plugin_name}] 使用PyPI镜像源: {self.mirror_url}")
+            
             # 添加代理设置
             if self.use_proxy and self.proxy_url:
                 cmd.extend(["--proxy", self.proxy_url])
+                logger.debug(f"[Plugin:{plugin_name}] 使用网络代理: {self.proxy_url}")
             
             # 添加配置的pip选项
             cmd.extend(self.pip_options)
@@ -277,11 +289,13 @@ def get_dependency_manager() -> DependencyManager:
     return _global_dependency_manager
 
 
-def configure_dependency_manager(auto_install: bool = True, use_proxy: bool = False, proxy_url: Optional[str] = None):
+def configure_dependency_manager(auto_install: bool = True, use_mirror: bool = False, mirror_url: Optional[str] = None, use_proxy: bool = False, proxy_url: Optional[str] = None):
     """配置全局依赖管理器"""
     global _global_dependency_manager
     _global_dependency_manager = DependencyManager(
         auto_install=auto_install,
+        use_mirror=use_mirror,
+        mirror_url=mirror_url,
         use_proxy=use_proxy,
         proxy_url=proxy_url
     ) 
