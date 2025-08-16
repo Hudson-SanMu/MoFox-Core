@@ -118,6 +118,7 @@ price_out = 0
 model_list = ["siliconflow-deepseek-v3"] # 使用的模型列表，每个子项对应上面的模型名称(name)
 temperature = 0.2                        # 模型温度，新V3建议0.1-0.3
 max_tokens = 800                         # 最大输出token数
+#concurrency_count = 2                   # 并发请求数量，默认为1（不并发），设置为2或更高启用并发
 
 [model_task_config.utils_small] # 在麦麦的一些组件中使用的小模型，消耗量较大，建议使用速度较快的小模型
 model_list = ["qwen3-8b"]

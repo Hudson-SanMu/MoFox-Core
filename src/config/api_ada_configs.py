@@ -94,6 +94,9 @@ class TaskConfig(ConfigBase):
     temperature: float = 0.3
     """模型温度"""
 
+    concurrency_count: int = 1
+    """并发请求数量，默认为1（不并发）"""
+
 
 @dataclass
 class ModelTaskConfig(ConfigBase):
