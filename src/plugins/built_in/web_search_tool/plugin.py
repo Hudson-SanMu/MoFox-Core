@@ -20,6 +20,7 @@ from src.plugin_system import (
     PythonDependency
 )
 from src.plugin_system.apis import config_api  # 添加config_api导入
+from src.common.cache_manager import tool_cache
 import httpx
 from bs4 import BeautifulSoup
 
@@ -86,6 +87,12 @@ class WebSurfingTool(BaseTool):
         if not query:
             return {"error": "搜索查询不能为空。"}
 
+        # 检查缓存
+        cached_result = tool_cache.get(self.name, function_args)
+        if cached_result:
+            logger.info(f"缓存命中: {self.name} -> {function_args}")
+            return cached_result
+
         # 读取搜索配置
         enabled_engines = config_api.get_global_config("web_search.enabled_engines", ["ddg"])
         search_strategy = config_api.get_global_config("web_search.search_strategy", "single")
@@ -94,11 +101,17 @@ class WebSurfingTool(BaseTool):
 
         # 根据策略执行搜索
         if search_strategy == "parallel":
-            return await self._execute_parallel_search(function_args, enabled_engines)
+            result = await self._execute_parallel_search(function_args, enabled_engines)
         elif search_strategy == "fallback":
-            return await self._execute_fallback_search(function_args, enabled_engines)
+            result = await self._execute_fallback_search(function_args, enabled_engines)
         else:  # single
-            return await self._execute_single_search(function_args, enabled_engines)
+            result = await self._execute_single_search(function_args, enabled_engines)
+        
+        # 保存到缓存
+        if "error" not in result:
+            tool_cache.set(self.name, function_args, result)
+            
+        return result
 
     async def _execute_parallel_search(self, function_args: Dict[str, Any], enabled_engines: List[str]) -> Dict[str, Any]:
         """并行搜索策略：同时使用所有启用的搜索引擎"""
@@ -449,6 +462,12 @@ class URLParserTool(BaseTool):
         """
         执行URL内容提取和总结。优先使用Exa，失败后尝试本地解析。
         """
+        # 检查缓存
+        cached_result = tool_cache.get(self.name, function_args)
+        if cached_result:
+            logger.info(f"缓存命中: {self.name} -> {function_args}")
+            return cached_result
+            
         urls_input = function_args.get("urls")
         if not urls_input:
             return {"error": "URL列表不能为空。"}
@@ -555,6 +574,10 @@ class URLParserTool(BaseTool):
             "content": formatted_content,
             "errors": error_messages
         }
+        
+        # 保存到缓存
+        if "error" not in result:
+            tool_cache.set(self.name, function_args, result)
 
         return result
 
