@@ -2,7 +2,7 @@ FROM python:3.13.5-slim-bookworm
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # 工作目录
-WORKDIR /MaiMBot
+WORKDIR /mmc
 
 # 复制依赖列表
 COPY requirements.txt .

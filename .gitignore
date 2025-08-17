@@ -16,6 +16,7 @@ MaiBot-Napcat-Adapter-main
 MaiBot-Napcat-Adapter
 /test
 uv.lock
+MaiBot-dev.code-workspace
 /log_debug
 /src/test
 nonebot-maibot-adapter/
