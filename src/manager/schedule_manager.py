@@ -1,5 +1,6 @@
 import json
-from datetime import datetime, time
+import asyncio
+from datetime import datetime, time, timedelta
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ValidationError, validator
 
@@ -8,6 +9,8 @@ from src.config.config import global_config, model_config
 from src.llm_models.utils_model import LLMRequest
 from src.common.logger import get_logger
 from json_repair import repair_json
+from src.manager.async_task_manager import AsyncTask, async_task_manager
+
 
 logger = get_logger("schedule_manager")
 
@@ -115,6 +118,18 @@ class ScheduleManager:
         self.today_schedule: Optional[List[Dict[str, Any]]] = None
         self.llm = LLMRequest(model_set=model_config.model_task_config.schedule_generator, request_type="schedule")
         self.max_retries = 3  # 最大重试次数
+        self.daily_task_started = False
+
+    async def start_daily_schedule_generation(self):
+        """启动每日零点自动生成新日程的任务"""
+        if not self.daily_task_started:
+            logger.info("正在启动每日日程生成任务...")
+            task = DailyScheduleGenerationTask(self)
+            await async_task_manager.add_task(task)
+            self.daily_task_started = True
+            logger.info("每日日程生成任务已成功启动。")
+        else:
+            logger.info("每日日程生成任务已在运行中。")
 
     async def load_or_generate_today_schedule(self):
         # 检查是否启用日程管理功能
@@ -130,7 +145,7 @@ class ScheduleManager:
                     logger.info(f"从数据库加载今天的日程 ({today_str})。")
                     
                     try:
-                        schedule_data = json.loads(schedule_record.schedule_data)
+                        schedule_data = json.loads(str(schedule_record.schedule_data))
                         
                         # 使用Pydantic验证日程数据
                         if self._validate_schedule_with_pydantic(schedule_data):
@@ -300,5 +315,40 @@ class ScheduleManager:
                 return False
         
         return True
+
+
+class DailyScheduleGenerationTask(AsyncTask):
+    """每日零点自动生成新日程的任务"""
+
+    def __init__(self, schedule_manager: "ScheduleManager"):
+        super().__init__(task_name="DailyScheduleGenerationTask")
+        self.schedule_manager = schedule_manager
+
+    async def run(self):
+        while True:
+            try:
+                # 1. 计算到下一个零点的时间
+                now = datetime.now()
+                tomorrow = now.date() + timedelta(days=1)
+                midnight = datetime.combine(tomorrow, time.min)
+                sleep_seconds = (midnight - now).total_seconds()
+
+                logger.info(f"下一次日程生成任务将在 {sleep_seconds:.2f} 秒后运行 (北京时间 {midnight.strftime('%Y-%m-%d %H:%M:%S')})")
+                
+                # 2. 等待直到零点
+                await asyncio.sleep(sleep_seconds)
+
+                # 3. 执行日程生成
+                logger.info("到达每日零点，开始为新的一天生成日程...")
+                await self.schedule_manager.generate_and_save_schedule()
+                
+            except asyncio.CancelledError:
+                logger.info("每日日程生成任务被取消。")
+                break
+            except Exception as e:
+                logger.error(f"每日日程生成任务发生未知错误: {e}")
+                # 发生错误后，等待5分钟再重试，避免频繁失败
+                await asyncio.sleep(300)
+
 
 schedule_manager = ScheduleManager()

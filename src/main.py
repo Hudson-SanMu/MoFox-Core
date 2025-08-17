@@ -148,6 +148,7 @@ MaiMbot-Pro-Max(第三方改版)
         if global_config.schedule.enable:
             logger.info("日程表功能已启用，正在初始化管理器...")
             await schedule_manager.load_or_generate_today_schedule()
+            await schedule_manager.start_daily_schedule_generation()
             logger.info("日程表管理器初始化成功。")
 
 
