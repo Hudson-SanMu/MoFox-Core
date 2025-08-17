@@ -9,7 +9,6 @@ import json
 import os
 import random
 import time
-from pathlib import Path
 from typing import Callable, Optional, Dict, Any, List, Tuple
 
 import aiohttp
@@ -17,10 +16,11 @@ import bs4
 import json5
 from src.chat.utils.utils_image import get_image_manager
 from src.common.logger import get_logger
-from src.plugin_system.apis import send_api, config_api, person_api
+from src.plugin_system.apis import config_api, person_api
 
 from .content_service import ContentService
 from .image_service import ImageService
+from .cookie_service import CookieService
 
 logger = get_logger("MaiZone.QZoneService")
 
@@ -38,10 +38,11 @@ class QZoneService:
     REPLY_URL = "https://user.qzone.qq.com/proxy/domain/taotao.qzone.qq.com/cgi-bin/emotion_cgi_re_feeds"
 
 
-    def __init__(self, get_config: Callable, content_service: ContentService, image_service: ImageService):
+    def __init__(self, get_config: Callable, content_service: ContentService, image_service: ImageService, cookie_service: CookieService):
         self.get_config = get_config
         self.content_service = content_service
         self.image_service = image_service
+        self.cookie_service = cookie_service
 
     # --- Public Methods (High-Level Business Logic) ---
 
@@ -225,37 +226,8 @@ class QZoneService:
             hash_val += (hash_val << 5) + ord(char)
         return str(hash_val & 2147483647)
 
-    async def _renew_and_load_cookies(self, qq_account: str, stream_id: Optional[str]) -> Optional[Dict[str, str]]:
-        cookie_dir = Path(__file__).resolve().parent.parent / "cookies"
-        cookie_dir.mkdir(exist_ok=True)
-        cookie_file_path = cookie_dir / f"cookies-{qq_account}.json"
-
-        try:
-            params = {"domain": "user.qzone.qq.com"}
-            if stream_id:
-                response = await send_api.adapter_command_to_stream(action="get_cookies", params=params, platform="qq", stream_id=stream_id, timeout=40.0)
-            else:
-                response = await send_api.adapter_command_to_stream(action="get_cookies", params=params, platform="qq", timeout=40.0)
-
-            if response.get("status") == "ok":
-                cookie_str = response.get("data", {}).get("cookies", "")
-                if cookie_str:
-                    parsed_cookies = {k.strip(): v.strip() for k, v in (p.split('=', 1) for p in cookie_str.split('; ') if '=' in p)}
-                    with open(cookie_file_path, "w", encoding="utf-8") as f:
-                        json.dump(parsed_cookies, f)
-                    logger.info(f"Cookie已更新并保存至: {cookie_file_path}")
-                    return parsed_cookies
-
-            if cookie_file_path.exists():
-                with open(cookie_file_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            return None
-        except Exception as e:
-            logger.error(f"更新或加载Cookie时发生异常: {e}")
-            return None
-
     async def _get_api_client(self, qq_account: str, stream_id: Optional[str]) -> Optional[Dict]:
-        cookies = await self._renew_and_load_cookies(qq_account, stream_id)
+        cookies = await self.cookie_service.get_cookies(qq_account, stream_id)
         if not cookies: return None
         
         p_skey = cookies.get('p_skey') or cookies.get('p_skey'.upper())

@@ -23,6 +23,7 @@ from .services.image_service import ImageService
 from .services.qzone_service import QZoneService
 from .services.scheduler_service import SchedulerService
 from .services.monitor_service import MonitorService
+from .services.cookie_service import CookieService
 from .services.manager import register_service
 
 logger = get_logger("MaiZone.Plugin")
@@ -68,6 +69,10 @@ class MaiZoneRefactoredPlugin(BasePlugin):
         "schedule": {
             "enable_schedule": ConfigField(type=bool, default=False, description="是否启用定时发送"),
         },
+        "cookie": {
+            "http_fallback_host": ConfigField(type=str, default="127.0.0.1", description="备用Cookie获取服务的主机地址"),
+            "http_fallback_port": ConfigField(type=int, default=8080, description="备用Cookie获取服务的端口"),
+        },
     }
 
     def __init__(self, *args, **kwargs):
@@ -75,7 +80,8 @@ class MaiZoneRefactoredPlugin(BasePlugin):
         
         content_service = ContentService(self.get_config)
         image_service = ImageService(self.get_config)
-        qzone_service = QZoneService(self.get_config, content_service, image_service)
+        cookie_service = CookieService(self.get_config)
+        qzone_service = QZoneService(self.get_config, content_service, image_service, cookie_service)
         scheduler_service = SchedulerService(self.get_config, qzone_service)
         monitor_service = MonitorService(self.get_config, qzone_service)
         
