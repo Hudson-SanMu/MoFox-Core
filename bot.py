@@ -200,6 +200,35 @@ def raw_main():
     logger.info("检查EULA和隐私条款完成")
 
     easter_egg()
+    
+    # 在此处初始化数据库
+    from src.config.config import global_config
+    from src.common.database.database import initialize_sql_database
+    from src.common.database.sqlalchemy_models import initialize_database as init_db
+    from src.common.database.db_migration import check_and_migrate_database
+    
+    logger.info("正在初始化数据库连接...")
+    try:
+        initialize_sql_database(global_config.database)
+        logger.info(f"数据库连接初始化成功，使用 {global_config.database.database_type} 数据库")
+    except Exception as e:
+        logger.error(f"数据库连接初始化失败: {e}")
+        raise e
+
+    logger.info("正在初始化数据库表结构...")
+    try:
+        init_db()
+        logger.info("数据库表结构初始化完成")
+    except Exception as e:
+        logger.error(f"数据库表结构初始化失败: {e}")
+        raise e
+
+    # 执行数据库自动迁移检查
+    try:
+        check_and_migrate_database()
+    except Exception as e:
+        logger.error(f"数据库自动迁移失败: {e}")
+        raise e
 
     # 返回MainSystem实例
     return MainSystem()

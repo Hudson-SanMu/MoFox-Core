@@ -9,7 +9,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 import os
 import datetime
-from src.config.config import global_config
 from src.common.logger import get_logger
 import threading
 from contextlib import contextmanager
@@ -25,6 +24,7 @@ def get_string_field(max_length=255, **kwargs):
     根据数据库类型返回合适的字符串字段
     MySQL需要指定长度的VARCHAR用于索引，SQLite可以使用Text
     """
+    from src.config.config import global_config
     if global_config.database.database_type == "mysql":
         return String(max_length, **kwargs)
     else:
@@ -436,6 +436,7 @@ _SessionLocal = None
 
 def get_database_url():
     """获取数据库连接URL"""
+    from src.config.config import global_config
     config = global_config.database
 
     if config.database_type == "mysql":
@@ -482,6 +483,7 @@ def initialize_database():
         return _engine, _SessionLocal
 
     database_url = get_database_url()
+    from src.config.config import global_config
     config = global_config.database
 
     # 配置引擎参数
