@@ -283,11 +283,11 @@ class QZoneService:
                     "qzreferrer": f"https://user.qzone.qq.com/{uin}",
                 }
                 if images:
-                    pic_bos, richvals = [], []
+                    pic_bos, richvals = [], []  # noqa: F841
                     # The original logic for uploading images is complex and involves multiple steps.
                     # This simplified version captures the essence. A full implementation would require
                     # a separate, robust image upload function.
-                    for img_bytes in images:
+                    for _img_bytes in images:
                         # This is a placeholder for the actual image upload logic which is quite complex.
                         # In a real scenario, you would call a dedicated `_upload_image` method here.
                         # For now, we assume the upload is successful and we get back dummy data.
@@ -439,12 +439,19 @@ class QZoneService:
                 res_text = await _request("GET", self.ZONE_LIST_URL, params=params)
 
                 # 增加对返回内容的校验
-                if not res_text.startswith("_Callback(") or not res_text.endswith(");"):
+                if res_text.startswith("_Callback("):
+                    # 兼容旧版jsonp格式
+                    json_str = res_text[len("_Callback(") : -2]
+                else:
+                    # 兼容新版纯json格式
+                    json_str = res_text
+
+                try:
+                    # 替换 undefined 为 null
+                    json_data = json5.loads(json_str.replace("undefined", "null"))
+                except Exception:
                     logger.warning(f"监控好友动态返回格式异常: {res_text}")
                     return []
-
-                json_str = res_text[len("_Callback(") : -2].replace("undefined", "null")
-                json_data = json5.loads(json_str)
                 feeds_data = []
                 if isinstance(json_data, dict):
                     data_level1 = json_data.get("data")
