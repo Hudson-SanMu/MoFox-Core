@@ -55,7 +55,6 @@ class MonitorService:
 
                 interval_minutes = self.get_config("monitor.interval_minutes", 10)
                 
-                logger.info("开始执行好友动态监控...")
                 await self.qzone_service.monitor_feeds()
                 
                 logger.info(f"本轮监控完成，将在 {interval_minutes} 分钟后进行下一次检查。")
