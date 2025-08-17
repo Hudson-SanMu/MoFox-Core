@@ -10,6 +10,8 @@ import cv2
 import tempfile
 import asyncio
 import base64
+import hashlib
+import time
 from PIL import Image
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
@@ -18,6 +20,7 @@ import io
 from src.llm_models.utils_model import LLMRequest
 from src.config.config import global_config, model_config
 from src.common.logger import get_logger
+from src.common.database.sqlalchemy_models import get_db_session, Videos
 
 logger = get_logger("src.multimodal.video_analyzer")
 
@@ -97,6 +100,44 @@ class VideoAnalyzer:
         self.system_prompt = "你是一个专业的视频内容分析助手。请仔细观察用户提供的视频关键帧，详细描述视频内容。"
         
         logger.info(f"✅ 视频分析器初始化完成，分析模式: {self.analysis_mode}")
+
+    def _calculate_video_hash(self, video_data: bytes) -> str:
+        """计算视频文件的hash值"""
+        hash_obj = hashlib.sha256()
+        hash_obj.update(video_data)
+        return hash_obj.hexdigest()
+    
+    def _check_video_exists(self, video_hash: str) -> Optional[Videos]:
+        """检查视频是否已经分析过"""
+        try:
+            with get_db_session() as session:
+                return session.query(Videos).filter(Videos.video_hash == video_hash).first()
+        except Exception as e:
+            self.logger.warning(f"检查视频是否存在时出错: {e}")
+            return None
+    
+    def _store_video_result(self, video_hash: str, description: str, path: str = "", metadata: Optional[Dict] = None) -> Optional[Videos]:
+        """存储视频分析结果到数据库"""
+        try:
+            with get_db_session() as session:
+                # 如果path为空，使用hash作为路径
+                if not path:
+                    path = f"video_{video_hash[:16]}.unknown"
+                
+                video_record = Videos(
+                    video_hash=video_hash,
+                    description=description,
+                    path=path,
+                    timestamp=time.time()
+                )
+                session.add(video_record)
+                session.commit()
+                session.refresh(video_record)
+                self.logger.info(f"✅ 视频分析结果已保存到数据库，hash: {video_hash[:16]}...")
+                return video_record
+        except Exception as e:
+            self.logger.error(f"存储视频分析结果时出错: {e}")
+            return None
 
     def set_analysis_mode(self, mode: str):
         """设置分析模式"""
@@ -309,6 +350,16 @@ class VideoAnalyzer:
             if not video_bytes:
                 return {"summary": "❌ 视频数据为空"}
             
+            # 计算视频hash值
+            video_hash = self._calculate_video_hash(video_bytes)
+            logger.info(f"视频hash: {video_hash[:16]}...")
+            
+            # 检查数据库中是否已存在该视频的分析结果
+            existing_video = self._check_video_exists(video_hash)
+            if existing_video:
+                logger.info(f"✅ 找到已存在的视频分析结果，直接返回 (id: {existing_video.id})")
+                return {"summary": existing_video.description}
+            
             # 创建临时文件保存视频数据
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
                 temp_file.write(video_bytes)
@@ -321,6 +372,20 @@ class VideoAnalyzer:
                 
                 # 使用临时文件进行分析
                 result = await self.analyze_video(temp_path, question)
+                
+                # 保存分析结果到数据库
+                metadata = {
+                    "filename": filename,
+                    "file_size": len(video_bytes),
+                    "analysis_timestamp": time.time()
+                }
+                self._store_video_result(
+                    video_hash=video_hash,
+                    description=result,
+                    path=filename or "",
+                    metadata=metadata
+                )
+                
                 return {"summary": result}
             finally:
                 # 清理临时文件

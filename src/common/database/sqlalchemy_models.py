@@ -217,6 +217,33 @@ class ImageDescriptions(Base):
     )
 
 
+class Videos(Base):
+    """视频信息模型"""
+    __tablename__ = 'videos'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    video_id = Column(Text, nullable=False, default="")
+    video_hash = Column(get_string_field(64), nullable=False, index=True, unique=True)
+    description = Column(Text, nullable=True)
+    path = Column(get_string_field(500), nullable=False, unique=True)
+    count = Column(Integer, nullable=False, default=1)
+    timestamp = Column(Float, nullable=False)
+    vlm_processed = Column(Boolean, nullable=False, default=False)
+    
+    # 视频特有属性
+    duration = Column(Float, nullable=True)  # 视频时长（秒）
+    frame_count = Column(Integer, nullable=True)  # 总帧数
+    fps = Column(Float, nullable=True)  # 帧率
+    resolution = Column(Text, nullable=True)  # 分辨率
+    file_size = Column(Integer, nullable=True)  # 文件大小（字节）
+
+    __table_args__ = (
+        Index('idx_videos_video_hash', 'video_hash'),
+        Index('idx_videos_path', 'path'),
+        Index('idx_videos_timestamp', 'timestamp'),
+    )
+
+
 class OnlineTime(Base):
     """在线时长记录模型"""
     __tablename__ = 'online_time'
