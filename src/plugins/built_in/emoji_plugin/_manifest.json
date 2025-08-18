@@ -28,6 +28,11 @@
         "type": "action",
         "name": "emoji", 
         "description": "发送表情包辅助表达情绪"
+      },
+      {
+        "type": "action",
+        "name": "anti_injector_manager",
+        "description": "管理和监控反注入系统"
       }
     ]
   }

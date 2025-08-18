@@ -84,6 +84,9 @@ class PluginManager:
 
         self._show_stats(total_registered, total_failed_registration)
 
+        # 插件加载完成后，刷新反注入跳过列表
+        self._refresh_anti_injection_skip_list()
+
         return total_registered, total_failed_registration
 
     def load_registered_plugin_classes(self, plugin_name: str) -> Tuple[bool, int]:
@@ -588,6 +591,25 @@ class PluginManager:
             logger.error(f"❌ 插件重载失败: {plugin_name} - {str(e)}")
             logger.debug("详细错误信息: ", exc_info=True)
             return False
+
+    def _refresh_anti_injection_skip_list(self):
+        """插件加载完成后刷新反注入跳过列表"""
+        try:
+            # 异步刷新反注入跳过列表
+            import asyncio
+            from src.chat.antipromptinjector.command_skip_list import skip_list_manager
+            
+            # 如果当前在事件循环中，直接调用
+            try:
+                loop = asyncio.get_running_loop()
+                # 在后台任务中执行刷新
+                loop.create_task(skip_list_manager.refresh_plugin_commands())
+                logger.debug("已触发反注入跳过列表刷新")
+            except RuntimeError:
+                # 没有运行的事件循环，稍后刷新
+                logger.debug("当前无事件循环，反注入跳过列表将在首次使用时刷新")
+        except Exception as e:
+            logger.warning(f"刷新反注入跳过列表失败: {e}")
 
 
 # 全局插件管理器实例

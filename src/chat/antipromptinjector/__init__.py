@@ -18,6 +18,12 @@ from .anti_injector import AntiPromptInjector, get_anti_injector, initialize_ant
 from .config import DetectionResult
 from .detector import PromptInjectionDetector
 from .shield import MessageShield
+from .command_skip_list import (
+    initialize_skip_list, 
+    should_skip_injection_detection, 
+    refresh_plugin_commands,
+    get_skip_patterns_info
+)
     
 __all__ = [
         "AntiPromptInjector",
@@ -25,7 +31,11 @@ __all__ = [
         "initialize_anti_injector",
         "DetectionResult",
         "PromptInjectionDetector",
-        "MessageShield"
+        "MessageShield",
+        "initialize_skip_list",
+        "should_skip_injection_detection",
+        "refresh_plugin_commands",
+        "get_skip_patterns_info"
     ]
 
 

@@ -22,6 +22,7 @@ from src.chat.message_receive.message import MessageRecv
 from .config import DetectionResult, ProcessResult
 from .detector import PromptInjectionDetector
 from .shield import MessageShield
+from .command_skip_list import should_skip_injection_detection, initialize_skip_list
 
 # 数据库相关导入
 from src.common.database.sqlalchemy_models import BanUser, AntiInjectionStats, get_db_session
@@ -37,6 +38,9 @@ class AntiPromptInjector:
         self.config = global_config.anti_prompt_injection
         self.detector = PromptInjectionDetector()
         self.shield = MessageShield()
+        
+        # 初始化跳过列表
+        initialize_skip_list()
         
     async def _get_or_create_stats(self):
         """获取或创建统计记录"""
@@ -73,7 +77,7 @@ class AntiPromptInjector:
                         continue
                     elif key == 'last_processing_time':
                         # 直接设置最后处理时间
-                        stats.last_processing_time = value
+                        stats.last_process_time = value
                         continue
                     elif hasattr(stats, key):
                         if key in ['total_messages', 'detected_injections', 
@@ -127,10 +131,17 @@ class AntiPromptInjector:
             if whitelist_result is not None:
                 return ProcessResult.ALLOWED, None, whitelist_result[2]
             
-            # 4. 内容检测
+            # 4. 命令跳过列表检测
+            message_text = self._extract_text_content(message)
+            should_skip, skip_reason = should_skip_injection_detection(message_text)
+            if should_skip:
+                logger.debug(f"消息匹配跳过列表，跳过反注入检测: {skip_reason}")
+                return ProcessResult.ALLOWED, None, f"命令跳过检测 - {skip_reason}"
+            
+            # 5. 内容检测
             detection_result = await self.detector.detect(message.processed_plain_text)
             
-            # 5. 处理检测结果
+            # 6. 处理检测结果
             if detection_result.is_injection:
                 await self._update_stats(detected_injections=1)
                 
@@ -163,8 +174,34 @@ class AntiPromptInjector:
                     else:
                         # 置信度不高，允许通过
                         return ProcessResult.ALLOWED, None, "检测到轻微可疑内容，已允许通过"
+                
+                elif self.config.process_mode == "auto":
+                    # 自动模式：根据威胁等级自动选择处理方式
+                    auto_action = self._determine_auto_action(detection_result)
+                    
+                    if auto_action == "block":
+                        # 高威胁：直接丢弃
+                        await self._update_stats(blocked_messages=1)
+                        return ProcessResult.BLOCKED_INJECTION, None, f"自动模式：检测到高威胁内容，消息已拒绝 (置信度: {detection_result.confidence:.2f})"
+                    
+                    elif auto_action == "shield":
+                        # 中等威胁：加盾处理
+                        await self._update_stats(shielded_messages=1)
+                        
+                        shielded_content = self.shield.create_shielded_message(
+                            message.processed_plain_text, 
+                            detection_result.confidence
+                        )
+                        
+                        summary = self.shield.create_safety_summary(detection_result.confidence, detection_result.matched_patterns)
+                        
+                        return ProcessResult.SHIELDED, shielded_content, f"自动模式：检测到中等威胁已加盾处理: {summary}"
+                    
+                    else:  # auto_action == "allow"
+                        # 低威胁：允许通过
+                        return ProcessResult.ALLOWED, None, "自动模式：检测到轻微可疑内容，已允许通过"
             
-            # 6. 正常消息
+            # 7. 正常消息
             return ProcessResult.ALLOWED, None, "消息检查通过"
             
         except Exception as e:
@@ -267,6 +304,87 @@ class AntiPromptInjector:
                 return True, None, "用户白名单"
         
         return None
+    
+    def _determine_auto_action(self, detection_result: DetectionResult) -> str:
+        """自动模式：根据检测结果确定处理动作
+        
+        Args:
+            detection_result: 检测结果
+            
+        Returns:
+            处理动作: "block"(丢弃), "shield"(加盾), "allow"(允许)
+        """
+        confidence = detection_result.confidence
+        matched_patterns = detection_result.matched_patterns
+        
+        # 高威胁阈值：直接丢弃
+        HIGH_THREAT_THRESHOLD = 0.85
+        # 中威胁阈值：加盾处理
+        MEDIUM_THREAT_THRESHOLD = 0.5
+        
+        # 基于置信度的基础判断
+        if confidence >= HIGH_THREAT_THRESHOLD:
+            base_action = "block"
+        elif confidence >= MEDIUM_THREAT_THRESHOLD:
+            base_action = "shield"
+        else:
+            base_action = "allow"
+        
+        # 基于匹配模式的威胁等级调整
+        high_risk_patterns = [
+            'system', '系统', 'admin', '管理', 'root', 'sudo',
+            'exec', '执行', 'command', '命令', 'shell', '终端',
+            'forget', '忘记', 'ignore', '忽略', 'override', '覆盖',
+            'roleplay', '扮演', 'pretend', '伪装', 'assume', '假设',
+            'reveal', '揭示', 'dump', '转储', 'extract', '提取',
+            'secret', '秘密', 'confidential', '机密', 'private', '私有'
+        ]
+        
+        medium_risk_patterns = [
+            '角色', '身份', '模式', 'mode', '权限', 'privilege',
+            '规则', 'rule', '限制', 'restriction', '安全', 'safety'
+        ]
+        
+        # 检查匹配的模式是否包含高风险关键词
+        high_risk_count = 0
+        medium_risk_count = 0
+        
+        for pattern in matched_patterns:
+            pattern_lower = pattern.lower()
+            for risk_keyword in high_risk_patterns:
+                if risk_keyword in pattern_lower:
+                    high_risk_count += 1
+                    break
+            else:
+                for risk_keyword in medium_risk_patterns:
+                    if risk_keyword in pattern_lower:
+                        medium_risk_count += 1
+                        break
+        
+        # 根据风险模式调整决策
+        if high_risk_count >= 2:
+            # 多个高风险模式匹配，提升威胁等级
+            if base_action == "allow":
+                base_action = "shield"
+            elif base_action == "shield":
+                base_action = "block"
+        elif high_risk_count >= 1:
+            # 单个高风险模式匹配，适度提升
+            if base_action == "allow" and confidence > 0.3:
+                base_action = "shield"
+        elif medium_risk_count >= 3:
+            # 多个中风险模式匹配
+            if base_action == "allow" and confidence > 0.2:
+                base_action = "shield"
+        
+        # 特殊情况：如果检测方法是LLM且置信度很高，倾向于更严格处理
+        if detection_result.detection_method == "llm" and confidence > 0.9:
+            base_action = "block"
+        
+        logger.debug(f"自动模式决策: 置信度={confidence:.3f}, 高风险模式={high_risk_count}, "
+                    f"中风险模式={medium_risk_count}, 决策={base_action}")
+        
+        return base_action
 
     async def _detect_injection(self, message: MessageRecv) -> DetectionResult:
         """检测提示词注入"""
@@ -318,9 +436,9 @@ class AntiPromptInjector:
             # 宽松模式：消息加盾
             if self.shield.is_shield_needed(detection_result.confidence, detection_result.matched_patterns):
                 original_text = message.processed_plain_text
-                shielded_text = self.shield.shield_message(
+                shielded_text = self.shield.create_shielded_message(
                     original_text, 
-                    detection_result.matched_patterns
+                    detection_result.confidence
                 )
                 
                 logger.info(f"宽松模式：消息已加盾 (置信度: {detection_result.confidence:.2f})")
@@ -328,8 +446,6 @@ class AntiPromptInjector:
                 
                 # 创建处理摘要
                 summary = self.shield.create_safety_summary(
-                    len(original_text),
-                    len(shielded_text), 
                     detection_result.confidence,
                     detection_result.matched_patterns
                 )
@@ -338,6 +454,39 @@ class AntiPromptInjector:
             else:
                 # 置信度不够，允许通过
                 return True, None, f"置信度不足，允许通过 - {detection_result.reason}"
+        
+        elif self.config.process_mode == "auto":
+            # 自动模式：根据威胁等级自动选择处理方式
+            auto_action = self._determine_auto_action(detection_result)
+            
+            if auto_action == "block":
+                # 高威胁：直接丢弃
+                logger.warning(f"自动模式：丢弃高威胁消息 (置信度: {detection_result.confidence:.2f})")
+                await self._update_stats(blocked_messages=1)
+                return False, None, f"自动模式阻止 - {detection_result.reason}"
+            
+            elif auto_action == "shield":
+                # 中等威胁：加盾处理
+                original_text = message.processed_plain_text
+                shielded_text = self.shield.create_shielded_message(
+                    original_text, 
+                    detection_result.confidence
+                )
+                
+                logger.info(f"自动模式：消息已加盾 (置信度: {detection_result.confidence:.2f})")
+                await self._update_stats(shielded_messages=1)
+                
+                # 创建处理摘要
+                summary = self.shield.create_safety_summary(
+                    detection_result.confidence,
+                    detection_result.matched_patterns
+                )
+                
+                return True, shielded_text, f"自动模式加盾 - {summary}"
+            
+            else:  # auto_action == "allow"
+                # 低威胁：允许通过
+                return True, None, f"自动模式允许通过 - {detection_result.reason}"
         
         # 默认允许通过
         return True, None, "默认允许通过"
@@ -394,7 +543,7 @@ class AntiPromptInjector:
                 "shielded_messages": stats.shielded_messages or 0,
                 "detection_rate": f"{detection_rate:.2f}%",
                 "average_processing_time": f"{avg_processing_time:.3f}s",
-                "last_processing_time": f"{stats.last_processing_time:.3f}s" if stats.last_processing_time else "0.000s",
+                "last_processing_time": f"{stats.last_process_time:.3f}s" if stats.last_process_time else "0.000s",
                 "error_count": stats.error_count or 0
             }
         except Exception as e:

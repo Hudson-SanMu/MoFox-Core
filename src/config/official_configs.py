@@ -1040,7 +1040,7 @@ class AntiPromptInjectionConfig(ConfigBase):
     """是否启用规则检测"""
     
     process_mode: str = "lenient"
-    """处理模式：strict(严格模式，直接丢弃), lenient(宽松模式，消息加盾)"""
+    """处理模式：strict(严格模式，直接丢弃), lenient(宽松模式，消息加盾), auto(自动模式，根据威胁等级自动选择加盾或丢弃)"""
     
     # 白名单配置
     whitelist: list[list[str]] = field(default_factory=list)
@@ -1086,3 +1086,25 @@ class AntiPromptInjectionConfig(ConfigBase):
     
     shield_suffix: str = " 🛡️"
     """加盾消息后缀"""
+    
+    # 跳过列表配置
+    enable_command_skip_list: bool = True
+    """是否启用命令跳过列表，启用后插件注册的命令将自动跳过反注入检测"""
+    
+    auto_collect_plugin_commands: bool = True
+    """是否自动收集插件注册的命令加入跳过列表"""
+    
+    manual_skip_patterns: list[str] = field(default_factory=list)
+    """手动指定的跳过模式列表，支持正则表达式"""
+    
+    skip_system_commands: bool = True
+    """是否跳过系统内置命令（如 /pm, /help 等）"""
+
+
+@dataclass
+class PluginsConfig(ConfigBase):
+    """插件配置"""
+
+    centralized_config: bool = field(
+        default=True, metadata={"description": "是否启用插件配置集中化管理"}
+    )

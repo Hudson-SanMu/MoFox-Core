@@ -11,10 +11,14 @@ from typing import List, Tuple, Type
 from src.plugin_system import BasePlugin, register_plugin, ComponentInfo
 from src.plugin_system.base.config_types import ConfigField
 
+
 # 导入依赖的系统组件
 from src.common.logger import get_logger
 
-from src.plugins.built_in.emoji_plugin.emoji import EmojiAction
+# 导入API模块 - 标准Python包方式
+from src.plugins.built_in.core_actions.no_reply import NoReplyAction
+from src.plugins.built_in.core_actions.emoji import EmojiAction
+from src.plugins.built_in.core_actions.anti_injector_manager import AntiInjectorStatusCommand, AntiInjectorSkipListCommand
 
 logger = get_logger("core_actions")
 
@@ -52,6 +56,7 @@ class CoreActionsPlugin(BasePlugin):
         },
         "components": {
             "enable_emoji": ConfigField(type=bool, default=True, description="是否启用发送表情/图片动作"),
+            "enable_anti_injector_manager": ConfigField(type=bool, default=True, description="是否启用反注入系统管理命令"),
         },
     }
 
@@ -62,6 +67,9 @@ class CoreActionsPlugin(BasePlugin):
         components = []
         if self.get_config("components.enable_emoji", True):
             components.append((EmojiAction.get_action_info(), EmojiAction))
+        if self.get_config("components.enable_anti_injector_manager", True):
+            components.append((AntiInjectorStatusCommand.get_command_info(), AntiInjectorStatusCommand))
+            components.append((AntiInjectorSkipListCommand.get_command_info(), AntiInjectorSkipListCommand))
 
 
         return components
