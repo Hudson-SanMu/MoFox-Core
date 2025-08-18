@@ -8,6 +8,7 @@ from packaging.requirements import Requirement
 
 from src.common.logger import get_logger
 from src.plugin_system.base.component_types import PythonDependency
+from src.plugin_system.utils.dependency_alias import INSTALL_NAME_TO_IMPORT_NAME
 
 logger = get_logger("dependency_manager")
 
@@ -190,41 +191,58 @@ class DependencyManager:
     
     def _check_single_dependency(self, dep: PythonDependency) -> bool:
         """检查单个依赖是否满足要求"""
-        try:
-            # 尝试导入包
-            spec = importlib.util.find_spec(dep.package_name)
-            if spec is None:
-                return False
-            
-            # 如果没有版本要求，导入成功就够了
-            if not dep.version:
-                return True
-            
-            # 检查版本要求
+        
+        def _try_check(import_name: str) -> bool:
+            """尝试使用给定的导入名进行检查"""
             try:
-                module = importlib.import_module(dep.package_name)
-                installed_version = getattr(module, '__version__', None)
-                
-                if installed_version is None:
-                    # 尝试其他常见的版本属性
-                    installed_version = getattr(module, 'VERSION', None)
+                spec = importlib.util.find_spec(import_name)
+                if spec is None:
+                    return False
+
+                # 如果没有版本要求，导入成功就够了
+                if not dep.version:
+                    return True
+
+                # 检查版本要求
+                try:
+                    module = importlib.import_module(import_name)
+                    installed_version = getattr(module, '__version__', None)
+
                     if installed_version is None:
-                        logger.debug(f"无法获取包 {dep.package_name} 的版本信息，假设满足要求")
-                        return True
-                
-                # 解析版本要求
-                req = Requirement(f"{dep.package_name}{dep.version}")
-                return version.parse(str(installed_version)) in req.specifier
-                
+                        # 尝试其他常见的版本属性
+                        installed_version = getattr(module, 'VERSION', None)
+                        if installed_version is None:
+                            logger.debug(f"无法获取包 {import_name} 的版本信息，假设满足要求")
+                            return True
+
+                    # 解析版本要求
+                    req = Requirement(f"{dep.package_name}{dep.version}")
+                    return version.parse(str(installed_version)) in req.specifier
+
+                except Exception as e:
+                    logger.debug(f"检查包 {import_name} 版本时出错: {e}")
+                    return True  # 如果无法检查版本，假设满足要求
+
+            except ImportError:
+                return False
             except Exception as e:
-                logger.debug(f"检查包 {dep.package_name} 版本时出错: {e}")
-                return True  # 如果无法检查版本，假设满足要求
-                
-        except ImportError:
-            return False
-        except Exception as e:
-            logger.error(f"检查依赖 {dep.package_name} 时发生未知错误: {e}")
-            return False
+                logger.error(f"检查依赖 {import_name} 时发生未知错误: {e}")
+                return False
+
+        # 1. 首先尝试使用原始的 package_name 进行检查
+        if _try_check(dep.package_name):
+            return True
+
+        # 2. 如果失败，查询别名映射表
+        #    注意：此时 dep.package_name 可能是 simple "requests" 或 "beautifulsoup4"
+        import_alias = INSTALL_NAME_TO_IMPORT_NAME.get(dep.package_name)
+        if import_alias:
+            logger.debug(f"依赖 '{dep.package_name}' 导入失败, 尝试使用别名 '{import_alias}'")
+            if _try_check(import_alias):
+                return True
+
+        # 3. 如果别名也失败了，或者没有别名，最终确认失败
+        return False
     
     def _install_single_package(self, package: str, plugin_name: str = "") -> bool:
         """安装单个包"""
