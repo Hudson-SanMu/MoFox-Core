@@ -132,9 +132,13 @@ class CacheManager:
         try:
             source_code = inspect.getsource(tool_class)
             code_hash = hashlib.md5(source_code.encode()).hexdigest()
-        except (TypeError, OSError) as e:
+        except Exception as e:
             code_hash = "unknown"
-            logger.warning(f"无法获取 {tool_class.__name__} 的源代码，代码哈希将为 'unknown'。错误: {e}")
+            # 获取更清晰的类名
+            class_name = getattr(tool_class, '__name__', str(tool_class))
+            # 简化错误信息
+            error_msg = str(e).replace(str(tool_class), class_name)
+            logger.warning(f"无法获取 {class_name} 的源代码，代码哈希将为 'unknown'。原因: {error_msg}")
         try:
             sorted_args = json.dumps(function_args, sort_keys=True)
         except TypeError:
