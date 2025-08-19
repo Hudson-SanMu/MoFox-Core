@@ -80,18 +80,26 @@ class MainSystem:
         # 其他初始化任务
         await asyncio.gather(self._init_components())
         phrases = [
-            "我们的代码里没有bug，只有‘特性’.",
-            "你知道吗,雅诺狐的耳朵很好模",
-            "你群最高技术力——言柒姐姐！",
-            "初墨小姐宇宙第一(不是)",
-            "world.execute(me);",
-            "正在尝试连接到MaiBot的服务器...连接失败，正在转接到maimaiDX",
-            "你的bug就像星星一样多，而我的代码像太阳一样，一出来就看不见了。",
-            "温馨提示：请不要在代码中留下任何魔法数字，除非你知道它的含义。",
-            "世界上有10种人：懂二进制的和不懂的。"
+            ("我们的代码里没有bug，只有‘特性’.", 10),
+            ("你知道吗,雅诺狐的耳朵很好模", 5),
+            ("你群最高技术力——言柒姐姐！", 20),
+            ("初墨小姐宇宙第一(不是)", 15),
+            ("world.execute(me);", 10),
+            ("正在尝试连接到MaiBot的服务器...连接失败，正在转接到maimaiDX", 10),
+            ("你的bug就像星星一样多，而我的代码像太阳一样，一出来就看不见了。", 10),
+            ("温馨提示：请不要在代码中留下任何魔法数字，除非你知道它的含义。", 10),
+            ("世界上有10种人：懂二进制的和不懂的。", 10),
+            ("喵喵~你的麦麦被猫娘入侵了喵~", 5),
+            ("恭喜你触发了稀有彩蛋：诺狐嗷呜~ ~", 1)
         ]
-        from random import choice
-        eggs = choice(phrases)
+        from random import choices
+        
+        # 分离彩蛋和权重
+        egg_texts, weights = zip(*phrases)
+        
+        # 使用choices进行带权重的随机选择
+        selected_egg = choices(egg_texts, weights=weights, k=1)
+        eggs = selected_egg[0]
         logger.info(f"""
 全部系统初始化完成，{global_config.bot.nickname}已成功唤醒
 =========================================================
