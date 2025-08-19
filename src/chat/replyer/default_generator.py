@@ -24,7 +24,7 @@ from src.chat.utils.chat_message_builder import (
 )
 from src.chat.express.expression_selector import expression_selector
 from src.chat.memory_system.memory_activator import MemoryActivator
-from src.chat.memory_system.instant_memory import InstantMemory
+from src.chat.memory_system.vector_instant_memory import VectorInstantMemory
 from src.mood.mood_manager import mood_manager
 from src.person_info.person_info import Person, is_person_known
 from src.plugin_system.base.component_types import ActionInfo, EventType
@@ -190,7 +190,7 @@ class DefaultReplyer:
         self.is_group_chat, self.chat_target_info = get_chat_type_and_target_info(self.chat_stream.stream_id)
         self.heart_fc_sender = HeartFCSender()
         self.memory_activator = MemoryActivator()
-        self.instant_memory = InstantMemory(chat_id=self.chat_stream.stream_id)
+        self.instant_memory = VectorInstantMemory(chat_id=self.chat_stream.stream_id)
 
         from src.plugin_system.core.tool_use import ToolExecutor  # 延迟导入ToolExecutor，不然会循环依赖
 
@@ -423,7 +423,8 @@ class DefaultReplyer:
         if global_config.memory.enable_instant_memory:
             asyncio.create_task(self.instant_memory.create_and_store_memory(chat_history))
 
-            instant_memory = await self.instant_memory.get_memory(target)
+            instant_memory_list = await self.instant_memory.get_memory(target)
+            instant_memory = instant_memory_list[0] if instant_memory_list else None
             logger.info(f"即时记忆：{instant_memory}")
 
         if not running_memories:
