@@ -7,7 +7,6 @@ from json_repair import repair_json
 from typing import Any, Callable, Dict, Union, Optional
 from sqlalchemy import select
 from src.common.logger import get_logger
-from src.common.database.database import db
 from src.common.database.sqlalchemy_models import PersonInfo
 from src.common.database.sqlalchemy_database_api import get_db_session
 from src.llm_models.utils_model import LLMRequest

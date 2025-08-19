@@ -11,7 +11,6 @@ import os
 import datetime
 import time
 from src.common.logger import get_logger
-import threading
 from contextlib import contextmanager
 
 logger = get_logger("sqlalchemy_models")

@@ -1,7 +1,6 @@
 # mmc/src/common/database/db_migration.py
 
 from sqlalchemy import inspect, text
-from sqlalchemy.engine import Engine
 from src.common.database.sqlalchemy_models import Base, get_engine
 from src.common.logger import get_logger
 

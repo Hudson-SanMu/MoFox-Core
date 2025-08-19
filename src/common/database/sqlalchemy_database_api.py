@@ -7,9 +7,7 @@
 import traceback
 import time
 from typing import Dict, List, Any, Union, Type, Optional
-from contextlib import contextmanager
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError, DisconnectionError, OperationalError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc, asc, func, and_
 from src.common.logger import get_logger
 from src.common.database.sqlalchemy_models import (

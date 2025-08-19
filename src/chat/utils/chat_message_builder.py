@@ -256,7 +256,6 @@ def get_actions_by_timestamp_with_chat(
 ) -> List[Dict[str, Any]]:
     """获取在特定聊天从指定时间戳到指定时间戳的动作记录，按时间升序排序，返回动作记录列表"""
     from src.common.logger import get_logger
-    from src.common.database.sqlalchemy_database_api import get_db_session
     
     logger = get_logger("chat_message_builder")
     
@@ -349,7 +348,6 @@ def get_actions_by_timestamp_with_chat_inclusive(
     chat_id: str, timestamp_start: float, timestamp_end: float, limit: int = 0, limit_mode: str = "latest"
 ) -> List[Dict[str, Any]]:
     """获取在特定聊天从指定时间戳到指定时间戳的动作记录（包含边界），按时间升序排序，返回动作记录列表"""
-    from src.common.database.sqlalchemy_database_api import get_db_session
     with get_db_session() as session:
         if limit > 0:
             if limit_mode == "latest":
@@ -780,7 +778,6 @@ def build_pic_mapping_info(pic_id_mapping: Dict[str, str]) -> str:
     sorted_items = sorted(pic_id_mapping.items(), key=lambda x: int(x[1].replace("图片", "")))
 
 
-    from src.common.database.sqlalchemy_database_api import get_db_session
     for pic_id, display_name in sorted_items:
         # 从数据库中获取图片描述
         description = "内容正在阅读，请稍等"

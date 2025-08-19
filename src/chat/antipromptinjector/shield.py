@@ -6,9 +6,7 @@
 主要通过注入系统提示词来指导AI安全响应。
 """
 
-import random
-import re
-from typing import List, Optional
+from typing import List
 
 from src.common.logger import get_logger
 from src.config.config import global_config

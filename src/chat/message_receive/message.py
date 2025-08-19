@@ -12,7 +12,6 @@ from src.common.logger import get_logger
 from src.chat.utils.utils_image import get_image_manager
 from src.chat.utils.utils_voice import get_voice_text
 from src.chat.utils.utils_video import get_video
-from src.multimodal.video_analyzer import get_video_analyzer
 from src.config.config import global_config
 from .chat_stream import ChatStream
 

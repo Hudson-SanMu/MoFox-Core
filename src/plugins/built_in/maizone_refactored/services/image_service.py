@@ -4,7 +4,6 @@
 负责处理所有与图片相关的任务，特别是AI生成图片。
 """
 import base64
-import os
 from pathlib import Path
 from typing import Callable
 

@@ -156,7 +156,7 @@ class ScheduleManager:
                                     schedule_str += f"  - {item.get('time_range', '未知时间')}: {item.get('activity', '未知活动')}\n"
                             logger.info(schedule_str)
                         else:
-                            logger.warning(f"数据库中的日程数据格式无效，将重新生成日程")
+                            logger.warning("数据库中的日程数据格式无效，将重新生成日程")
                             await self.generate_and_save_schedule()
                     except json.JSONDecodeError as e:
                         logger.error(f"日程数据JSON解析失败: {e}，将重新生成日程")
@@ -219,13 +219,13 @@ class ScheduleManager:
                         existing_schedule = session.query(Schedule).filter(Schedule.date == today_str).first()
                         if existing_schedule:
                             # 更新现有日程
-                            setattr(existing_schedule, 'schedule_data', json.dumps(schedule_data))
-                            setattr(existing_schedule, 'updated_at', datetime.now())
+                            existing_schedule.schedule_data = json.dumps(schedule_data)
+                            existing_schedule.updated_at = datetime.now()
                         else:
                             # 创建新日程
                             new_schedule = Schedule()
-                            setattr(new_schedule, 'date', today_str)
-                            setattr(new_schedule, 'schedule_data', json.dumps(schedule_data))
+                            new_schedule.date = today_str
+                            new_schedule.schedule_data = json.dumps(schedule_data)
                             session.add(new_schedule)
                             session.commit()
                     
@@ -241,7 +241,7 @@ class ScheduleManager:
                     logger.warning(f"第 {attempt + 1} 次生成的日程验证失败，正在重试...")
                     if attempt < self.max_retries - 1:
                         # 在重试时添加更详细的错误提示
-                        prompt += f"\n\n**上次生成失败，请特别注意**:\n- 确保所有时间段连续覆盖24小时\n- 时间格式必须为HH:MM-HH:MM\n- 不能有时间间隙或重叠"
+                        prompt += "\n\n**上次生成失败，请特别注意**:\n- 确保所有时间段连续覆盖24小时\n- 时间格式必须为HH:MM-HH:MM\n- 不能有时间间隙或重叠"
                         
             except Exception as e:
                 logger.error(f"第 {attempt + 1} 次生成日程失败: {e}")

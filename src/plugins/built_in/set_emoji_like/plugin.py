@@ -1,6 +1,5 @@
 import re
 from typing import List, Tuple, Type
-import difflib
 
 from src.plugin_system import (
     BasePlugin,
@@ -9,9 +8,7 @@ from src.plugin_system import (
     ComponentInfo,
     ActionActivationType,
     ConfigField,
-    database_api,
 )
-from src.common.database.sqlalchemy_models import Messages, PersonInfo
 from src.common.logger import get_logger
 from src.plugin_system.apis import send_api
 from .qq_emoji_list import qq_face

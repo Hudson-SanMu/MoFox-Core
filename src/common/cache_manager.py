@@ -1,8 +1,6 @@
 import time
 import json
 import hashlib
-import inspect
-import os
 from pathlib import Path
 import numpy as np
 import faiss

@@ -7,8 +7,7 @@ from rich.traceback import install
 from maim_message import GroupInfo, UserInfo
 
 from src.common.logger import get_logger
-from src.common.database.database import db
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from src.common.database.sqlalchemy_models import ChatStreams  # 新增导入

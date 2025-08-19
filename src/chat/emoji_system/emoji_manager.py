@@ -13,7 +13,6 @@ from typing import Optional, Tuple, List, Any
 from PIL import Image
 from rich.traceback import install
 from sqlalchemy import select
-from src.common.database.database import db
 from src.common.database.sqlalchemy_database_api import get_db_session
 from src.common.database.sqlalchemy_models import Emoji, Images
 from src.common.logger import get_logger

@@ -209,7 +209,7 @@ class PluginHotReloadManager:
                 else:
                     dir_info.append(f"{watch_dir} (外部插件)")
 
-            logger.info(f"🚀 插件热重载已启动，监听目录:")
+            logger.info("🚀 插件热重载已启动，监听目录:")
             for info in dir_info:
                 logger.info(f"  📂 {info}")
 

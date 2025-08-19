@@ -73,7 +73,7 @@ class VideoAnalyzer:
             self.frame_interval = 1.0  # 抽帧时间间隔（秒）
             self.batch_size = 3  # 批处理时每批处理的帧数
             self.timeout = 60.0  # 分析超时时间（秒）
-            self.logger.info(f"✅ 从配置文件读取视频分析参数")
+            self.logger.info("✅ 从配置文件读取视频分析参数")
             
         except AttributeError as e:
             # 如果配置不存在，使用代码中的默认值
@@ -494,7 +494,7 @@ class VideoAnalyzer:
                 return {"summary": existing_video.description}
             
             # hash未匹配，但可能是重编码的相同视频，进行特征检测
-            self.logger.info(f"未找到hash匹配的视频记录，检查是否为重编码的相同视频（测试功能）")
+            self.logger.info("未找到hash匹配的视频记录，检查是否为重编码的相同视频（测试功能）")
             
             # 创建临时文件以提取视频特征
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
@@ -520,7 +520,7 @@ class VideoAnalyzer:
                     self._update_video_count(existing_similar_video.id)
                     return {"summary": existing_similar_video.description}
                 
-                self.logger.info(f"未找到相似视频，开始新的分析")
+                self.logger.info("未找到相似视频，开始新的分析")
                 
                 # 检查临时文件是否创建成功
                 if not os.path.exists(temp_path):

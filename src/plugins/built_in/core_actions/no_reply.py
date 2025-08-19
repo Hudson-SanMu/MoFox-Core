@@ -3,7 +3,6 @@ from collections import deque
 
 # 导入新插件系统
 from src.plugin_system import BaseAction, ActionActivationType, ChatMode
-from src.plugin_system.base.component_types import ChatType
 
 # 导入依赖的系统组件
 from src.common.logger import get_logger
