@@ -37,7 +37,7 @@ class APIProvider(ValidatedConfigBase):
     @classmethod
     def validate_client_type(cls, v):
         """验证客户端类型"""
-        allowed_types = ["openai", "gemini"]
+        allowed_types = ["openai", "gemini","aiohttp_gemini"]
         if v not in allowed_types:
             raise ValueError(f"客户端类型必须是以下之一: {allowed_types}")
         return v
@@ -89,9 +89,9 @@ class TaskConfig(ValidatedConfigBase):
     """任务配置类"""
 
     model_list: List[str] = Field(..., description="任务使用的模型列表")
-    max_tokens: int = Field(default=None, ge=1, le=100000, description="任务最大输出token数")
-    temperature: float = Field(default=None, ge=0.0, le=2.0, description="模型温度")
-    concurrency_count: int = Field(default=None, ge=1, le=10, description="并发请求数量")
+    max_tokens: int = Field(default=800, description="任务最大输出token数")
+    temperature: float = Field(default=0.7, description="模型温度")
+    concurrency_count: int = Field(default=1, description="并发请求数量")
 
     @field_validator('model_list')
     @classmethod
