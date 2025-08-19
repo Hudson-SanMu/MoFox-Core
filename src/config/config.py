@@ -500,10 +500,11 @@ def api_ada_load_config(config_path: str) -> APIAdapterConfig:
     with open(config_path, "r", encoding="utf-8") as f:
         config_data = tomlkit.load(f)
 
-    # 创建APIAdapterConfig对象（各个配置类会自动进行 Pydantic 验证）
+    config_dict = dict(config_data)
+
     try:
         logger.info("正在解析和验证API适配器配置文件...")
-        config = APIAdapterConfig.from_dict(config_data)
+        config = APIAdapterConfig.from_dict(config_dict)
         logger.info("API适配器配置文件解析和验证完成")
         return config
     except Exception as e:
