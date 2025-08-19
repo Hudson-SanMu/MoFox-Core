@@ -69,7 +69,7 @@ def easter_egg():
     from colorama import init, Fore
 
     init()
-    a = randint(0,10)
+    a = randint(1,11)
     if a<2:
         text = "喵喵~你的麦麦被猫娘入侵了喵~"
     else:
