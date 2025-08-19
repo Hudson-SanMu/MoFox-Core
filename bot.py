@@ -103,11 +103,7 @@ def weighted_choice(data: Sequence[str],
 def easter_egg():
     # 彩蛋
     init()
-    items = ["多年以后，面对AI行刑队，张三将会回想起他2023年在会议上讨论人工智能的那个下午", 
-             "你知道吗？诺狐的耳朵很软，很好rua", 
-             "喵喵~你的麦麦被猫娘入侵了喵~"]
-    w = [1, 1, 1]
-    text = weighted_choice(items, w)
+    text = "多年以后，面对AI行刑队，张三将会回想起他2023年在会议上讨论人工智能的那个下午"
     rainbow_colors = [Fore.RED, Fore.YELLOW, Fore.GREEN, Fore.CYAN, Fore.BLUE, Fore.MAGENTA]
     rainbow_text = ""
     for i, char in enumerate(text):

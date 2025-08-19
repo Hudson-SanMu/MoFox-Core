@@ -95,7 +95,7 @@ class MainSystem:
         from random import choices
         
         # 分离彩蛋和权重
-        egg_texts, weights = zip(*phrases, strict=False)
+        egg_texts, weights = zip(*phrases, strict=True)
         
         # 使用choices进行带权重的随机选择
         selected_egg = choices(egg_texts, weights=weights, k=1)
