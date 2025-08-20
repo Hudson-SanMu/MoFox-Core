@@ -66,6 +66,7 @@ class HeartFChatting:
     用于在特定聊天流中生成回复。
     其生命周期现在由其关联的 SubHeartflow 的 FOCUSED 状态控制。
     """
+    VALID_PROACTIVE_SCOPES = {"private", "group", "all"}
 
     def __init__(
         self,
@@ -154,6 +155,9 @@ class HeartFChatting:
             请根据当前情况做出选择。如果选择回复，请直接发送你想说的内容；如果选择保持沉默，请只回复"沉默"（注意：这个词不会被发送到群聊中）。""",
         }
         self.proactive_thinking_chat_scope = global_config.chat.The_scope_that_proactive_thinking_can_trigger
+        if self.proactive_thinking_chat_scope not in self.VALID_PROACTIVE_SCOPES:
+            logger.error(f"无效的主动思考范围: '{self.proactive_thinking_chat_scope}'。有效值为: {self.VALID_PROACTIVE_SCOPES}")
+            raise ValueError(f"配置错误：无效的主动思考范围 '{self.proactive_thinking_chat_scope}'") #乱填参数是吧,我跟你爆了
 
     async def start(self):
         """检查是否需要启动主循环，如果未激活则启动。"""
@@ -293,7 +297,6 @@ class HeartFChatting:
                 continue
             if self.proactive_thinking_chat_scope == "private" and self.chat_stream.group_info is not None:
                 continue
-            
 
             current_time = time.time()
             silence_duration = current_time - self.last_message_time
@@ -497,7 +500,8 @@ class HeartFChatting:
             message_data.get("chat_info_platform") or message_data.get("user_platform") or self.chat_stream.platform
         )
         user_id = message_data.get("user_id")
-
+        if user_id is None:
+            user_id = ""
         person_id = person_info_manager.get_person_id(platform, user_id)
         person_name = await person_info_manager.get_value(person_id, "person_name")
         return f"{person_name}:{message_data.get('processed_plain_text')}"
