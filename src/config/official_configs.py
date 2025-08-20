@@ -618,7 +618,7 @@ class WebSearchConfig(ValidatedConfigBase):
     enable_web_search_tool: bool = Field(default=True, description="启用网络搜索工具")
     enable_url_tool: bool = Field(default=True, description="启用URL工具")
     enabled_engines: list[str] = Field(default_factory=lambda: ["ddg"], description="启用的搜索引擎")
-    search_strategy: str = Field(default="single", description="搜索策略")
+    search_strategy: Literal["fallback","single","parallel"] = Field(default="single", description="搜索策略")
 
 
 class AntiPromptInjectionConfig(ValidatedConfigBase):

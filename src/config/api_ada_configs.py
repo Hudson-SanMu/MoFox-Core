@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Literal
 from pydantic import Field, field_validator
 
 from src.config.config_base import ValidatedConfigBase
@@ -10,7 +10,7 @@ class APIProvider(ValidatedConfigBase):
     name: str = Field(..., min_length=1, description="API提供商名称")
     base_url: str = Field(..., description="API基础URL")
     api_key: str = Field(..., min_length=1, description="API密钥")
-    client_type: str = Field(default="openai", description="客户端类型（如openai/google等，默认为openai）")
+    client_type: Literal["openai", "gemini", "aiohttp_gemini"] = Field(default="openai", description="客户端类型（如openai/google等，默认为openai）")
     max_retry: int = Field(default=2, ge=0, description="最大重试次数（单个模型API调用失败，最多重试的次数）")
     timeout: int = Field(default=10, ge=1, description="API调用的超时时长（超过这个时长，本次请求将被视为'请求超时'，单位：秒）")
     retry_interval: int = Field(default=10, ge=0, description="重试间隔（如果API调用失败，重试的间隔时间，单位：秒）")
@@ -31,15 +31,6 @@ class APIProvider(ValidatedConfigBase):
         """验证API密钥不能为空"""
         if not v or not v.strip():
             raise ValueError("API密钥不能为空")
-        return v
-
-    @field_validator('client_type')
-    @classmethod
-    def validate_client_type(cls, v):
-        """验证客户端类型"""
-        allowed_types = ["openai", "gemini","aiohttp_gemini"]
-        if v not in allowed_types:
-            raise ValueError(f"客户端类型必须是以下之一: {allowed_types}")
         return v
 
     def get_api_key(self) -> str:
