@@ -281,14 +281,8 @@ if __name__ == "__main__":
             loop.run_until_complete(main_tasks)
 
         except KeyboardInterrupt:
-            # loop.run_until_complete(get_global_api().stop())
             logger.warning("收到中断信号，正在优雅关闭...")
-            if loop and not loop.is_closed():
-                try:
-                    loop.run_until_complete(graceful_shutdown())
-                except Exception as ge:  # 捕捉优雅关闭时可能发生的错误
-                    logger.error(f"优雅关闭时发生错误: {ge}")
-        # 新增：检测外部请求关闭
+            # The actual shutdown logic is now in the finally block.
 
     except Exception as e:
         logger.error(f"主程序发生异常: {str(e)} {str(traceback.format_exc())}")
@@ -296,6 +290,11 @@ if __name__ == "__main__":
     finally:
         # 确保 loop 在任何情况下都尝试关闭（如果存在且未关闭）
         if "loop" in locals() and loop and not loop.is_closed():
+            logger.info("开始执行最终关闭流程...")
+            try:
+                loop.run_until_complete(graceful_shutdown())
+            except Exception as ge:
+                logger.error(f"优雅关闭时发生错误: {ge}")
             loop.close()
             logger.info("事件循环已关闭")
 
