@@ -225,9 +225,9 @@ class HeartFChatting:
         if is_group_chat and global_config.chat.group_chat_mode == "focus":
             return
 
-        if self.context.energy_value <= 1:
-            self.context.energy_value = 1
-            self.context.loop_mode = ChatMode.NORMAL
+        if self.context.energy_value <= 1:  # 如果能量值小于等于1（非强制情况）
+            self.context.energy_value = 1  # 将能量值设置为1
+            self.context.loop_mode = ChatMode.NORMAL  # 切换到普通模式
 
     def _check_focus_entry(self, new_message_count: int):
         """
@@ -254,11 +254,11 @@ class HeartFChatting:
         if is_group_chat and global_config.chat.group_chat_mode == "normal":
             return
         
-        if global_config.chat.focus_value != 0:
-            if new_message_count > 3 / pow(global_config.chat.focus_value, 0.5):
-                self.context.loop_mode = ChatMode.FOCUS
-                self.context.energy_value = 10 + (new_message_count / (3 / pow(global_config.chat.focus_value, 0.5))) * 10
-                return
+        if global_config.chat.focus_value != 0:  # 如果专注值配置不为0（启用自动专注）
+            if new_message_count > 3 / pow(global_config.chat.focus_value, 0.5):  # 如果新消息数超过阈值（基于专注值计算）
+                self.context.loop_mode = ChatMode.FOCUS  # 进入专注模式
+                self.context.energy_value = 10 + (new_message_count / (3 / pow(global_config.chat.focus_value, 0.5))) * 10  # 根据消息数量计算能量值
+                return  # 返回，不再检查其他条件
 
-            if self.context.energy_value >= 30:
-                self.context.loop_mode = ChatMode.FOCUS
+            if self.context.energy_value >= 30:  # 如果能量值达到或超过30
+                self.context.loop_mode = ChatMode.FOCUS  # 进入专注模式

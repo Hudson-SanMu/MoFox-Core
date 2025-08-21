@@ -9,7 +9,7 @@ from maim_message.message_base import GroupInfo
 
 from src.common.message_repository import count_messages
 
-logger = get_logger(__name__)
+logger = get_logger("hfc")
 
 
 class CycleDetail:

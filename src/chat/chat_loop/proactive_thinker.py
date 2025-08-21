@@ -11,7 +11,7 @@ from .hfc_context import HfcContext
 if TYPE_CHECKING:
     from .cycle_processor import CycleProcessor
 
-logger = get_logger("hfc.proactive")
+logger = get_logger("hfc")
 
 class ProactiveThinker:
     def __init__(self, context: HfcContext, cycle_processor: "CycleProcessor"):

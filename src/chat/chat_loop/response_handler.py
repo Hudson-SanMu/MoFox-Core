@@ -9,7 +9,7 @@ from src.plugin_system.apis import generator_api, send_api, message_api, databas
 from src.person_info.person_info import get_person_info_manager
 from .hfc_context import HfcContext
 
-logger = get_logger("hfc.response")
+logger = get_logger("hfc")
 
 class ResponseHandler:
     def __init__(self, context: HfcContext):

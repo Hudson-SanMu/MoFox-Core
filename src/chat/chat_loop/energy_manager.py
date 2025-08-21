@@ -6,7 +6,7 @@ from src.config.config import global_config
 from src.plugin_system.base.component_types import ChatMode
 from .hfc_context import HfcContext
 
-logger = get_logger("hfc.energy")
+logger = get_logger("hfc")
 
 class EnergyManager:
     def __init__(self, context: HfcContext):

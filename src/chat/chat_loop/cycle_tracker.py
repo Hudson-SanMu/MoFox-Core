@@ -5,7 +5,7 @@ from src.common.logger import get_logger
 from src.chat.chat_loop.hfc_utils import CycleDetail
 from .hfc_context import HfcContext
 
-logger = get_logger("hfc.cycle")
+logger = get_logger("hfc")
 
 class CycleTracker:
     def __init__(self, context: HfcContext):
