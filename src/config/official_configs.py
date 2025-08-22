@@ -683,6 +683,7 @@ class MonthlyPlanSystemConfig(ValidatedConfigBase):
     generation_threshold: int = Field(default=10, ge=0, description="启动时，如果当月计划少于此数量，则触发LLM生成")
     plans_per_generation: int = Field(default=5, ge=1, description="每次调用LLM期望生成的计划数量")
     deletion_probability_on_use: float = Field(default=0.5, ge=0.0, le=1.0, description="计划被使用后，被删除的概率")
+    max_plans_per_month: int = Field(default=20, ge=1, description="每个月允许存在的最大计划数量")
 
 
 class ContextGroup(ValidatedConfigBase):

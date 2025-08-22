@@ -417,11 +417,13 @@ centralized_config = true # 是否启用插件配置集中化管理
 # 是否启用本功能
 enable = true
 # 启动时，如果当月计划少于此数量，则触发LLM生成
-generation_threshold = 30
+generation_threshold = 20
 # 每次调用LLM期望生成的计划数量
-plans_per_generation = 5
+plans_per_generation = 4
 # 计划被使用后，被删除的概率 (0.0 到 1.0)
 deletion_probability_on_use = 0.5
+#每个月允许存在的最大计划数量
+max_plans_per_month = 30
 
 [wakeup_system]
 enable = true #"是否启用唤醒度系统"
