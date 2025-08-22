@@ -42,7 +42,7 @@ class HfcContext:
         self.energy_value = 5.0
         
         self.last_message_time = time.time()
-        self.last_read_time = time.time() - 1
+        self.last_read_time = time.time() - 10
         
         self.action_manager = ActionManager()
         

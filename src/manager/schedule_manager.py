@@ -314,60 +314,64 @@ class ScheduleManager:
 
     def is_sleeping(self, wakeup_manager=None) -> bool:
         """
-        检查当前是否处于休眠时间（日程表的第一项或最后一项）
+        通过关键词匹配检查当前是否处于休眠时间。
         
         Args:
-            wakeup_manager: 可选的唤醒度管理器，用于检查是否被唤醒
+            wakeup_manager: 可选的唤醒度管理器，用于检查是否被唤醒。
             
         Returns:
-            bool: 是否处于休眠状态
+            bool: 是否处于休眠状态。
         """
         if not global_config.schedule.enable_is_sleep:
             return False
         if not self.today_schedule:
             return False
 
-        now = datetime.now().time()
+        # 从配置获取关键词，如果配置中没有则使用默认列表
+        sleep_keywords = ["休眠", "睡觉", "梦乡",]
         
-        # 修复：应该获取列表的第一个元素
-        first_item = self.today_schedule[0]
-        last_item = self.today_schedule[-1]
+        now = datetime.now().time()
 
-        is_in_sleep_time = False
-        for item in [first_item, last_item]:
+        # 遍历当天的所有日程
+        for event in self.today_schedule:
             try:
-                time_range = item.get("time_range")
-                if not time_range:
+                activity = event.get("activity", "").strip()
+                time_range = event.get("time_range")
+
+                if not activity or not time_range:
                     continue
 
-                start_str, end_str = time_range.split('-')
-                start_time = datetime.strptime(start_str.strip(), "%H:%M").time()
-                end_time = datetime.strptime(end_str.strip(), "%H:%M").time()
+                # 1. 检查活动内容是否包含任一休眠关键词
+                if any(keyword in activity for keyword in sleep_keywords):
+                    # 2. 如果包含，再检查当前时间是否在该时间段内
+                    start_str, end_str = time_range.split('-')
+                    start_time = datetime.strptime(start_str.strip(), "%H:%M").time()
+                    end_time = datetime.strptime(end_str.strip(), "%H:%M").time()
 
-                if start_time <= end_time:
-                    # 同一天内的时间段
-                    if start_time <= now < end_time:
-                        is_in_sleep_time = True
-                        break
-                else:
-                    # 跨天的时间段
-                    if now >= start_time or now < end_time:
-                        is_in_sleep_time = True
-                        break
+                    is_in_time_range = False
+                    if start_time <= end_time:  # 同一天
+                        if start_time <= now < end_time:
+                            is_in_time_range = True
+                    else:  # 跨天
+                        if now >= start_time or now < end_time:
+                            is_in_time_range = True
+                    
+                    # 如果时间匹配，则进入最终判断
+                    if is_in_time_range:
+                        # 检查是否被唤醒
+                        if wakeup_manager and wakeup_manager.is_in_angry_state():
+                            logger.info(f"在休眠活动 '{activity}' 期间，但已被唤醒。")
+                            return False
+                        
+                        logger.info(f"当前处于休眠活动 '{activity}' 中。")
+                        return True  # 找到匹配的休眠活动，直接返回True
+
             except (ValueError, KeyError, AttributeError) as e:
-                logger.warning(f"解析休眠日程事件失败: {item}, 错误: {e}")
+                logger.warning(f"解析日程事件时出错: {event}, 错误: {e}")
                 continue
-        
-        # 如果不在休眠时间，直接返回False
-        if not is_in_sleep_time:
-            return False
-            
-        # 如果在休眠时间，检查是否被唤醒度管理器唤醒
-        if wakeup_manager and wakeup_manager.is_in_angry_state():
-            logger.debug("虽然在休眠时间，但已被唤醒度管理器唤醒")
-            return False
-            
-        return True
+                
+        # 遍历完所有日程都未找到匹配的休眠活动
+        return False
 
     def _validate_schedule_with_pydantic(self, schedule_data) -> bool:
         """使用Pydantic验证日程数据格式和完整性"""
