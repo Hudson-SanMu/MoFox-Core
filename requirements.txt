@@ -64,4 +64,3 @@ chromadb
 asyncio
 tavily-python
 google-generativeai
-cognee
