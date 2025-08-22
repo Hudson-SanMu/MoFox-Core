@@ -122,6 +122,8 @@ class ScheduleManager:
         self.llm = LLMRequest(model_set=model_config.model_task_config.schedule_generator, request_type="schedule")
         self.max_retries = 3  # 最大重试次数
         self.daily_task_started = False
+        self.last_sleep_log_time = 0
+        self.sleep_log_interval = 35  # 日志记录间隔，单位秒
 
     async def start_daily_schedule_generation(self):
         """启动每日零点自动生成新日程的任务"""
@@ -376,7 +378,12 @@ class ScheduleManager:
                             logger.info(f"在休眠活动 '{activity}' 期间，但已被唤醒。")
                             return False
                         
-                        logger.info(f"当前处于休眠活动 '{activity}' 中。")
+                        current_timestamp = datetime.now().timestamp()
+                        if current_timestamp - self.last_sleep_log_time > self.sleep_log_interval:
+                            logger.info(f"当前处于休眠活动 '{activity}' 中。")
+                            self.last_sleep_log_time = current_timestamp
+                        else:
+                            logger.debug(f"当前处于休眠活动 '{activity}' 中。")
                         return True  # 找到匹配的休眠活动，直接返回True
 
             except (ValueError, KeyError, AttributeError) as e:

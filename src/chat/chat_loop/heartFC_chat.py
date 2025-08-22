@@ -1,6 +1,7 @@
 import asyncio
 import time
 import traceback
+import re
 from typing import Optional
 
 from src.common.logger import get_logger
@@ -197,6 +198,9 @@ class HeartFChatting:
         """
         is_sleeping = schedule_manager.is_sleeping(self.wakeup_manager)
         
+        # 核心修复：在睡眠模式下获取消息时，不过滤命令消息，以确保@消息能被接收
+        filter_command_flag = not is_sleeping
+        
         recent_messages = message_api.get_messages_by_time_in_chat(
             chat_id=self.context.stream_id,
             start_time=self.context.last_read_time,
@@ -204,7 +208,7 @@ class HeartFChatting:
             limit=10,
             limit_mode="latest",
             filter_mai=True,
-            filter_command=True,
+            filter_command=filter_command_flag,
         )
         
         has_new_messages = bool(recent_messages)
@@ -321,19 +325,10 @@ class HeartFChatting:
                 
                 # 检查群聊消息是否艾特了机器人
                 if not is_private_chat:
-                    # 检查消息中是否包含艾特信息
-                    message_content = message.get("processed_plain_text", "")
-                    bot_name = global_config.bot.nickname
-                    alias_names = global_config.bot.alias_names or []
-                    
-                    # 检查是否被艾特（简单的文本匹配）
-                    if f"@{bot_name}" in message_content:
+                    # 最终修复：直接使用消息对象中由上游处理好的 is_mention 字段。
+                    # 该字段在 message.py 的 MessageRecv._process_single_segment 中被设置。
+                    if message.get("is_mentioned"):
                         is_mentioned = True
-                    else:
-                        for alias in alias_names:
-                            if f"@{alias}" in message_content:
-                                is_mentioned = True
-                                break
                 
                 # 累积唤醒度
                 woke_up = self.wakeup_manager.add_wakeup_value(is_private_chat, is_mentioned)
