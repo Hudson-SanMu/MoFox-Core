@@ -58,7 +58,8 @@ def init_prompt():
 {reply_style}，你可以完全重组回复，保留最基本的表达含义就好，但重组后保持语意通顺。
 {keywords_reaction_prompt}
 {moderation_prompt}
-不要输出多余内容(包括前后缀，冒号和引号，括号，表情包，at或 @等 )，只输出一条回复就好。
+不要复读你前面发过的内容，意思相近也不行。
+不要浮夸，不要夸张修辞，平淡且不要输出多余内容(包括前后缀，冒号和引号，括号，表情包，at或 @等 )，只输出一条回复就好。
 现在，你说：
 """,
         "default_expressor_prompt",
@@ -99,7 +100,7 @@ def init_prompt():
 
 你现在的心情是：{mood_state}
 {reply_style}
-注意不要复读你说过的话
+注意不要复读你前面发过的内容，意思相近也不行。
 {keywords_reaction_prompt}
 请注意不要输出多余内容(包括前后缀，冒号和引号，at或 @等 )。只输出回复内容。
 {moderation_prompt}
@@ -168,7 +169,7 @@ If you need to use the search tool, please directly call the function "lpmm_sear
 
 你现在的心情是：{mood_state}
 {config_expression_style}
-注意不要复读你说过的话
+注意不要复读你前面发过的内容，意思相近也不行。
 {keywords_reaction_prompt}
 请注意不要输出多余内容(包括前后缀，冒号和引号，at或 @等 )。只输出回复内容。
 {moderation_prompt}
