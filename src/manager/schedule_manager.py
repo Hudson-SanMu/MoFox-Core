@@ -246,8 +246,6 @@ class ScheduleManager:
 4. time_range格式必须为 "HH:MM-HH:MM" (24小时制)
 5. 相邻的时间段必须连续，不能有间隙
 6. 不要包含任何JSON以外的解释性文字或代码块标记
-7. **重要：必须在JSON数组的最后一个对象后面加上结束标记 "###SCHEDULE_END###"**
-
 **示例**:
 [
     {{"time_range": "00:00-07:00", "activity": "进入梦乡，处理数据"}},
@@ -255,9 +253,9 @@ class ScheduleManager:
     {{"time_range": "08:00-09:00", "activity": "享用早餐，规划今天的任务"}},
     {{"time_range": "09:00-23:30", "activity": "其他活动"}},
     {{"time_range": "23:30-00:00", "activity": "准备休眠"}}
-]###SCHEDULE_END###
+]
 
-请你扮演我，以我的身份和口吻，为我生成一份完整的24小时日程表。记住最后一定要加上结束标记。
+请你扮演我，以我的身份和口吻，为我生成一份完整的24小时日程表。
 """
             
             # 无限重试直到生成成功的标准日程表
@@ -277,23 +275,14 @@ class ScheduleManager:
 - 确保JSON格式正确，所有时间段连续覆盖24小时
 - 时间格式必须为HH:MM-HH:MM，不能有时间间隙或重叠
 - 不要输出任何解释文字，只输出纯JSON数组
-- **必须在最后加上结束标记 "###SCHEDULE_END###"，这很重要！**
+- 确保输出完整，不要被截断
 """
                         prompt += failure_hint
                     
                     response, _ = await self.llm.generate_response_async(prompt)
                     
-                    # 首先检查结束标记，确保消息没有被截断
-                    if not self._check_response_completeness(response):
-                        logger.warning(f"第 {attempt} 次生成被截断（缺少结束标记），继续重试...")
-                        await asyncio.sleep(2)
-                        continue
-                    
-                    # 清理响应内容，移除结束标记
-                    cleaned_response = self._clean_response(response)
-                    
-                    # 尝试解析和验证JSON
-                    schedule_data = json.loads(repair_json(cleaned_response))
+                    # 尝试解析和验证JSON（项目内置的反截断机制会自动处理截断问题）
+                    schedule_data = json.loads(repair_json(response))
                     
                     # 使用Pydantic验证生成的日程数据
                     if self._validate_schedule_with_pydantic(schedule_data):
@@ -482,42 +471,6 @@ class ScheduleManager:
         
         return True
 
-    def _check_response_completeness(self, response: str) -> bool:
-        """检查响应是否完整（包含结束标记）"""
-        if not response or not response.strip():
-            logger.warning("响应为空")
-            return False
-        
-        # 检查是否包含结束标记
-        end_marker = "###SCHEDULE_END###"
-        if end_marker not in response:
-            logger.warning("响应缺少结束标记，可能被截断")
-            return False
-        
-        logger.debug("响应包含结束标记，消息完整")
-        return True
-    
-    def _clean_response(self, response: str) -> str:
-        """清理响应内容，移除结束标记和多余内容"""
-        if not response:
-            return response
-        
-        # 移除结束标记
-        end_marker = "###SCHEDULE_END###"
-        if end_marker in response:
-            # 取结束标记之前的内容
-            response = response.split(end_marker)[0]
-        
-        # 清理可能的多余空白
-        response = response.strip()
-        
-        # 如果存在markdown代码块标记，清理掉
-        if response.startswith("```json"):
-            response = response[7:]
-        if response.endswith("```"):
-            response = response[:-3]
-        
-        return response.strip()
 
 
 class DailyScheduleGenerationTask(AsyncTask):
