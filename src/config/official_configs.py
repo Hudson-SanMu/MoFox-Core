@@ -674,6 +674,7 @@ class WakeUpSystemConfig(ValidatedConfigBase):
     decay_rate: float = Field(default=0.2, ge=0.0, description="每次衰减的唤醒度数值")
     decay_interval: float = Field(default=30.0, ge=1.0, description="唤醒度衰减间隔(秒)")
     angry_duration: float = Field(default=300.0, ge=10.0, description="愤怒状态持续时间(秒)")
+    angry_prompt: str = Field(default="你被人吵醒了非常生气，说话带着怒气", description="被吵醒后的愤怒提示词")
 
 
 class MonthlyPlanSystemConfig(ValidatedConfigBase):

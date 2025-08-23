@@ -36,6 +36,7 @@ class WakeUpManager:
         self.decay_interval = wakeup_config.decay_interval
         self.angry_duration = wakeup_config.angry_duration
         self.enabled = wakeup_config.enable
+        self.angry_prompt = wakeup_config.angry_prompt
 
     async def start(self):
         """启动唤醒度管理器"""
@@ -146,7 +147,7 @@ class WakeUpManager:
     def get_angry_prompt_addition(self) -> str:
         """获取愤怒状态下的提示词补充"""
         if self.is_angry:
-            return "你被人吵醒了非常生气，说话带着怒气"
+            return self.angry_prompt
         return ""
 
     def is_in_angry_state(self) -> bool:
