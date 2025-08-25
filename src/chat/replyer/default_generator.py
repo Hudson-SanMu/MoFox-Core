@@ -325,6 +325,7 @@ class DefaultReplyer:
         selected_expressions = None
         if available_actions is None:
             available_actions = {}
+        llm_response = None
         try:
             # 3. 构建 Prompt
             with Timer("构建Prompt", {}):  # 内部计时器，可选保留
