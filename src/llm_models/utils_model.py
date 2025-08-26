@@ -288,6 +288,7 @@ class LLMRequest:
         # 模型选择和请求准备
         start_time = time.time()
         model_info, api_provider, client = self._select_model()
+        model_name = model_info.name
         
         # 检查是否启用反截断
         use_anti_truncation = getattr(self.model_for_task, "anti_truncation", False)
@@ -404,7 +405,7 @@ class LLMRequest:
         # 重试失败
         if raise_when_empty:
             raise RuntimeError(f"经过 {max_empty_retry} 次重试后仍然无法生成有效回复")
-        return "生成的响应为空，请检查模型配置或输入内容是否正确", ("", model_info.name, None)
+        return "生成的响应为空，请检查模型配置或输入内容是否正确", ("", model_name, None)
 
     async def get_embedding(self, embedding_input: str) -> Tuple[List[float], str]:
         """获取嵌入向量
@@ -567,7 +568,7 @@ class LLMRequest:
         Returns:
             (等待间隔（如果为0则不等待，为-1则不再请求该模型）, 新的消息列表（适用于压缩消息）)
         """
-        model_name = model_info.name
+        model_name = model_info.name if model_info else "unknown"
 
         if isinstance(e, NetworkConnectionError):  # 网络连接错误
             return self._check_retry(
