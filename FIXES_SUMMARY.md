@@ -1,4 +1,4 @@
-# MaiBot-Plus 修复总结
+# MoFox_Bot 修复总结
 
 ## 修复的问题
 
