@@ -279,3 +279,56 @@ class ProactiveThinker:
         except Exception as e:
             logger.error(f"{self.context.log_prefix} 主动思考执行异常: {e}")
             logger.error(traceback.format_exc())
+
+    async def trigger_insomnia_thinking(self, reason: str):
+        """
+        由外部事件（如失眠）触发的一次性主动思考
+        
+        Args:
+            reason: 触发的原因 (e.g., "low_pressure", "random")
+        """
+        logger.info(f"{self.context.log_prefix} 因“{reason}”触发失眠，开始深夜思考...")
+        
+        # 1. 根据原因修改情绪
+        try:
+            from src.mood.mood_manager import mood_manager
+            mood_obj = mood_manager.get_mood_by_chat_id(self.context.stream_id)
+            if reason == "low_pressure":
+                mood_obj.mood_state = "精力过剩，毫无睡意"
+            elif reason == "random":
+                mood_obj.mood_state = "深夜emo，胡思乱想"
+            mood_obj.last_change_time = time.time() # 更新时间戳以允许后续的情绪回归
+            logger.info(f"{self.context.log_prefix} 因失眠，情绪状态被强制更新为: {mood_obj.mood_state}")
+        except Exception as e:
+            logger.error(f"{self.context.log_prefix} 设置失眠情绪时出错: {e}")
+
+        # 2. 直接执行主动思考逻辑
+        try:
+            # 传入一个象征性的silence_duration，因为它在这里不重要
+            await self._execute_proactive_thinking(silence_duration=1)
+        except Exception as e:
+            logger.error(f"{self.context.log_prefix} 失眠思考执行出错: {e}")
+            logger.error(traceback.format_exc())
+
+    async def trigger_goodnight_thinking(self):
+        """
+        在失眠状态结束后，触发一次准备睡觉的主动思考
+        """
+        logger.info(f"{self.context.log_prefix} 失眠状态结束，准备睡觉，触发告别思考...")
+        
+        # 1. 设置一个准备睡觉的特定情绪
+        try:
+            from src.mood.mood_manager import mood_manager
+            mood_obj = mood_manager.get_mood_by_chat_id(self.context.stream_id)
+            mood_obj.mood_state = "有点困了，准备睡觉了"
+            mood_obj.last_change_time = time.time()
+            logger.info(f"{self.context.log_prefix} 情绪状态更新为: {mood_obj.mood_state}")
+        except Exception as e:
+            logger.error(f"{self.context.log_prefix} 设置睡前情绪时出错: {e}")
+
+        # 2. 直接执行主动思考逻辑
+        try:
+            await self._execute_proactive_thinking(silence_duration=1)
+        except Exception as e:
+            logger.error(f"{self.context.log_prefix} 睡前告别思考执行出错: {e}")
+            logger.error(traceback.format_exc())

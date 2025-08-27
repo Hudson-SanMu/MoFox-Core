@@ -5,6 +5,7 @@ from src.common.logger import get_logger
 from src.config.config import global_config
 from src.plugin_system.base.component_types import ChatMode
 from .hfc_context import HfcContext
+from src.schedule.schedule_manager import schedule_manager
 
 logger = get_logger("hfc")
 
@@ -77,7 +78,7 @@ class EnergyManager:
 
     async def _energy_loop(self):
         """
-        能量管理的主循环
+        能量与睡眠压力管理的主循环
         
         功能说明:
         - 每10秒执行一次能量更新
@@ -92,24 +93,35 @@ class EnergyManager:
             if not self.context.chat_stream:
                 continue
 
-            is_group_chat = self.context.chat_stream.group_info is not None
-            if is_group_chat and global_config.chat.group_chat_mode != "auto":
-                if global_config.chat.group_chat_mode == "focus":
-                    self.context.loop_mode = ChatMode.FOCUS
-                    self.context.energy_value = 35
-                elif global_config.chat.group_chat_mode == "normal":
-                    self.context.loop_mode = ChatMode.NORMAL
-                    self.context.energy_value = 15
-                continue
+            # 判断当前是否为睡眠时间
+            is_sleeping = schedule_manager.is_sleeping(self.context.wakeup_manager)
 
-            if self.context.loop_mode == ChatMode.NORMAL:
-                self.context.energy_value -= 0.3
-                self.context.energy_value = max(self.context.energy_value, 0.3)
-            if self.context.loop_mode == ChatMode.FOCUS:
-                self.context.energy_value -= 0.6
-                self.context.energy_value = max(self.context.energy_value, 0.3)
-            
-            self._log_energy_change("能量值衰减")
+            if is_sleeping:
+                # 睡眠中：减少睡眠压力
+                decay_per_10s = global_config.wakeup_system.sleep_pressure_decay_rate / 6
+                self.context.sleep_pressure -= decay_per_10s
+                self.context.sleep_pressure = max(self.context.sleep_pressure, 0)
+                self._log_sleep_pressure_change("睡眠压力释放")
+            else:
+                # 清醒时：处理能量衰减
+                is_group_chat = self.context.chat_stream.group_info is not None
+                if is_group_chat and global_config.chat.group_chat_mode != "auto":
+                    if global_config.chat.group_chat_mode == "focus":
+                        self.context.loop_mode = ChatMode.FOCUS
+                        self.context.energy_value = 35
+                    elif global_config.chat.group_chat_mode == "normal":
+                        self.context.loop_mode = ChatMode.NORMAL
+                        self.context.energy_value = 15
+                    continue
+
+                if self.context.loop_mode == ChatMode.NORMAL:
+                    self.context.energy_value -= 0.3
+                    self.context.energy_value = max(self.context.energy_value, 0.3)
+                if self.context.loop_mode == ChatMode.FOCUS:
+                    self.context.energy_value -= 0.6
+                    self.context.energy_value = max(self.context.energy_value, 0.3)
+                
+                self._log_energy_change("能量值衰减")
 
     def _should_log_energy(self) -> bool:
         """
@@ -128,6 +140,15 @@ class EnergyManager:
             self.last_energy_log_time = current_time
             return True
         return False
+
+    def increase_sleep_pressure(self):
+        """
+        在执行动作后增加睡眠压力
+        """
+        increment = global_config.wakeup_system.sleep_pressure_increment
+        self.context.sleep_pressure += increment
+        self.context.sleep_pressure = min(self.context.sleep_pressure, 100.0) # 设置一个100的上限
+        self._log_sleep_pressure_change("执行动作，睡眠压力累积")
 
     def _log_energy_change(self, action: str, reason: str = ""):
         """
@@ -152,3 +173,13 @@ class EnergyManager:
             if reason:
                 log_message = f"{self.context.log_prefix} {action}，{reason}，当前能量值：{self.context.energy_value:.1f}"
             logger.debug(log_message)
+
+    def _log_sleep_pressure_change(self, action: str):
+        """
+        记录睡眠压力变化日志
+        """
+        # 使用与能量日志相同的频率控制
+        if self._should_log_energy():
+            logger.info(f"{self.context.log_prefix} {action}，当前睡眠压力：{self.context.sleep_pressure:.1f}")
+        else:
+            logger.debug(f"{self.context.log_prefix} {action}，当前睡眠压力：{self.context.sleep_pressure:.1f}")

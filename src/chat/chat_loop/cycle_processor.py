@@ -131,6 +131,11 @@ class CycleProcessor:
 
         if ENABLE_S4U:
             await stop_typing()
+
+        # 在一轮动作执行完毕后，增加睡眠压力
+        if self.context.energy_manager and global_config.wakeup_system.enable_insomnia_system:
+            if action_type not in ["no_reply", "no_action"]:
+                self.context.energy_manager.increase_sleep_pressure()
         
         return True
 

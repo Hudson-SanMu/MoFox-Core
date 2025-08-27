@@ -9,6 +9,7 @@ from src.chat.chat_loop.hfc_utils import CycleDetail
 
 if TYPE_CHECKING:
     from .wakeup_manager import WakeUpManager
+    from .energy_manager import EnergyManager
 
 class HfcContext:
     def __init__(self, chat_id: str):
@@ -40,6 +41,12 @@ class HfcContext:
         
         self.loop_mode = ChatMode.NORMAL
         self.energy_value = 5.0
+        self.sleep_pressure = 0.0
+        self.was_sleeping = False # 用于检测睡眠状态的切换
+        
+        # 失眠状态
+        self.is_in_insomnia: bool = False
+        self.insomnia_end_time: float = 0.0
         
         self.last_message_time = time.time()
         self.last_read_time = time.time() - 10
@@ -54,3 +61,4 @@ class HfcContext:
         
         # 唤醒度管理器 - 延迟初始化以避免循环导入
         self.wakeup_manager: Optional['WakeUpManager'] = None
+        self.energy_manager: Optional['EnergyManager'] = None

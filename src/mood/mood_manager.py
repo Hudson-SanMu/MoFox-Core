@@ -66,6 +66,11 @@ class ChatMood:
         self.last_change_time: float = 0
 
     async def update_mood_by_message(self, message: MessageRecv, interested_rate: float):
+        # 如果当前聊天处于失眠状态，则锁定情绪，不允许更新
+        if self.chat_id in mood_manager.insomnia_chats:
+            logger.debug(f"{self.log_prefix} 处于失眠状态，情绪已锁定，跳过更新。")
+            return
+
         self.regression_count = 0
 
         during_last_time = message.message_info.time - self.last_change_time  # type: ignore
@@ -216,6 +221,7 @@ class MoodManager:
         self.mood_list: list[ChatMood] = []
         """当前情绪状态"""
         self.task_started: bool = False
+        self.insomnia_chats: set[str] = set() # 正在失眠的聊天ID列表
 
     async def start(self):
         """启动情绪回归后台任务"""
@@ -261,6 +267,16 @@ class MoodManager:
             mood.is_angry_from_wakeup = False
             mood.mood_state = "感觉很平静"
             logger.info(f"{mood.log_prefix} 清除被吵醒的愤怒状态")
+
+    def start_insomnia(self, chat_id: str):
+        """开始一个聊天的失眠状态，锁定情绪更新"""
+        logger.info(f"Chat [{chat_id}]进入失眠状态，情绪已锁定。")
+        self.insomnia_chats.add(chat_id)
+
+    def stop_insomnia(self, chat_id: str):
+        """停止一个聊天的失眠状态，解锁情绪更新"""
+        logger.info(f"Chat [{chat_id}]失眠状态结束，情绪已解锁。")
+        self.insomnia_chats.discard(chat_id)
 
     def get_angry_prompt_addition(self, chat_id: str) -> str:
         """获取愤怒状态下的提示词补充"""

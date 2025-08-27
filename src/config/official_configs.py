@@ -657,7 +657,7 @@ class PluginsConfig(ValidatedConfigBase):
 
 
 class WakeUpSystemConfig(ValidatedConfigBase):
-    """唤醒度系统配置类"""
+    """唤醒度与失眠系统配置类"""
 
     enable: bool = Field(default=True, description="是否启用唤醒度系统")
     wakeup_threshold: float = Field(default=15.0, ge=1.0, description="唤醒阈值，达到此值时会被唤醒")
@@ -667,6 +667,16 @@ class WakeUpSystemConfig(ValidatedConfigBase):
     decay_interval: float = Field(default=30.0, ge=1.0, description="唤醒度衰减间隔(秒)")
     angry_duration: float = Field(default=300.0, ge=10.0, description="愤怒状态持续时间(秒)")
     angry_prompt: str = Field(default="你被人吵醒了非常生气，说话带着怒气", description="被吵醒后的愤怒提示词")
+
+    # --- 失眠机制相关参数 ---
+    enable_insomnia_system: bool = Field(default=True, description="是否启用失眠系统")
+    insomnia_duration_minutes: int = Field(default=30, ge=1, description="单次失眠状态的持续时间（分钟）")
+    sleep_pressure_threshold: float = Field(default=30.0, description="触发“压力不足型失眠”的睡眠压力阈值")
+    deep_sleep_threshold: float = Field(default=80.0, description="进入“深度睡眠”的睡眠压力阈值")
+    insomnia_chance_low_pressure: float = Field(default=0.6, ge=0.0, le=1.0, description="压力不足时的失眠基础概率")
+    insomnia_chance_normal_pressure: float = Field(default=0.1, ge=0.0, le=1.0, description="压力正常时的失眠基础概率")
+    sleep_pressure_increment: float = Field(default=1.5, ge=0.0, description="每次AI执行动作后，增加的睡眠压力值")
+    sleep_pressure_decay_rate: float = Field(default=1.5, ge=0.0, description="睡眠时，每分钟衰减的睡眠压力值")
 
 
 class MonthlyPlanSystemConfig(ValidatedConfigBase):

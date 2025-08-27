@@ -10,6 +10,7 @@ from src.chat.express.expression_learner import expression_learner_manager
 from src.plugin_system.base.component_types import ChatMode
 from src.schedule.schedule_manager import schedule_manager
 from src.plugin_system.apis import message_api
+from src.mood.mood_manager import mood_manager
 
 from .hfc_context import HfcContext
 from .energy_manager import EnergyManager
@@ -48,6 +49,7 @@ class HeartFChatting:
         
         # 将唤醒度管理器设置到上下文中
         self.context.wakeup_manager = self.wakeup_manager
+        self.context.energy_manager = self.energy_manager
         
         self._loop_task: Optional[asyncio.Task] = None
         
@@ -196,8 +198,28 @@ class HeartFChatting:
         - NORMAL模式：检查进入FOCUS模式的条件，并通过normal_mode_handler处理消息
         """
         is_sleeping = schedule_manager.is_sleeping(self.wakeup_manager)
-        
-        # 核心修复：在睡眠模式下获取消息时，不过滤命令消息，以确保@消息能被接收
+
+        # --- 失眠状态管理 ---
+        if self.context.is_in_insomnia and time.time() > self.context.insomnia_end_time:
+            # 失眠状态结束
+            self.context.is_in_insomnia = False
+            await self.proactive_thinker.trigger_goodnight_thinking()
+
+        if is_sleeping and not self.context.was_sleeping:
+            # 刚刚进入睡眠状态，进行一次入睡检查
+            if self.wakeup_manager and self.wakeup_manager.check_for_insomnia():
+                # 触发失眠
+                self.context.is_in_insomnia = True
+                duration = global_config.wakeup_system.insomnia_duration_minutes * 60
+                self.context.insomnia_end_time = time.time() + duration
+                
+                # 判断失眠原因并触发思考
+                reason = "random"
+                if self.context.sleep_pressure < global_config.wakeup_system.sleep_pressure_threshold:
+                    reason = "low_pressure"
+                await self.proactive_thinker.trigger_insomnia_thinking(reason)
+
+        # 核心修复：在睡眠模式(包括失眠)下获取消息时，不过滤命令消息，以确保@消息能被接收
         filter_command_flag = not is_sleeping
         
         recent_messages = message_api.get_messages_by_time_in_chat(
@@ -220,8 +242,9 @@ class HeartFChatting:
             # 处理唤醒度逻辑
             if is_sleeping:
                 self._handle_wakeup_messages(recent_messages)
-                # 如果仍在睡眠状态，跳过正常处理但仍返回有新消息
-                if schedule_manager.is_sleeping(self.wakeup_manager):
+                # 如果处于失眠状态，则无视睡眠时间，继续处理消息
+                # 否则，如果仍然在睡眠（没被吵醒），则跳过本轮处理
+                if not self.context.is_in_insomnia and schedule_manager.is_sleeping(self.wakeup_manager):
                     return has_new_messages
 
             # 根据聊天模式处理新消息
@@ -239,6 +262,9 @@ class HeartFChatting:
                 self._check_focus_exit()
             elif self.context.loop_mode == ChatMode.NORMAL:
                 self._check_focus_entry(0)  # 传入0表示无新消息
+
+        # 更新上一帧的睡眠状态
+        self.context.was_sleeping = is_sleeping
                     
         return has_new_messages
 
