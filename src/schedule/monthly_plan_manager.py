@@ -8,7 +8,9 @@ from src.common.database.monthly_plan_db import (
     add_new_plans,
     get_archived_plans_for_month,
     archive_active_plans_for_month,
-    has_active_plans
+    has_active_plans,
+    get_active_plans_for_month,
+    delete_plans_by_ids
 )
 from src.config.config import global_config, model_config
 from src.llm_models.utils_model import LLMRequest
@@ -67,7 +69,23 @@ class MonthlyPlanManager:
             logger.info(f" {target_month} 没有任何有效的月度计划，将立即生成。")
             return await self.generate_monthly_plans(target_month)
         else:
-            # logger.info(f"{target_month} 已存在有效的月度计划，跳过生成。")
+            logger.info(f"{target_month} 已存在有效的月度计划。")
+            plans = get_active_plans_for_month(target_month)
+            
+            # 检查是否超出上限
+            max_plans = global_config.monthly_plan_system.max_plans_per_month
+            if len(plans) > max_plans:
+                logger.warning(f"当前月度计划数量 ({len(plans)}) 超出上限 ({max_plans})，将自动删除多余的计划。")
+                # 按创建时间升序排序（旧的在前），然后删除超出上限的部分（新的）
+                plans_to_delete = sorted(plans, key=lambda p: p.created_at)[max_plans:]
+                delete_ids = [p.id for p in plans_to_delete]
+                delete_plans_by_ids(delete_ids)
+                # 重新获取计划列表
+                plans = get_active_plans_for_month(target_month)
+
+            if plans:
+                plan_texts = "\n".join([f"  {i+1}. {plan.plan_text}" for i, plan in enumerate(plans)])
+                logger.info(f"当前月度计划内容:\n{plan_texts}")
             return True # 已经有计划，也算成功
 
     async def generate_monthly_plans(self, target_month: Optional[str] = None) -> bool:

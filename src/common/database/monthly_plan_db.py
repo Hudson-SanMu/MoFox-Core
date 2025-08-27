@@ -80,13 +80,51 @@ def mark_plans_completed(plan_ids: List[int]):
 
     with get_db_session() as session:
         try:
+            plans_to_mark = session.query(MonthlyPlan).filter(MonthlyPlan.id.in_(plan_ids)).all()
+            if not plans_to_mark:
+                logger.info("没有需要标记为完成的月度计划。")
+                return
+
+            plan_details = "\n".join([f"  {i+1}. {plan.plan_text}" for i, plan in enumerate(plans_to_mark)])
+            logger.info(f"以下 {len(plans_to_mark)} 条月度计划将被标记为已完成:\n{plan_details}")
+
             session.query(MonthlyPlan).filter(
                 MonthlyPlan.id.in_(plan_ids)
             ).update({"status": "completed"}, synchronize_session=False)
             session.commit()
-            logger.info(f"成功将 {len(plan_ids)} 条月度计划标记为已完成。")
         except Exception as e:
             logger.error(f"标记月度计划为完成时发生错误: {e}")
+            session.rollback()
+            raise
+
+def delete_plans_by_ids(plan_ids: List[int]):
+    """
+    根据ID列表从数据库中物理删除月度计划。
+
+    :param plan_ids: 需要删除的计划ID列表。
+    """
+    if not plan_ids:
+        return
+
+    with get_db_session() as session:
+        try:
+            # 先查询要删除的计划，用于日志记录
+            plans_to_delete = session.query(MonthlyPlan).filter(MonthlyPlan.id.in_(plan_ids)).all()
+            if not plans_to_delete:
+                logger.info("没有找到需要删除的月度计划。")
+                return
+
+            plan_details = "\n".join([f"  {i+1}. {plan.plan_text}" for i, plan in enumerate(plans_to_delete)])
+            logger.info(f"检测到月度计划超额，将删除以下 {len(plans_to_delete)} 条计划:\n{plan_details}")
+
+            # 执行删除
+            session.query(MonthlyPlan).filter(
+                MonthlyPlan.id.in_(plan_ids)
+            ).delete(synchronize_session=False)
+            session.commit()
+            
+        except Exception as e:
+            logger.error(f"删除月度计划时发生错误: {e}")
             session.rollback()
             raise
 
