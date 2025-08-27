@@ -208,6 +208,7 @@ class ToolExecutor:
         try:
             function_name = tool_call.func_name
             function_args = tool_call.args or {}
+            logger.info(f"🤖 {self.log_prefix} 正在执行工具: [bold green]{function_name}[/bold green] | 参数: {function_args}")
             function_args["llm_called"] = True  # 标记为LLM调用
 
             # 获取对应工具实例
