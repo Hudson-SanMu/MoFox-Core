@@ -17,6 +17,7 @@ from .base import (
     ComponentInfo,
     ActionInfo,
     CommandInfo,
+    PlusCommandInfo,
     PluginInfo,
     ToolInfo,
     PythonDependency,
@@ -25,6 +26,12 @@ from .base import (
     EventType,
     MaiMessages,
     ToolParamType,
+    # 新增的增强命令系统
+    PlusCommand,
+    CommandArgs,
+    PlusCommandAdapter,
+    create_plus_command_adapter,
+    ChatType,
 )
 
 # 导入工具模块
@@ -81,10 +88,17 @@ __all__ = [
     "BaseCommand",
     "BaseTool",
     "BaseEventHandler",
+    # 增强命令系统
+    "PlusCommand",
+    "CommandArgs",
+    "PlusCommandAdapter", 
+    "create_plus_command_adapter", 
+    "create_plus_command_adapter",
     # 类型定义
     "ComponentType",
     "ActionActivationType",
     "ChatMode",
+    "ChatType",
     "ComponentInfo",
     "ActionInfo",
     "CommandInfo",

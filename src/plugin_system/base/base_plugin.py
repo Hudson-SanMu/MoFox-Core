@@ -1,13 +1,14 @@
 from abc import abstractmethod
-from typing import List, Type, Tuple, Union
+from typing import List, Type, Tuple, Union, TYPE_CHECKING
 from .plugin_base import PluginBase
 
 from src.common.logger import get_logger
-from src.plugin_system.base.component_types import ActionInfo, CommandInfo, EventHandlerInfo, ToolInfo
+from src.plugin_system.base.component_types import ActionInfo, CommandInfo, PlusCommandInfo, EventHandlerInfo, ToolInfo
 from .base_action import BaseAction
 from .base_command import BaseCommand
 from .base_events_handler import BaseEventHandler
 from .base_tool import BaseTool
+from .plus_command import PlusCommand
 
 logger = get_logger("base_plugin")
 
@@ -31,6 +32,7 @@ class BasePlugin(PluginBase):
         Union[
             Tuple[ActionInfo, Type[BaseAction]],
             Tuple[CommandInfo, Type[BaseCommand]],
+            Tuple[PlusCommandInfo, Type[PlusCommand]],
             Tuple[EventHandlerInfo, Type[BaseEventHandler]],
             Tuple[ToolInfo, Type[BaseTool]],
         ]

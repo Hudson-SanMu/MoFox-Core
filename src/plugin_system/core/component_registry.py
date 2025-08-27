@@ -8,6 +8,7 @@ from src.plugin_system.base.component_types import (
     ActionInfo,
     ToolInfo,
     CommandInfo,
+    PlusCommandInfo,
     EventHandlerInfo,
     PluginInfo,
     ComponentType,
@@ -16,6 +17,7 @@ from src.plugin_system.base.base_command import BaseCommand
 from src.plugin_system.base.base_action import BaseAction
 from src.plugin_system.base.base_tool import BaseTool
 from src.plugin_system.base.base_events_handler import BaseEventHandler
+from src.plugin_system.base.plus_command import PlusCommand
 
 logger = get_logger("component_registry")
 
@@ -32,7 +34,7 @@ class ComponentRegistry:
         """组件注册表 命名空间式组件名 -> 组件信息"""
         self._components_by_type: Dict[ComponentType, Dict[str, ComponentInfo]] = {types: {} for types in ComponentType}
         """类型 -> 组件原名称 -> 组件信息"""
-        self._components_classes: Dict[str, Type[Union[BaseCommand, BaseAction, BaseTool, BaseEventHandler]]] = {}
+        self._components_classes: Dict[str, Type[Union[BaseCommand, BaseAction, BaseTool, BaseEventHandler, PlusCommand]]] = {}
         """命名空间式组件名 -> 组件类"""
 
         # 插件注册表
@@ -133,6 +135,10 @@ class ComponentRegistry:
                 assert isinstance(component_info, CommandInfo)
                 assert issubclass(component_class, BaseCommand)
                 ret = self._register_command_component(component_info, component_class)
+            case ComponentType.PLUS_COMMAND:
+                assert isinstance(component_info, PlusCommandInfo)
+                assert issubclass(component_class, PlusCommand)
+                ret = self._register_plus_command_component(component_info, component_class)
             case ComponentType.TOOL:
                 assert isinstance(component_info, ToolInfo)
                 assert issubclass(component_class, BaseTool)
@@ -192,6 +198,26 @@ class ComponentRegistry:
 
         return True
 
+    def _register_plus_command_component(self, plus_command_info: PlusCommandInfo, plus_command_class: Type[PlusCommand]) -> bool:
+        """注册PlusCommand组件到特定注册表"""
+        plus_command_name = plus_command_info.name
+
+        if not plus_command_name:
+            logger.error(f"PlusCommand组件 {plus_command_class.__name__} 必须指定名称")
+            return False
+        if not isinstance(plus_command_info, PlusCommandInfo) or not issubclass(plus_command_class, PlusCommand):
+            logger.error(f"注册失败: {plus_command_name} 不是有效的PlusCommand")
+            return False
+
+        # 创建专门的PlusCommand注册表（如果还没有）
+        if not hasattr(self, '_plus_command_registry'):
+            self._plus_command_registry: Dict[str, Type[PlusCommand]] = {}
+
+        self._plus_command_registry[plus_command_name] = plus_command_class
+
+        logger.debug(f"已注册PlusCommand组件: {plus_command_name}")
+        return True
+
     def _register_tool_component(self, tool_info: ToolInfo, tool_class: Type[BaseTool]) -> bool:
         """注册Tool组件到Tool特定注册表"""
         tool_name = tool_info.name
@@ -247,6 +273,12 @@ class ComponentRegistry:
                     for key in keys_to_remove:
                         self._command_patterns.pop(key, None)
                     logger.debug(f"已移除Command组件: {component_name} (清理了 {len(keys_to_remove)} 个模式)")
+
+                case ComponentType.PLUS_COMMAND:
+                    # 移除PlusCommand注册
+                    if hasattr(self, '_plus_command_registry'):
+                        self._plus_command_registry.pop(component_name, None)
+                    logger.debug(f"已移除PlusCommand组件: {component_name}")
 
                 case ComponentType.TOOL:
                     # 移除Tool注册
@@ -520,21 +552,23 @@ class ComponentRegistry:
             text: 输入文本
 
         Returns:
-            Tuple: (命令类, 匹配的命名组, 是否拦截消息, 插件名) 或 None
+            Tuple: (命令类, 匹配的命名组, 命令信息) 或 None
         """
 
+        # 只查找传统的BaseCommand
         candidates = [pattern for pattern in self._command_patterns if pattern.match(text)]
-        if not candidates:
-            return None
-        if len(candidates) > 1:
-            logger.warning(f"文本 '{text}' 匹配到多个命令模式: {candidates}，使用第一个匹配")
-        command_name = self._command_patterns[candidates[0]]
-        command_info: CommandInfo = self.get_registered_command_info(command_name)  # type: ignore
-        return (
-            self._command_registry[command_name],
-            candidates[0].match(text).groupdict(),  # type: ignore
-            command_info,
-        )
+        if candidates:
+            if len(candidates) > 1:
+                logger.warning(f"文本 '{text}' 匹配到多个命令模式: {candidates}，使用第一个匹配")
+            command_name = self._command_patterns[candidates[0]]
+            command_info: CommandInfo = self.get_registered_command_info(command_name)  # type: ignore
+            return (
+                self._command_registry[command_name],
+                candidates[0].match(text).groupdict(),  # type: ignore
+                command_info,
+            )
+            
+        return None
 
     # === Tool 特定查询方法 ===
     def get_tool_registry(self) -> Dict[str, Type[BaseTool]]:
@@ -556,6 +590,25 @@ class ComponentRegistry:
         """
         info = self.get_component_info(tool_name, ComponentType.TOOL)
         return info if isinstance(info, ToolInfo) else None
+
+    # === PlusCommand 特定查询方法 ===
+    def get_plus_command_registry(self) -> Dict[str, Type[PlusCommand]]:
+        """获取PlusCommand注册表"""
+        if not hasattr(self, '_plus_command_registry'):
+            self._plus_command_registry: Dict[str, Type[PlusCommand]] = {}
+        return self._plus_command_registry.copy()
+
+    def get_registered_plus_command_info(self, command_name: str) -> Optional[PlusCommandInfo]:
+        """获取PlusCommand信息
+
+        Args:
+            command_name: 命令名称
+
+        Returns:
+            PlusCommandInfo: 命令信息对象，如果命令不存在则返回 None
+        """
+        info = self.get_component_info(command_name, ComponentType.PLUS_COMMAND)
+        return info if isinstance(info, PlusCommandInfo) else None
 
     # === EventHandler 特定查询方法 ===
 
@@ -612,6 +665,7 @@ class ComponentRegistry:
         command_components: int = 0
         tool_components: int = 0
         events_handlers: int = 0
+        plus_command_components: int = 0
         for component in self._components.values():
             if component.component_type == ComponentType.ACTION:
                 action_components += 1
@@ -621,11 +675,14 @@ class ComponentRegistry:
                 tool_components += 1
             elif component.component_type == ComponentType.EVENT_HANDLER:
                 events_handlers += 1
+            elif component.component_type == ComponentType.PLUS_COMMAND:
+                plus_command_components += 1
         return {
             "action_components": action_components,
             "command_components": command_components,
             "tool_components": tool_components,
             "event_handlers": events_handlers,
+            "plus_command_components": plus_command_components,
             "total_components": len(self._components),
             "total_plugins": len(self._plugins),
             "components_by_type": {

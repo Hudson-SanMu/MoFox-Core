@@ -13,9 +13,11 @@ from .component_types import (
     ComponentType,
     ActionActivationType,
     ChatMode,
+    ChatType,
     ComponentInfo,
     ActionInfo,
     CommandInfo,
+    PlusCommandInfo,
     ToolInfo,
     PluginInfo,
     PythonDependency,
@@ -25,6 +27,8 @@ from .component_types import (
     ToolParamType,
 )
 from .config_types import ConfigField
+from .plus_command import PlusCommand, PlusCommandAdapter, create_plus_command_adapter
+from .command_args import CommandArgs
 
 __all__ = [
     "BasePlugin",
@@ -34,9 +38,11 @@ __all__ = [
     "ComponentType",
     "ActionActivationType",
     "ChatMode",
+    "ChatType",
     "ComponentInfo",
     "ActionInfo",
     "CommandInfo",
+    "PlusCommandInfo",
     "ToolInfo",
     "PluginInfo",
     "PythonDependency",
@@ -46,4 +52,9 @@ __all__ = [
     "BaseEventHandler",
     "MaiMessages",
     "ToolParamType",
+    # 增强命令系统
+    "PlusCommand",
+    "CommandArgs",
+    "PlusCommandAdapter",
+    "create_plus_command_adapter",
 ]

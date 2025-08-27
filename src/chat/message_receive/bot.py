@@ -98,6 +98,118 @@ class ChatBot:
 
             self._started = True
 
+    async def _process_plus_commands(self, message: MessageRecv):
+        """独立处理PlusCommand系统"""
+        try:
+            text = message.processed_plain_text
+            
+            # 获取配置的命令前缀
+            from src.config.config import global_config
+            prefixes = global_config.command.command_prefixes
+            
+            # 检查是否以任何前缀开头
+            matched_prefix = None
+            for prefix in prefixes:
+                if text.startswith(prefix):
+                    matched_prefix = prefix
+                    break
+            
+            if not matched_prefix:
+                return False, None, True  # 不是命令，继续处理
+            
+            # 移除前缀
+            command_part = text[len(matched_prefix):].strip()
+            
+            # 分离命令名和参数
+            parts = command_part.split(None, 1)
+            if not parts:
+                return False, None, True  # 没有命令名，继续处理
+            
+            command_word = parts[0].lower()
+            args_text = parts[1] if len(parts) > 1 else ""
+            
+            # 查找匹配的PlusCommand
+            plus_command_registry = component_registry.get_plus_command_registry()
+            matching_commands = []
+            
+            for plus_command_name, plus_command_class in plus_command_registry.items():
+                plus_command_info = component_registry.get_registered_plus_command_info(plus_command_name)
+                if not plus_command_info:
+                    continue
+                
+                # 检查命令名是否匹配（命令名和别名）
+                all_commands = [plus_command_name.lower()] + [alias.lower() for alias in plus_command_info.command_aliases]
+                if command_word in all_commands:
+                    matching_commands.append((plus_command_class, plus_command_info, plus_command_name))
+            
+            if not matching_commands:
+                return False, None, True  # 没有找到匹配的PlusCommand，继续处理
+            
+            # 如果有多个匹配，按优先级排序
+            if len(matching_commands) > 1:
+                matching_commands.sort(key=lambda x: x[1].priority, reverse=True)
+                logger.warning(f"文本 '{text}' 匹配到多个PlusCommand: {[cmd[2] for cmd in matching_commands]}，使用优先级最高的")
+            
+            plus_command_class, plus_command_info, plus_command_name = matching_commands[0]
+            
+            # 检查命令是否被禁用
+            if (
+                message.chat_stream
+                and message.chat_stream.stream_id
+                and plus_command_name
+                in global_announcement_manager.get_disabled_chat_commands(message.chat_stream.stream_id)
+            ):
+                logger.info("用户禁用的PlusCommand，跳过处理")
+                return False, None, True
+            
+            message.is_command = True
+            
+            # 获取插件配置
+            plugin_config = component_registry.get_plugin_config(plus_command_name)
+            
+            # 创建PlusCommand实例
+            plus_command_instance = plus_command_class(message, plugin_config)
+            
+            try:
+                # 检查聊天类型限制
+                if not plus_command_instance.is_chat_type_allowed():
+                    is_group = hasattr(message, 'is_group_message') and message.is_group_message
+                    logger.info(f"PlusCommand {plus_command_class.__name__} 不支持当前聊天类型: {'群聊' if is_group else '私聊'}")
+                    return False, None, True  # 跳过此命令，继续处理其他消息
+                
+                # 设置参数
+                from src.plugin_system.base.command_args import CommandArgs
+                command_args = CommandArgs(args_text)
+                plus_command_instance.args = command_args
+                
+                # 执行命令
+                success, response, intercept_message = await plus_command_instance.execute(command_args)
+                
+                # 记录命令执行结果
+                if success:
+                    logger.info(f"PlusCommand执行成功: {plus_command_class.__name__} (拦截: {intercept_message})")
+                else:
+                    logger.warning(f"PlusCommand执行失败: {plus_command_class.__name__} - {response}")
+                
+                # 根据命令的拦截设置决定是否继续处理消息
+                return True, response, not intercept_message  # 找到命令，根据intercept_message决定是否继续
+                
+            except Exception as e:
+                logger.error(f"执行PlusCommand时出错: {plus_command_class.__name__} - {e}")
+                logger.error(traceback.format_exc())
+                
+                try:
+                    await plus_command_instance.send_text(f"命令执行出错: {str(e)}")
+                except Exception as send_error:
+                    logger.error(f"发送错误消息失败: {send_error}")
+                
+                # 命令出错时，根据命令的拦截设置决定是否继续处理消息
+                return True, str(e), False  # 出错时继续处理消息
+                
+        except Exception as e:
+            logger.error(f"处理PlusCommand时出错: {e}")
+            return False, None, True  # 出错时继续处理消息
+
     async def _process_commands_with_new_system(self, message: MessageRecv):
         # sourcery skip: use-named-expression
         """使用新插件系统处理命令"""
@@ -308,14 +420,24 @@ class ChatBot:
             ):
                 return
 
-            # 命令处理 - 使用新插件系统检查并处理命令
-            is_command, cmd_result, continue_process = await self._process_commands_with_new_system(message)
-
-            # 如果是命令且不需要继续处理，则直接返回
-            if is_command and not continue_process:
+            # 命令处理 - 首先尝试PlusCommand独立处理
+            is_plus_command, plus_cmd_result, plus_continue_process = await self._process_plus_commands(message)
+            
+            # 如果是PlusCommand且不需要继续处理，则直接返回
+            if is_plus_command and not plus_continue_process:
                 await MessageStorage.store_message(message, chat)
-                logger.info(f"命令处理完成，跳过后续消息处理: {cmd_result}")
+                logger.info(f"PlusCommand处理完成，跳过后续消息处理: {plus_cmd_result}")
                 return
+            
+            # 如果不是PlusCommand，尝试传统的BaseCommand处理
+            if not is_plus_command:
+                is_command, cmd_result, continue_process = await self._process_commands_with_new_system(message)
+                
+                # 如果是命令且不需要继续处理，则直接返回
+                if is_command and not continue_process:
+                    await MessageStorage.store_message(message, chat)
+                    logger.info(f"命令处理完成，跳过后续消息处理: {cmd_result}")
+                    return
 
             result = await event_manager.trigger_event(EventType.ON_MESSAGE,message=message)
             if not result.all_continue_process():

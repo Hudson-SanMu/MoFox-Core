@@ -697,6 +697,12 @@ class MaizoneIntercomConfig(ValidatedConfigBase):
     groups: List[ContextGroup] = Field(default_factory=list, description="Maizone互通组列表")
 
 
+class CommandConfig(ValidatedConfigBase):
+    """命令系统配置类"""
+    
+    command_prefixes: List[str] = Field(default_factory=lambda: ['/', '!', '.', '#'], description="支持的命令前缀列表")
+
+
 class PermissionConfig(ValidatedConfigBase):
     """权限系统配置类"""
     

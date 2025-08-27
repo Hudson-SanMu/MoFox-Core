@@ -12,6 +12,7 @@ class ComponentType(Enum):
 
     ACTION = "action"  # 动作组件
     COMMAND = "command"  # 命令组件
+    PLUS_COMMAND = "plus_command"  # 增强命令组件
     TOOL = "tool"  # 工具组件
     SCHEDULER = "scheduler"  # 定时任务组件（预留）
     EVENT_HANDLER = "event_handler"  # 事件处理组件
@@ -162,6 +163,22 @@ class CommandInfo(ComponentInfo):
     def __post_init__(self):
         super().__post_init__()
         self.component_type = ComponentType.COMMAND
+
+
+@dataclass
+class PlusCommandInfo(ComponentInfo):
+    """增强命令组件信息"""
+
+    command_aliases: List[str] = field(default_factory=list)  # 命令别名列表
+    priority: int = 0  # 命令优先级
+    chat_type_allow: ChatType = ChatType.ALL  # 允许的聊天类型
+    intercept_message: bool = False  # 是否拦截消息
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.command_aliases is None:
+            self.command_aliases = []
+        self.component_type = ComponentType.PLUS_COMMAND
 
 
 @dataclass

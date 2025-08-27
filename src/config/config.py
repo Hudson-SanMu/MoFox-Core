@@ -44,6 +44,7 @@ from src.config.official_configs import (
     MonthlyPlanSystemConfig,
     CrossContextConfig,
     PermissionConfig,
+    CommandConfig,
     MaizoneIntercomConfig,
 )
 
@@ -395,6 +396,7 @@ class Config(ValidatedConfigBase):
     voice: VoiceConfig = Field(..., description="语音配置")
     schedule: ScheduleConfig = Field(..., description="调度配置")
     permission: PermissionConfig = Field(..., description="权限配置")
+    command: CommandConfig = Field(..., description="命令系统配置")
     
     # 有默认值的字段放在后面
     anti_prompt_injection: AntiPromptInjectionConfig = Field(default_factory=lambda: AntiPromptInjectionConfig(), description="反提示注入配置")
