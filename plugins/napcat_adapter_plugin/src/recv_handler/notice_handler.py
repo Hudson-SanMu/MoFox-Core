@@ -6,6 +6,7 @@ from typing import Tuple, Optional
 
 from src.common.logger import get_logger
 logger = get_logger("napcat_adapter")
+
 from ..config import global_config
 from ..config.features_config import features_manager
 from ..database import BanUser, db_manager, is_identical
@@ -22,6 +23,8 @@ from ..utils import (
     get_stranger_info,
     read_ban_list,
 )
+
+from ...CONSTS import PLUGIN_NAME
 
 notice_queue: asyncio.Queue[MessageBase] = asyncio.Queue(maxsize=100)
 unsuccessful_notice_queue: asyncio.Queue[MessageBase] = asyncio.Queue(maxsize=3)
@@ -118,7 +121,7 @@ class NoticeHandler:
                     case NoticeType.Notify.input_status:
                         from src.plugin_system.core.event_manager import event_manager
                         from ...event_types import NapcatEvent
-                        await event_manager.trigger_event(NapcatEvent.ON_FRIEND_INPUT)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.FRIEND_INPUT,plugin_name=PLUGIN_NAME)
                     case _:
                         logger.warning(f"不支持的notify类型: {notice_type}.{sub_type}")
             case NoticeType.group_ban:

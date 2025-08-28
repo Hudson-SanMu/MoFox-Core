@@ -2,6 +2,8 @@ import sys
 import asyncio
 import json
 import websockets as Server
+from . import event_types,CONSTS
+
 from typing import List, Tuple
 
 from src.plugin_system import BasePlugin, BaseEventHandler, register_plugin, EventType, ConfigField, BaseAction, ActionActivationType
@@ -98,7 +100,7 @@ class LauchNapcatAdapterHandler(BaseEventHandler):
 
 @register_plugin
 class NapcatAdapterPlugin(BasePlugin):
-    plugin_name = "napcat_adapter"
+    plugin_name = CONSTS.PLUGIN_NAME
     enable_plugin: bool = True
     dependencies: List[str] = []  # 插件依赖列表
     python_dependencies: List[str] = []  # Python包依赖列表
@@ -119,7 +121,10 @@ class NapcatAdapterPlugin(BasePlugin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        
+        for e in event_types.NapcatEvent.ON_RECEIVED:
+            event_manager.register_event(e ,allowed_triggers=[self.plugin_name])
+    
     def get_plugin_components(self):
         components = []
         if self.get_config("plugin.enabled",""):

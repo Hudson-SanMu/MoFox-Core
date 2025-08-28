@@ -1,6 +1,8 @@
 from ...event_types import NapcatEvent
 from src.plugin_system.core.event_manager import event_manager
 from src.common.logger import get_logger
+from ...CONSTS import PLUGIN_NAME
+
 logger = get_logger("napcat_adapter")
 
 from ..config import global_config
@@ -329,14 +331,14 @@ class MessageHandler:
                 case RealMessageType.text:
                     ret_seg = await self.handle_text_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_TEXT,message_seg=ret_seg)   
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.TEXT,plugin_name=PLUGIN_NAME,message_seg=ret_seg)   
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("text处理失败")
                 case RealMessageType.face:
                     ret_seg = await self.handle_face_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_FACE,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.FACE,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("face处理失败或不支持")
@@ -344,7 +346,7 @@ class MessageHandler:
                     if not in_reply:
                         ret_seg = await self.handle_reply_message(sub_message)
                         if ret_seg:
-                            await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_REPLY,message_seg=ret_seg)
+                            await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.REPLY,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                             seg_message += ret_seg
                         else:
                             logger.warning("reply处理失败")
@@ -352,7 +354,7 @@ class MessageHandler:
                     logger.debug(f"开始处理图片消息段")
                     ret_seg = await self.handle_image_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_IMAGE,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.IMAGE,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                         logger.debug(f"图片处理成功，添加到消息段")
                     else:
@@ -361,7 +363,7 @@ class MessageHandler:
                 case RealMessageType.record:
                     ret_seg = await self.handle_record_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_RECORD,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.RECORD,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.clear()
                         seg_message.append(ret_seg)
                         break  # 使得消息只有record消息
@@ -370,7 +372,7 @@ class MessageHandler:
                 case RealMessageType.video:
                     ret_seg = await self.handle_video_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_VIDEO,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.VIDEO,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("video处理失败")
@@ -381,28 +383,28 @@ class MessageHandler:
                         raw_message.get("group_id"),
                     )
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_AT,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.AT,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("at处理失败")
                 case RealMessageType.rps:
                     ret_seg = await self.handle_rps_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_RPS,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.RPS,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("rps处理失败")
                 case RealMessageType.dice:
                     ret_seg = await self.handle_dice_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_DICE,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.DICE,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("dice处理失败")
                 case RealMessageType.shake:
                     ret_seg = await self.handle_shake_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_SHAKE,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.SHAKE,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("shake处理失败")
@@ -425,7 +427,7 @@ class MessageHandler:
                 case RealMessageType.json:
                     ret_seg = await self.handle_json_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED_JSON,message_seg=ret_seg)
+                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.JSON,plugin_name=PLUGIN_NAME,message_seg=ret_seg)
                         seg_message.append(ret_seg)
                     else:
                         logger.warning("json处理失败")
