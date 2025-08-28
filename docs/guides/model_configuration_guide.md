@@ -43,7 +43,7 @@ retry_interval = 10                     # 重试间隔（秒）
 | `name` | ✅ | 服务商名称，需要在模型配置中引用 | - |
 | `base_url` | ✅ | API服务的基础URL | - |
 | `api_key` | ✅ | API密钥，请替换为实际密钥 | - |
-| `client_type` | ❌ | 客户端类型：`openai`（OpenAI格式）或 `aiohttp_gemini`(至少现在支持良好) | `openai` |
+| `client_type` | ❌ | 客户端类型：`openai`、`gemini` 或 `aiohttp_gemini` | `openai` |
 | `max_retry` | ❌ | API调用失败时的最大重试次数 | 2 |
 | `timeout` | ❌ | API请求超时时间（秒） | 30 |
 | `retry_interval` | ❌ | 重试间隔时间（秒） | 10 |
@@ -72,7 +72,7 @@ client_type = "openai"
 ```toml
 [[api_providers]]
 name = "Google"
-base_url = "https://api.google.com/v1" #在MoFox-Bot中, 使用aiohttp_gemini客户端的提供商可以自定义base_url
+base_url = "https://generativelanguage.googleapis.com/v1beta" # 在MoFox-Bot中, 使用aiohttp_gemini客户端的提供商可以自定义base_url
 api_key = "your-google-api-key"
 client_type = "aiohttp_gemini"  # 注意：Gemini需要使用特殊客户端
 ```
@@ -132,7 +132,6 @@ thinking = {type = "disabled"} # 禁用思考
 ```
 请注意，`extra_params` 的配置应该构成一个合法的TOML字典结构，具体内容取决于API服务商的要求。
 
-**请注意，对于`client_type`为`gemini`的模型，此字段无效。**
 ### 3.3 配置参数说明
 
 | 参数 | 必填 | 说明 |
@@ -144,6 +143,7 @@ thinking = {type = "disabled"} # 禁用思考
 | `price_out` | ❌ | 输出价格（元/M token），用于成本统计 |
 | `force_stream_mode` | ❌ | 是否强制使用流式输出 |
 | `extra_params` | ❌ | 额外的模型参数配置 |
+| `anti_truncation` | ❌ | 是否启用反截断功能 |
 
 ## 4. 模型任务配置
 
@@ -175,7 +175,7 @@ max_tokens = 800
 ```
 
 ### planner - 决策模型
-负责决定MaiBot该做什么：
+负责决定MoFox_Bot该做什么：
 ```toml
 [model_task_config.planner]
 model_list = ["siliconflow-deepseek-v3"]
@@ -184,7 +184,7 @@ max_tokens = 800
 ```
 
 ### emotion - 情绪模型
-负责MaiBot的情绪变化：
+负责MoFox_Bot的情绪变化：
 ```toml
 [model_task_config.emotion]
 model_list = ["siliconflow-deepseek-v3"]
@@ -250,6 +250,44 @@ max_tokens = 800
 [model_task_config.lpmm_qa]
 model_list = ["deepseek-r1-distill-qwen-32b"]
 temperature = 0.7
+max_tokens = 800
+```
+
+### schedule_generator - 日程生成模型
+```toml
+[model_task_config.schedule_generator]
+model_list = ["deepseek-v3"]
+temperature = 0.5
+max_tokens = 1024
+```
+
+### monthly_plan_generator - 月度计划生成模型
+```toml
+[model_task_config.monthly_plan_generator]
+model_list = ["deepseek-v3"]
+temperature = 0.7
+max_tokens = 1024
+```
+
+### emoji_vlm - 表情包VLM模型
+```toml
+[model_task_config.emoji_vlm]
+model_list = ["qwen-vl-max"]
+max_tokens = 800
+```
+
+### anti_injection - 反注入模型
+```toml
+[model_task_config.anti_injection]
+model_list = ["deepseek-v3"]
+temperature = 0.1
+max_tokens = 512
+```
+
+### utils_video - 视频分析模型
+```toml
+[model_task_config.utils_video]
+model_list = ["qwen-vl-max"]
 max_tokens = 800
 ```
 
