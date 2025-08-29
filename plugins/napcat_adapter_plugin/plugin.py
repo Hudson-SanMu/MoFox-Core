@@ -206,7 +206,7 @@ class APITestHandler(BaseEventHandler):
 @register_plugin
 class NapcatAdapterPlugin(BasePlugin):
     plugin_name = CONSTS.PLUGIN_NAME
-    enable_plugin: bool = True
+    enable_plugin: bool = False
     dependencies: List[str] = []  # 插件依赖列表
     python_dependencies: List[str] = []  # Python包依赖列表
     config_file_name: str = "config.toml"  # 配置文件名

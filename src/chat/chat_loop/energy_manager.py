@@ -94,7 +94,7 @@ class EnergyManager:
                 continue
 
             # 判断当前是否为睡眠时间
-            is_sleeping = schedule_manager.is_sleeping(self.context.wakeup_manager)
+            is_sleeping = schedule_manager.is_sleeping()
 
             if is_sleeping:
                 # 睡眠中：减少睡眠压力
