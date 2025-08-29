@@ -137,7 +137,9 @@ class WakeUpManager:
             
         # 只有在休眠且非失眠状态下才累积唤醒度
         from src.schedule.schedule_manager import schedule_manager
-        if not schedule_manager.is_sleeping() or self.context.is_in_insomnia:
+        from src.schedule.sleep_manager import SleepState
+        current_sleep_state = schedule_manager.get_current_sleep_state()
+        if current_sleep_state != SleepState.SLEEPING:
             return False
             
         old_value = self.wakeup_value

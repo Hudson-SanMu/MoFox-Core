@@ -46,11 +46,6 @@ class HfcContext:
         self.sleep_pressure = 0.0
         self.was_sleeping = False # 用于检测睡眠状态的切换
         
-        # 失眠状态
-        self.is_in_insomnia: bool = False
-        self.insomnia_end_time: float = 0.0
-        self.last_wakeup_time: float = 0.0 # 被吵醒的时间
-        
         self.last_message_time = time.time()
         self.last_read_time = time.time() - 10
         
@@ -78,8 +73,6 @@ class HfcContext:
         if state and isinstance(state, dict):
             self.energy_value = state.get("energy_value", 5.0)
             self.sleep_pressure = state.get("sleep_pressure", 0.0)
-            self.is_in_insomnia = state.get("is_in_insomnia", False)
-            self.insomnia_end_time = state.get("insomnia_end_time", 0.0)
             logger = get_logger("hfc_context")
             logger.info(f"{self.log_prefix} 成功从本地存储加载HFC上下文状态: {state}")
         else:
@@ -91,9 +84,6 @@ class HfcContext:
         state = {
             "energy_value": self.energy_value,
             "sleep_pressure": self.sleep_pressure,
-            "is_in_insomnia": self.is_in_insomnia,
-            "insomnia_end_time": self.insomnia_end_time,
-            "last_wakeup_time": self.last_wakeup_time,
         }
         local_storage[self._get_storage_key()] = state
         logger = get_logger("hfc_context")
