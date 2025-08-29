@@ -1,12 +1,13 @@
 import sys
 import asyncio
 import json
+import inspect
 import websockets as Server
-from . import event_types,CONSTS
+from . import event_types,CONSTS,event_handlers
 
 from typing import List, Tuple
 
-from src.plugin_system import BasePlugin, BaseEventHandler, register_plugin, EventType, ConfigField, BaseAction, ActionActivationType
+from src.plugin_system import BasePlugin, BaseEventHandler, register_plugin, EventType, ConfigField
 from src.plugin_system.base.base_event import HandlerResult
 from src.plugin_system.core.event_manager import event_manager
 
@@ -31,6 +32,13 @@ from .src.response_pool import put_response, check_timeout_response
 from .src.websocket_manager import websocket_manager
 
 message_queue = asyncio.Queue()
+
+def get_classes_in_module(module):
+    classes = []
+    for name, member in inspect.getmembers(module):
+        if inspect.isclass(member):
+            classes.append(member)
+    return classes
 
 class LauchNapcatAdapterHandler(BaseEventHandler):
     """自动启动Adapter"""
@@ -98,6 +106,25 @@ class LauchNapcatAdapterHandler(BaseEventHandler):
         asyncio.create_task(self.message_process())
         asyncio.create_task(check_timeout_response())
 
+class APITestHandler(BaseEventHandler):
+    handler_name: str = "napcat_api_test_handler"
+    handler_description: str = "接口测试"
+    weight: int = 100
+    intercept_message: bool = False
+    init_subscribe = [EventType.ON_MESSAGE]
+
+    async def execute(self,_):
+        logger.info("5s后开始测试napcat接口...")
+        await asyncio.sleep(5)
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.SET_PROFILE,
+            nickname="我叫杰瑞喵、",
+            personal_note="喵汪~",
+            sex=2
+            )
+        logger.info(res.get_message_result())
+        return HandlerResult(True,True,"")
+        
 @register_plugin
 class NapcatAdapterPlugin(BasePlugin):
     plugin_name = CONSTS.PLUGIN_NAME
@@ -124,8 +151,21 @@ class NapcatAdapterPlugin(BasePlugin):
         
         for e in event_types.NapcatEvent.ON_RECEIVED:
             event_manager.register_event(e ,allowed_triggers=[self.plugin_name])
-    
+        
+        for e in event_types.NapcatEvent.ACCOUNT:
+            event_manager.register_event(e,allowed_subscribers=[f"{e.value}_handler"])
+
+        for e in event_types.NapcatEvent.GROUP:
+            event_manager.register_event(e,allowed_subscribers=[f"{e.value}_handler"])
+
+        for e in event_types.NapcatEvent.MESSAGE:
+            event_manager.register_event(e,allowed_subscribers=[f"{e.value}_handler"])
+
     def get_plugin_components(self):
         components = []
         components.append((LauchNapcatAdapterHandler.get_handler_info(), LauchNapcatAdapterHandler))
+        components.append((APITestHandler.get_handler_info(), APITestHandler))
+        for handler in get_classes_in_module(event_handlers):
+            if issubclass(handler,BaseEventHandler):
+                components.append((handler.get_handler_info(), handler))
         return components

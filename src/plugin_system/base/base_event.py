@@ -40,6 +40,19 @@ class HandlerResultsCollection:
         """获取continue_process为False的handler结果"""
         return [result for result in self.results if not result.continue_process]
     
+    def get_message_result(self) -> Any:
+        """获取handler的message
+        
+        当只有一个handler的结果时，直接返回那个handler结果中的message字段
+        否则用字典的形式{handler_name:message}返回
+        """
+        if len(self.results) == 0:
+            return {}
+        elif len(self.results) == 1:
+            return self.results[0].message
+        else:
+            return {result.handler_name: result.message for result in self.results}
+    
     def get_handler_result(self, handler_name: str) -> Optional[HandlerResult]:
         """获取指定handler的结果"""
         for result in self.results:
