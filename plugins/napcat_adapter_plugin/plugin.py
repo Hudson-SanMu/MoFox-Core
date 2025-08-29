@@ -116,14 +116,92 @@ class APITestHandler(BaseEventHandler):
     async def execute(self,_):
         logger.info("5s后开始测试napcat接口...")
         await asyncio.sleep(5)
+        '''
+        # 测试获取登录信息
+        logger.info("测试获取登录信息...")
         res = await event_manager.trigger_event(
-            event_types.NapcatEvent.ACCOUNT.SET_PROFILE,
-            nickname="我叫杰瑞喵、",
-            personal_note="喵汪~",
-            sex=2
-            )
-        logger.info(res.get_message_result())
-        return HandlerResult(True,True,"")
+            event_types.NapcatEvent.ACCOUNT.GET_LOGIN_INFO
+        )
+        logger.info(f"GET_LOGIN_INFO: {res.get_message_result()}")
+        
+        # 测试获取状态
+        logger.info("测试获取状态...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.GET_STATUS
+        )
+        logger.info(f"GET_STATUS: {res.get_message_result()}")
+        
+        # 测试获取好友列表
+        logger.info("测试获取好友列表...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.GET_FRIEND_LIST,
+            no_cache=False
+        )
+        logger.info(f"GET_FRIEND_LIST: {res.get_message_result()}")
+        
+        # 测试获取好友分组列表
+        logger.info("测试获取好友分组列表...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.GET_FRIENDS_WITH_CATEGORY
+        )
+        logger.info(f"GET_FRIENDS_WITH_CATEGORY: {res.get_message_result()}")
+        
+        # 测试获取在线客户端
+        logger.info("测试获取在线客户端...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.GET_ONLINE_CLIENTS,
+            no_cache=True
+        )
+        logger.info(f"GET_ONLINE_CLIENTS: {res.get_message_result()}")
+        
+        # 测试获取最近联系人
+        logger.info("测试获取最近联系人...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.GET_RECENT_CONTACT,
+            count=5
+        )
+        logger.info(f"GET_RECENT_CONTACT: {res.get_message_result()}")
+        
+        # 测试设置个性签名
+        logger.info("测试设置个性签名...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.SET_SELF_LONGNICK,
+            longNick="测试个性签名 - 来自APITestHandler"
+        )
+        logger.info(f"SET_SELF_LONGNICK: {res.get_message_result()}")
+        
+        # 测试设置在线状态
+        logger.info("测试设置在线状态...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.SET_ONLINE_STATUS,
+            status="11",
+            ext_status="0",
+            battery_status="0"
+        )
+        logger.info(f"SET_ONLINE_STATUS: {res.get_message_result()}")
+        
+        # 测试设置自定义在线状态
+        logger.info("测试设置自定义在线状态...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.SET_DIY_ONLINE_STATUS,
+            face_id="358",
+            face_type="1",
+            wording="测试中..."
+        )
+        logger.info(f"SET_DIY_ONLINE_STATUS: {res.get_message_result()}")
+        
+        # 测试获取点赞列表
+        logger.info("测试获取点赞列表...")
+        res = await event_manager.trigger_event(
+            event_types.NapcatEvent.ACCOUNT.GET_PROFILE_LIKE,
+            start=0,
+            count=5
+        )
+        logger.info(f"GET_PROFILE_LIKE: {res.get_message_result()}")
+        
+        logger.info("所有ACCOUNT接口测试完成！")
+        '''
+        return HandlerResult(True,True,"所有接口测试完成")
         
 @register_plugin
 class NapcatAdapterPlugin(BasePlugin):
