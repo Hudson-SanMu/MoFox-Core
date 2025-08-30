@@ -2,7 +2,7 @@ from src.plugin_system import BaseEventHandler
 from src.plugin_system.base.base_event import HandlerResult
 
 from .src.send_handler import send_handler
-from .event_types import NapcatEvent
+from . import event_types
 
 from src.common.logger import get_logger
 logger = get_logger("napcat_adapter")
@@ -13,7 +13,7 @@ class SetProfileHandler(BaseEventHandler):
     handler_description: str = "设置账号信息"
     weight: int = 100
     intercept_message: bool = False
-    init_subscribe = [NapcatEvent.ACCOUNT.SET_PROFILE]
+    init_subscribe = [event_types.NapcatEvent.ACCOUNT.SET_PROFILE]
 
     async def execute(self,params:dict):
         raw = params.get("raw",{})
