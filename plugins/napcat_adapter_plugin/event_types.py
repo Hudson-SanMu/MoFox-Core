@@ -320,7 +320,7 @@ class NapcatEvent(Enum):
         '''获取好友列表
         
         Args:
-            no_cache (Opetional[bool]): 是否不使用缓存
+            no_cache (Optional[bool]): 是否不使用缓存
             raw (Optional[dict]): 原始请求体
         
         Returns:
@@ -352,9 +352,9 @@ class NapcatEvent(Enum):
         '''获取点赞列表
         
         Args:
-            user_id (Opetional[str|int]): 用户id,指定用户,不填为获取所有
-            start (Opetional[int]): 起始值
-            count (Opetional[int]): 返回数量
+            user_id (Optional[str|int]): 用户id,指定用户,不填为获取所有
+            start (Optional[int]): 起始值
+            count (Optional[int]): 返回数量
             raw (Optional[dict]): 原始请求体
 
         Returns:
@@ -425,9 +425,9 @@ class NapcatEvent(Enum):
         '''删除好友
         
         Args:
-            user_id (Opetional[str|int]): 用户id(必需)
-            temp_block (Opetional[bool]): 拉黑(必需)
-            temp_both_del (Opetional[bool]): 双向删除(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            temp_block (Optional[bool]): 拉黑(必需)
+            temp_both_del (Optional[bool]): 双向删除(必需)
             raw (Optional[dict]): 原始请求体
         
         Returns:
@@ -447,7 +447,7 @@ class NapcatEvent(Enum):
         '''获取(指定)用户状态
         
         Args:
-            user_id (Opetional[str|int]): 用户id(必需)
+            user_id (Optional[str|int]): 用户id(必需)
             raw (Optional[dict]): 原始请求体
         
         Returns:
@@ -568,8 +568,8 @@ class NapcatEvent(Enum):
         '''发送私聊消息
         
         Args:
-            user_id (Opetional[str|int]): 用户id(必需)
-            message (Opetional[str]): 消息object(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            message (Optional[str]): 消息object(必需)
             raw (Optional[dict]): 原始请求体
         
         Returns:
@@ -884,7 +884,7 @@ class NapcatEvent(Enum):
             "echo": "string"
         }
         '''
-        SEND_FORWARF_MSG = "napcat_send_forward_msg"    
+        SEND_FORWARD_MSG = "napcat_send_forward_msg"    
         '''发送合并转发消息
         
         Args:
@@ -929,73 +929,886 @@ class NapcatEvent(Enum):
         }
         '''
 
+
     class GROUP(Enum):
         """
         该分类是对群聊相关的操作，只能由外部触发，napcat_plugin负责处理
         """
-        SET_GROUP_SEARCH = "napcat_set_group_search"
-        '''设置群搜索'''
-        GET_GROUP_DETAIL_INFO = "napcat_get_group_detail_info"  
-        '''获取群详细信息'''
+        GET_GROUP_INFO = "napcat_get_group_info"  
+        '''获取群信息
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体
+
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "group_all_shut": 0,
+                "group_remark": "string",
+                "group_id": "string",
+                "group_name": "string",
+                "member_count": 0,
+                "max_member_count": 0
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_ADD_OPTION = "napcat_set_group_add_option"    
-        '''设置群添加选项'''
-        SET_GROUP_ROBOT_ADD_OPTION = "napcat_set_group_robot_add_option"    
-        '''设置群机器人添加选项'''
+        '''设置群添加选项
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            add_type (Optional[str]): 群添加类型(必需)
+            group_question (Optional[str]): 群添加问题
+            group_answer (Optional[str]): 群添加答案
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_KICK_MEMBERS = "napcat_set_group_kick_members"    
-        '''批量踢出群成员'''
+        '''批量踢出群成员
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[List[str|int]]): 用户id列表(必需)
+            reject_add_request (Optional[bool]): 是否群拉黑
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
+        SET_GROUP_REMARK = "napcat_set_group_remark"
+        '''设置群备注
+
+        Args:
+            group_id (Optional[str]): 群号(必需)
+            remark (Optional[str]): 备注内容(必需)
+            raw (Optional[dict]): 原始请求体
+
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }     
+        ''' 
         SET_GROUP_KICK = "napcat_set_group_kick"    
-        '''群踢人'''
+        '''群踢人
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            reject_add_request (Optional[bool]): 是否群拉黑
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_SYSTEM_MSG = "napcat_get_group_system_msg"    
-        '''获取群系统消息'''
+        '''获取群系统消息
+        
+        Args:
+            count (Optional[int]): 获取数量(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "InvitedRequest": [
+                    {
+                        "request_id": 0,
+                        "invitor_uin": 0,
+                        "invitor_nick": "string",
+                        "group_id": 0,
+                        "message": "string",
+                        "group_name": "string",
+                        "checked": true,
+                        "actor": 0,
+                        "requester_nick": "string"
+                    }
+                ],
+                "join_requests": [
+                    {
+                        "request_id": 0,
+                        "invitor_uin": 0,
+                        "invitor_nick": "string",
+                        "group_id": 0,
+                        "message": "string",
+                        "group_name": "string",
+                        "checked": true,
+                        "actor": 0,
+                        "requester_nick": "string"
+                    }
+                ]
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_BAN = "napcat_set_group_ban"  
-        '''群禁言'''
+        '''群禁言
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            duration (Optional[int]): 禁言时间：秒(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_ESSENCE_MSG_LIST = "napcat_get_essence_msg_list"    
-        '''获取群精华消息'''
+        '''获取群精华消息
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": [
+                {
+                    "msg_seq": 0,
+                    "msg_random": 0,
+                    "sender_id": 0,
+                    "sender_nick": "string",
+                    "operator_id": 0,
+                    "operator_nick": "string",
+                    "message_id": 0,
+                    "operator_time": 0,
+                    "content": [
+                        {
+                            "type": "text",
+                            "data": {
+                                "text": "string"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_WHOLE_BAN = "napcat_set_group_whole_ban"  
-        '''全体禁言'''
+        '''全体禁言
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            enable (Optional[bool]): 是否启用(必需)
+            raw (Optional[dict]): 原始请求体
+
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_PORTRAINT = "napcat_set_group_portrait"   
-        '''设置群头像'''
+        '''设置群头像
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            file (Optional[str]): 文件路径(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "result": 0,
+                "errMsg": "success"
+            },
+            "message": "",
+            "wording": "",
+            "echo": null
+        }
+        '''
         SET_GROUP_ADMIN = "napcat_set_group_admin"  
-        '''设置群管理'''
+        '''设置群管理
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            enable (Optional[bool]): 是否设为群管理(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_CARD = "napcat_group_card"    
-        '''设置群成员名片'''
+        '''设置群成员名片
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            card (Optional[str]): 为空则为取消群名片
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_ESSENCE_MSG = "napcat_set_essence_msg"  
-        '''设置群精华消息'''
+        '''设置群精华消息
+        
+        Args:
+            message_id (Optional[str|int]): 消息id(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "errCode": 0,
+                "errMsg": "success",
+                "result": {
+                    "wording": "",
+                    "digestUin": "0",
+                    "digestTime": 0,
+                    "msg": {
+                        "groupCode": "0",
+                        "msgSeq": 0,
+                        "msgRandom": 0,
+                        "msgContent": [],
+                        "textSize": "0",
+                        "picSize": "0",
+                        "videoSize": "0",
+                        "senderUin": "0",
+                        "senderTime": 0,
+                        "addDigestUin": "0",
+                        "addDigestTime": 0,
+                        "startTime": 0,
+                        "latestMsgSeq": 0,
+                        "opType": 0
+                    },
+                    "errorCode": 0
+                }
+            },
+            "message": "",
+            "wording": "",
+            "echo": null
+        }
+        '''
         SET_GROUP_NAME = "napcat_set_group_name"    
-        '''设置群名'''
+        '''设置群名
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            group_name (Optional[str]): 群名(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         DELETE_ESSENCE_MSG = "napcat_delete_essence_msg"    
-        '''删除群精华消息'''
+        '''删除群精华消息
+        
+        Args:
+            message_id (Optional[str|int]): 消息id(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict:{
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "errCode": 0,
+                "errMsg": "success",
+                "result": {
+                    "wording": "",
+                    "digestUin": "0",
+                    "digestTime": 0,
+                    "msg": {
+                        "groupCode": "0",
+                        "msgSeq": 0,
+                        "msgRandom": 0,
+                        "msgContent": [],
+                        "textSize": "0",
+                        "picSize": "0",
+                        "videoSize": "0",
+                        "senderUin": "0",
+                        "senderTime": 0,
+                        "addDigestUin": "0",
+                        "addDigestTime": 0,
+                        "startTime": 0,
+                        "latestMsgSeq": 0,
+                        "opType": 0
+                    },
+                    "errorCode": 0
+                }
+            },
+            "message": "",
+            "wording": "",
+            "echo": null
+        }
+        '''
         SET_GROUP_LEAVE = "napcat_set_group_leave"  
-        '''退群'''
+        '''退群
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SEND_GROUP_NOTICE = "napcat_group_notice"   
-        '''发送群公告'''
+        '''发送群公告
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            content (Optional[str]): 公告内容(必需)
+            image (Optional[str]): 图片地址
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_SPECIAL_TITLE = "napcat_set_group_special_title"  
-        '''设置群头衔'''
+        '''设置群头衔
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            special_title (Optional[str]): 为空则取消头衔
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_NOTICE = "napcat_get_group_notice"    
-        '''获取群公告'''
+        '''获取群公告
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": [
+                {
+                    "notice_id": "63491e2f000000004f4d1e677d2b0200",
+                    "sender_id": 123,
+                    "publish_time": 1730039119,
+                    "message": {
+                        "text": "这是一条神奇的群公告",
+                        "image": [
+                            {
+                                "id": "aJJBbZ6BqyLiaC1kmpvIWGBBkJerEfpRBHX5Brxbaurs",
+                                "height": "400",
+                                "width": "400"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "message": "",
+            "wording": "",
+            "echo": null
+        }
+        '''
         SET_GROUP_ADD_REQUEST = "napcat_set_group_add_request"  
-        '''处理加群请求'''
-        GET_GROUP_INFO = "napcat_get_group_info"    
-        '''获取群信息'''
+        '''处理加群请求
+        
+        Args:
+            flag (Optional[str]): 请求id(必需)
+            approve (Optional[bool]): 是否同意(必需)
+            reason (Optional[str]): 拒绝理由
+            raw (Optional[dict]): 原始请求体
+
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": null,
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_LIST = "napcat_get_group_list"    
-        '''获取群列表'''
+        '''获取群列表
+        
+        Args:
+            no_cache (Optional[bool]): 是否不缓存
+            raw (Optional[dict]): 原始请求体  
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": [
+                {
+                    "group_all_shut": 0,
+                    "group_remark": "string",
+                    "group_id": "string",
+                    "group_name": "string",
+                    "member_count": 0,
+                    "max_member_count": 0
+                }
+            ],
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }   
+        '''
         DELETE_GROUP_NOTICE = "napcat_del_group_notice"
-        '''删除群公告'''
+        '''删除群公告
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            notice_id (Optional[str]): 公告id(必需)
+            raw (Optional[dict]): 原始请求体  
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "result": 0,
+                "errMsg": "string"
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_MEMBER_INFO = "napcat_get_group_member_info"
-        '''获取群成员信息'''
+        '''获取群成员信息
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            user_id (Optional[str|int]): 用户id(必需)
+            no_cache (Optional[bool]): 是否不缓存
+            raw (Optional[dict]): 原始请求体 
+    
+        Returns:
+            dict:{
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "group_id": 0,
+                "user_id": 0,
+                "nickname": "string",
+                "card": "string",
+                "sex": "string",
+                "age": 0,
+                "join_time": 0,
+                "last_sent_time": 0,
+                "level": 0,
+                "qq_level": 0,
+                "role": "string",
+                "title": "string",
+                "area": "string",
+                "unfriendly": true,
+                "title_expire_time": 0,
+                "card_changeable": true,
+                "shut_up_timestamp": 0,
+                "is_robot": true,
+                "qage": "string"
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_MEMBER_LIST = "napcat_get_group_member_list"
-        '''获取群成员列表'''
+        '''获取群成员列表
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            no_cache (Optional[bool]): 是否不缓存
+            raw (Optional[dict]): 原始请求体 
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": [
+                {
+                    "group_id": 0,
+                    "user_id": 0,
+                    "nickname": "string",
+                    "card": "string",
+                    "sex": "string",
+                    "age": 0,
+                    "join_time": 0,
+                    "last_sent_time": 0,
+                    "level": 0,
+                    "qq_level": 0,
+                    "role": "string",
+                    "title": "string",
+                    "area": "string",
+                    "unfriendly": true,
+                    "title_expire_time": 0,
+                    "card_changeable": true,
+                    "shut_up_timestamp": 0,
+                    "is_robot": true,
+                    "qage": "string"
+                }
+            ],
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_HONOR_INFO = "napcat_get_group_honor_info"
-        '''获取群荣誉'''
+        '''获取群荣誉
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            type (Optional[str]): 看详情
+            raw (Optional[dict]): 原始请求体 
+        
+        Returns:
+            dict:{
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "group_id": "string",
+                "current_talkative": {
+                    "user_id": 0,
+                    "nickname": "string",
+                    "avatar": 0,
+                    "description": "string"
+                },
+                "talkative_list": [
+                    {
+                        "user_id": 0,
+                        "nickname": "string",
+                        "avatar": 0,
+                        "description": "string"
+                    }
+                ],
+                "performer_list": [
+                    {
+                        "user_id": 0,
+                        "nickname": "string",
+                        "avatar": 0,
+                        "description": "string"
+                    }
+                ],
+                "legend_list": [
+                    {
+                        "user_id": 0,
+                        "nickname": "string",
+                        "avatar": 0,
+                        "description": "string"
+                    }
+                ],
+                "emotion_list": [
+                    {
+                        "user_id": 0,
+                        "nickname": "string",
+                        "avatar": 0,
+                        "description": "string"
+                    }
+                ],
+                "strong_newbie_list": [
+                    {
+                        "user_id": 0,
+                        "nickname": "string",
+                        "avatar": 0,
+                        "description": "string"
+                    }
+                ]
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_INFO_EX = "napcat_get_group_info_ex"
-        '''获取群信息ex'''   
+        '''获取群信息ex
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体 
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "groupCode": "790514019",
+                "resultCode": 0,
+                "extInfo": {
+                    "groupInfoExtSeq": 1,
+                    "reserve": 0,
+                    "luckyWordId": "0",
+                    "lightCharNum": 0,
+                    "luckyWord": "",
+                    "starId": 0,
+                    "essentialMsgSwitch": 0,
+                    "todoSeq": 0,
+                    "blacklistExpireTime": 0,
+                    "isLimitGroupRtc": 0,
+                    "companyId": 0,
+                    "hasGroupCustomPortrait": 1,
+                    "bindGuildId": "0",
+                    "groupOwnerId": {
+                        "memberUin": "1129317309",
+                        "memberUid": "u_4_QA-QaFryh-Ocgsv4_8EQ",
+                        "memberQid": ""
+                    },
+                    "essentialMsgPrivilege": 0,
+                    "msgEventSeq": "0",
+                    "inviteRobotSwitch": 0,
+                    "gangUpId": "0",
+                    "qqMusicMedalSwitch": 0,
+                    "showPlayTogetherSwitch": 0,
+                    "groupFlagPro1": "0",
+                    "groupBindGuildIds": {
+                        "guildIds": []
+                    },
+                    "viewedMsgDisappearTime": "0",
+                    "groupExtFlameData": {
+                        "switchState": 0,
+                        "state": 0,
+                        "dayNums": [],
+                        "version": 0,
+                        "updateTime": "0",
+                        "isDisplayDayNum": false
+                    },
+                    "groupBindGuildSwitch": 0,
+                    "groupAioBindGuildId": "0",
+                    "groupExcludeGuildIds": {
+                        "guildIds": []
+                    },
+                    "fullGroupExpansionSwitch": 0,
+                    "fullGroupExpansionSeq": "0",
+                    "inviteRobotMemberSwitch": 0,
+                    "inviteRobotMemberExamine": 0,
+                    "groupSquareSwitch": 0
+                }
+            },
+            "message": "",
+            "wording": "",
+            "echo": null
+        }      
+        '''   
         GET_GROUP_AT_ALL_REMAIN = "napcat_get_group_at_all_remain"
-        '''获取群 @全体成员 剩余次数'''
+        '''获取群 @全体成员 剩余次数
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体 
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "can_at_all": true,
+                "remain_at_all_count_for_group": 0,
+                "remain_at_all_count_for_uin": 0
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_SHUT_LIST = "napcat_get_group_shut_list"
-        '''获取群禁言列表'''
+        '''获取群禁言列表
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体 
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": [
+                {
+                    "uid": "string",
+                    "qid": "string",
+                    "uin": "string",
+                    "nick": "string",
+                    "remark": "string",
+                    "cardType": 0,
+                    "cardName": "string",
+                    "role": 0,
+                    "avatarPath": "string",
+                    "shutUpTime": 0,
+                    "isDelete": true,
+                    "isSpecialConcerned": true,
+                    "isSpecialShield": true,
+                    "isRobot": true,
+                    "groupHonor": {},
+                    "memberRealLevel": 0,
+                    "memberLevel": 0,
+                    "globalGroupLevel": 0,
+                    "globalGroupPoint": 0,
+                    "memberTitleId": 0,
+                    "memberSpecialTitle": "string",
+                    "specialTitleExpireTime": "string",
+                    "userShowFlag": 0,
+                    "userShowFlagNew": 0,
+                    "richFlag": 0,
+                    "mssVipType": 0,
+                    "bigClubLevel": 0,
+                    "bigClubFlag": 0,
+                    "autoRemark": "string",
+                    "creditLevel": 0,
+                    "joinTime": 0,
+                    "lastSpeakTime": 0,
+                    "memberFlag": 0,
+                    "memberFlagExt": 0,
+                    "memberMobileFlag": 0,
+                    "memberFlagExt2": 0,
+                    "isSpecialShielded": true,
+                    "cardNameId": 0
+                }
+            ],
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         GET_GROUP_IGNORED_NOTIFIES = "napcat_get_group_ignored_notifies"
-        '''获取群过滤系统消息'''
+        '''获取群过滤系统消息
+        
+        Returns:
+            dict: {
+            "status": "ok",
+            "retcode": 0,
+            "data": {
+                "InvitedRequest": [
+                    {
+                        "request_id": 0,
+                        "invitor_uin": 0,
+                        "invitor_nick": "string",
+                        "group_id": 0,
+                        "message": "string",
+                        "group_name": "string",
+                        "checked": true,
+                        "actor": 0,
+                        "requester_nick": "string"
+                    }
+                ],
+                "join_requests": [
+                    {
+                        "request_id": 0,
+                        "invitor_uin": 0,
+                        "invitor_nick": "string",
+                        "group_id": 0,
+                        "message": "string",
+                        "group_name": "string",
+                        "checked": true,
+                        "actor": 0,
+                        "requester_nick": "string"
+                    }
+                ]
+            },
+            "message": "string",
+            "wording": "string",
+            "echo": "string"
+        }
+        '''
         SET_GROUP_SIGN = "napcat_set_group_sign"
-        '''群打卡'''
+        '''群打卡
+        
+        Args:
+            group_id (Optional[str|int]): 群号(必需)
+            raw (Optional[dict]): 原始请求体 
 
+        Returns:
+            dict: {}
+        '''
 
+    class FILE(Enum):
+        ...
