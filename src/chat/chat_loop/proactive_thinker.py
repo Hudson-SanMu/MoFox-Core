@@ -273,9 +273,21 @@ class ProactiveThinker:
 
             # 如果决策不是 do_nothing，则执行
             if action_result and action_result.get("action_type") != "do_nothing":
-                logger.info(
-                    f"{self.context.log_prefix} 主动思考决策: {action_result.get('action_type')}, 原因: {action_result.get('reasoning')}"
-                )
+                logger.info(f"{self.context.log_prefix} 主动思考决策: {action_result.get('action_type')}, 原因: {action_result.get('reasoning')}")
+                # 在主动思考时，如果 target_message 为 None，则默认选取最新 message 作为 target_message
+                if target_message is None and self.context.chat_stream and self.context.chat_stream.context:
+                    from src.chat.message_receive.message import MessageRecv
+                    latest_message = self.context.chat_stream.context.get_last_message()
+                    if isinstance(latest_message, MessageRecv):
+                        user_info = latest_message.message_info.user_info
+                        target_message = {
+                            "chat_info_platform": latest_message.message_info.platform,
+                            "user_platform": user_info.platform if user_info else None,
+                            "user_id": user_info.user_id if user_info else None,
+                            "processed_plain_text": latest_message.processed_plain_text,
+                            "is_mentioned": latest_message.is_mentioned,
+                        }
+
                 # 将决策结果交给 cycle_processor 的后续流程处理
                 await self.cycle_processor.execute_plan(action_result, target_message)
             else:
