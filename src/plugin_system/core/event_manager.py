@@ -67,8 +67,8 @@ class EventManager:
 
         event = BaseEvent(event_name, allowed_subscribers, allowed_triggers)
         self._events[event_name] = event
-        logger.info(f"事件 {event_name} 注册成功")
-
+        logger.debug(f"事件 {event_name} 注册成功")
+        
         # 检查是否有缓存的订阅需要处理
         self._process_pending_subscriptions(event_name)
 
