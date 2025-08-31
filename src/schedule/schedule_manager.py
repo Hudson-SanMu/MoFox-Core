@@ -182,13 +182,14 @@ class ScheduleManager:
             await self.generate_and_save_schedule()
 
     async def generate_and_save_schedule(self):
-        """启动日程生成任务"""
+        """将日程生成任务提交到后台执行"""
         if self.schedule_generation_running:
             logger.info("日程生成任务已在运行中，跳过重复启动")
             return
 
-        # 直接执行日程生成
-        await self._async_generate_and_save_schedule()
+        logger.info("检测到需要生成日程，已提交后台任务。")
+        task = OnDemandScheduleGenerationTask(self)
+        await async_task_manager.add_task(task)
 
     async def _async_generate_and_save_schedule(self):
         """异步生成并保存日程的内部方法"""
@@ -442,6 +443,20 @@ class ScheduleManager:
                 return False
 
         return True
+
+
+class OnDemandScheduleGenerationTask(AsyncTask):
+    """按需生成日程的后台任务"""
+
+    def __init__(self, schedule_manager: "ScheduleManager"):
+        task_name = f"OnDemandScheduleGenerationTask-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        super().__init__(task_name=task_name)
+        self.schedule_manager = schedule_manager
+
+    async def run(self):
+        logger.info(f"后台任务 {self.task_name} 开始执行日程生成。")
+        await self.schedule_manager._async_generate_and_save_schedule()
+        logger.info(f"后台任务 {self.task_name} 完成。")
 
 
 class DailyScheduleGenerationTask(AsyncTask):
