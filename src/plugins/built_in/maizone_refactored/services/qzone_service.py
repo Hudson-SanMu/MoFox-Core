@@ -789,8 +789,9 @@ class QZoneService:
         async def _reply(fid, host_qq, target_name, content, comment_tid):
             """回复评论"""
             try:
+                # 构造需要的参数
                 data = {
-                    "topicId": f"{host_qq}_{fid}__{comment_tid}",
+                    "topicId": f"{host_qq}_{fid}_2",  # 主题ID格式修改
                     "uin": uin,
                     "hostUin": host_qq,
                     "content": content,
@@ -801,6 +802,7 @@ class QZoneService:
                     "ref": "feeds",
                     "richtype": "",
                     "richval": "",
+                    "parent_tid": comment_tid,  # 添加父评论ID
                     "paramstr": f"@{target_name} {content}",
                 }
                 
