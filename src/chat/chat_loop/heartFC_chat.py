@@ -12,6 +12,7 @@ from src.chat.express.expression_learner import expression_learner_manager
 from src.plugin_system.base.component_types import ChatMode
 from src.schedule.schedule_manager import schedule_manager, SleepState
 from src.plugin_system.apis import message_api
+from src.chat.willing.willing_manager import get_willing_manager
 
 from .hfc_context import HfcContext
 from .energy_manager import EnergyManager
@@ -59,7 +60,7 @@ class HeartFChatting:
         
         # 记录最近3次的兴趣度
         self.recent_interest_records: deque = deque(maxlen=3)
-
+        self.willing_manager = get_willing_manager()
         self._initialize_chat_mode()
         logger.info(f"{self.context.log_prefix} HeartFChatting 初始化完成")
 

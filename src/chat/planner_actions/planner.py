@@ -590,6 +590,20 @@ class ActionPlanner:
             else:
                 logger.warning(f"{self.log_prefix}使用中的动作 {action_name} 未在已注册动作中找到")
 
+        # 将no_reply作为系统级特殊动作添加到可用动作中
+        # no_reply虽然是系统级决策，但需要让规划器认为它是可用的
+        no_reply_info = ActionInfo(
+            name="no_reply",
+            component_type=ComponentType.ACTION,
+            description="系统级动作：选择不回复消息的决策",
+            action_parameters={},
+            activation_keywords=[],
+            plugin_name="SYSTEM",
+            enabled=True,  # 始终启用
+            parallel_action=False,
+        )
+        current_available_actions["no_reply"] = no_reply_info
+
         return is_group_chat, chat_target_info, current_available_actions
 
 

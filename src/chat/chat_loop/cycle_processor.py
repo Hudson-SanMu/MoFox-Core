@@ -30,9 +30,7 @@ class CycleProcessor:
             context: HFC聊天上下文对象，包含聊天流、能量值等信息
             response_handler: 响应处理器，负责生成和发送回复
             cycle_tracker: 循环跟踪器，负责记录和管理每次思考循环的信息
-        """
-        self.log_prefix = f"[{get_chat_manager().get_stream_name(self.stream_id) or self.stream_id}]"
-        
+        """    
         self.context = context
         self.response_handler = response_handler
         self.cycle_tracker = cycle_tracker
@@ -40,7 +38,9 @@ class CycleProcessor:
         self.action_modifier = ActionModifier(
             action_manager=self.context.action_manager, chat_id=self.context.stream_id
         )
-        
+
+        self.log_prefix = self.context.log_prefix
+
     async def _send_and_store_reply(
         self,
         response_set,
@@ -52,7 +52,7 @@ class CycleProcessor:
         plan_result,
     ) -> Tuple[Dict[str, Any], str, Dict[str, float]]:
         with Timer("回复发送", cycle_timers):
-            reply_text = await self._send_response(response_set, reply_to_str, loop_start_time, action_message)
+            reply_text = await self.response_handler.send_response(response_set, reply_to_str, loop_start_time, action_message)
 
             # 存储reply action信息
         person_info_manager = get_person_info_manager()
@@ -64,7 +64,7 @@ class CycleProcessor:
         action_prompt_display = f"你对{person_name}进行了回复：{reply_text}"
 
         await database_api.store_action_info(
-            chat_stream=self.chat_stream,
+            chat_stream=self.context.chat_stream,
             action_build_into_prompt=False,
             action_prompt_display=action_prompt_display,
             action_done=True,
@@ -248,7 +248,7 @@ class CycleProcessor:
                     gather_timeout = global_config.chat.thinking_timeout
                     try:
                         response_set = await asyncio.wait_for(
-                            self.response_handler._generate_response(
+                            self.response_handler.generate_response(
                                 message_data=action_info["action_message"],
                                 available_actions=action_info["available_actions"],
                                 reply_to=reply_to_str,
@@ -284,7 +284,6 @@ class CycleProcessor:
                             "loop_info": None
                         }
 
-                    # TODO: Where is my fucking _send_and_store_reply?
                     loop_info, reply_text, cycle_timers_reply = await self._send_and_store_reply(
                         response_set,
                         reply_to_str,

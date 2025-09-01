@@ -64,7 +64,7 @@ class ResponseHandler:
         - 构建并返回完整的循环信息
         - 用于上级方法的状态跟踪
         """
-        reply_text = await self._send_response(response_set, reply_to_str, loop_start_time, action_message)
+        reply_text = await self.send_response(response_set, reply_to_str, loop_start_time, action_message)
 
         person_info_manager = get_person_info_manager()
 
@@ -105,7 +105,7 @@ class ResponseHandler:
 
         return loop_info, reply_text, cycle_timers
 
-    async def _send_response(self, reply_set, reply_to, thinking_start_time, message_data) -> str:
+    async def send_response(self, reply_set, reply_to, thinking_start_time, message_data) -> str:
         """
         发送回复内容的具体实现
 
