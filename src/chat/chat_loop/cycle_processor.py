@@ -3,6 +3,7 @@ import time
 import traceback
 from typing import Optional, Dict, Any
 
+from src.chat.utils.timer_calculator import Timer
 from src.common.logger import get_logger
 from src.config.config import global_config
 from src.chat.planner_actions.planner import ActionPlanner
@@ -65,12 +66,13 @@ class CycleProcessor:
 
         loop_start_time = time.time()
 
-        try:
-            await self.action_modifier.modify_actions()
-            available_actions = self.context.action_manager.get_using_actions()
-        except Exception as e:
-            logger.error(f"{self.context.log_prefix} 动作修改失败: {e}")
-            available_actions = {}
+        with Timer("动作修改", cycle_timers):
+            try:
+                await self.action_modifier.modify_actions()
+                available_actions = self.context.action_manager.get_using_actions()
+            except Exception as e:
+                logger.error(f"{self.context.log_prefix} 动作修改失败: {e}")
+                available_actions = {}
 
         is_mentioned_bot = message_data.get("is_mentioned", False)
         at_bot_mentioned = (global_config.chat.mentioned_bot_inevitable_reply and is_mentioned_bot) or (
