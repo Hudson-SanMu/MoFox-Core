@@ -2,8 +2,8 @@ import json
 import asyncio
 
 from src.common.logger import get_logger
-from src.message_chunker import chunker
-from src.config import global_config
+from ..message_chunker import chunker
+from ..config import global_config
 
 logger = get_logger("napcat_adapter")
 from maim_message import MessageBase, Router
