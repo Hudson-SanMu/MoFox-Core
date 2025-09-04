@@ -361,6 +361,7 @@ class GraphNodes(Base):
     concept = Column(get_string_field(255), nullable=False, unique=True, index=True)
     memory_items = Column(Text, nullable=False)
     hash = Column(Text, nullable=False)
+    weight = Column(Float, nullable=False, default=1.0)
     created_time = Column(Float, nullable=False)
     last_modified = Column(Float, nullable=False)
 
