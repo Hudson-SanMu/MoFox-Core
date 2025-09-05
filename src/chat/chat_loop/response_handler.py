@@ -12,7 +12,7 @@ from .hfc_context import HfcContext
 # 导入反注入系统
 from src.chat.antipromptinjector import get_anti_injector
 from src.chat.antipromptinjector.types import ProcessResult
-from src.chat.utils.prompt_builder import Prompt
+from src.chat.utils.prompt import Prompt
 
 logger = get_logger("hfc")
 anti_injector_logger = get_logger("anti_injector")

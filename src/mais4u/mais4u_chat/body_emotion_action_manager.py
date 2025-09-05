@@ -7,7 +7,7 @@ from src.llm_models.utils_model import LLMRequest
 from src.common.logger import get_logger
 from src.chat.utils.chat_message_builder import build_readable_messages, get_raw_msg_by_timestamp_with_chat_inclusive
 from src.config.config import global_config, model_config
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.manager.async_task_manager import AsyncTask, async_task_manager
 from src.plugin_system.apis import send_api
 

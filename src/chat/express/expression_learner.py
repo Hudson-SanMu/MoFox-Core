@@ -13,7 +13,7 @@ from src.common.database.sqlalchemy_models import Expression
 from src.llm_models.utils_model import LLMRequest
 from src.config.config import model_config, global_config
 from src.chat.utils.chat_message_builder import get_raw_msg_by_timestamp_with_chat_inclusive, build_anonymous_messages
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.chat.message_receive.chat_stream import get_chat_manager
 
 

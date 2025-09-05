@@ -1,6 +1,6 @@
 """
 共享提示词工具模块 - 消除重复代码
-提供统一的工具函数供DefaultReplyer和SmartPrompt使用
+提供统一的工具函数供DefaultReplyer和统一Prompt系统使用
 """
 
 import re

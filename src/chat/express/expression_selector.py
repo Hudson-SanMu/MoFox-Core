@@ -11,7 +11,7 @@ from src.config.config import global_config, model_config
 from src.common.logger import get_logger
 from sqlalchemy import select
 from src.common.database.sqlalchemy_models import Expression
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.common.database.sqlalchemy_database_api import get_db_session
 
 logger = get_logger("expression_selector")

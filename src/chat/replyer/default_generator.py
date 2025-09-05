@@ -1,6 +1,6 @@
 """
-默认回复生成器 - 集成SmartPrompt系统
-使用重构后的SmartPrompt系统替换原有的复杂提示词构建逻辑
+默认回复生成器 - 集成统一Prompt系统
+使用重构后的统一Prompt系统替换原有的复杂提示词构建逻辑
 """
 
 import traceback
@@ -22,7 +22,7 @@ from src.chat.message_receive.chat_stream import ChatStream
 from src.chat.message_receive.uni_message_sender import HeartFCSender
 from src.chat.utils.timer_calculator import Timer
 from src.chat.utils.utils import get_chat_type_and_target_info
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.chat.utils.chat_message_builder import (
     build_readable_messages,
     get_raw_msg_before_timestamp_with_chat,
@@ -36,8 +36,8 @@ from src.person_info.person_info import Person, is_person_known
 from src.plugin_system.base.component_types import ActionInfo, EventType
 from src.plugin_system.apis import llm_api
 
-# 导入新的智能Prompt系统
-from src.chat.utils.smart_prompt import SmartPrompt, SmartPromptParameters
+# 导入新的统一Prompt系统
+from src.chat.utils.prompt import Prompt, PromptContext
 
 logger = get_logger("replyer")
 
@@ -998,8 +998,8 @@ class DefaultReplyer:
         # 根据配置选择模板
         current_prompt_mode = global_config.personality.prompt_mode
 
-        # 使用重构后的SmartPrompt系统
-        prompt_params = SmartPromptParameters(
+        # 使用新的统一Prompt系统
+        prompt_context = PromptContext(
             chat_id=chat_id,
             is_group_chat=is_group_chat,
             sender=sender,
@@ -1032,12 +1032,9 @@ class DefaultReplyer:
             action_descriptions=action_descriptions,
         )
 
-        # 使用重构后的SmartPrompt系统
-        smart_prompt = SmartPrompt(
-            template_name=None,  # 由current_prompt_mode自动选择
-            parameters=prompt_params,
-        )
-        prompt_text = await smart_prompt.build_prompt()
+        # 使用新的统一Prompt系统
+        prompt = Prompt(template_name=None, context=prompt_context)  # 由current_prompt_mode自动选择
+        prompt_text = await prompt.build_prompt()
 
         return prompt_text
 
@@ -1139,8 +1136,8 @@ class DefaultReplyer:
 
         template_name = "default_expressor_prompt"
 
-        # 使用重构后的SmartPrompt系统 - Expressor模式
-        prompt_params = SmartPromptParameters(
+        # 使用新的统一Prompt系统 - Expressor模式
+        prompt_context = PromptContext(
             chat_id=chat_id,
             is_group_chat=is_group_chat,
             sender=sender,
@@ -1160,8 +1157,8 @@ class DefaultReplyer:
             relation_info_block=relation_info,
         )
 
-        smart_prompt = SmartPrompt(parameters=prompt_params)
-        prompt_text = await smart_prompt.build_prompt()
+        prompt = Prompt(template_name=template_name, context=prompt_context)
+        prompt_text = await prompt.build_prompt()
 
         return prompt_text
 

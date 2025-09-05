@@ -1,6 +1,6 @@
 from src.config.config import global_config
 from src.common.logger import get_logger
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.chat.utils.chat_message_builder import build_readable_messages, get_raw_msg_before_timestamp_with_chat
 import time
 from src.chat.utils.utils import get_recent_group_speaker

@@ -12,7 +12,7 @@ from src.chat.message_receive.chat_stream import get_chat_manager, ChatStream
 from src.chat.message_receive.message import MessageRecv, MessageRecvS4U
 from src.chat.message_receive.storage import MessageStorage
 from src.chat.heart_flow.heartflow_message_processor import HeartFCMessageReceiver
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.plugin_system.core import component_registry, event_manager, global_announcement_manager
 from src.plugin_system.base import BaseCommand, EventType
 from src.mais4u.mais4u_chat.s4u_msg_processor import S4UMessageProcessor

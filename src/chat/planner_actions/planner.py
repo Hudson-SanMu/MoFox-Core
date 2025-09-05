@@ -9,7 +9,7 @@ from json_repair import repair_json
 from src.llm_models.utils_model import LLMRequest
 from src.config.config import global_config, model_config
 from src.common.logger import get_logger
-from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
+from src.chat.utils.prompt import Prompt, global_prompt_manager
 from src.chat.utils.chat_message_builder import (
     build_readable_actions,
     get_actions_by_timestamp_with_chat,
