@@ -13,6 +13,7 @@ from src.common.logger import get_logger
 import imghdr
 import asyncio
 from src.plugin_system.apis import llm_api, config_api, generator_api
+from src.plugin_system.apis.cross_context_api import get_chat_history_by_group_name
 from src.chat.message_receive.chat_stream import get_chat_manager
 from maim_message import UserInfo
 from src.llm_models.utils_model import LLMRequest
@@ -86,6 +87,11 @@ class ContentService:
             # 如果有上下文，则加入到prompt中
             if context:
                 prompt += f"\n作为参考，这里有一些最近的聊天记录：\n---\n{context}\n---"
+
+            # 添加跨群聊上下文
+            cross_context = await get_chat_history_by_group_name("maizone_context_group")
+            if cross_context and "找不到名为" not in cross_context:
+                prompt += f"\n\n---跨群聊参考---\n{cross_context}\n---"
 
             # 添加历史记录以避免重复
             prompt += "\n\n---历史说说记录---\n"
@@ -232,7 +238,7 @@ class ContentService:
         for i in range(3):  # 重试3次
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(image_url, timeout=30) as resp:
+                    async with session.get(image_url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                         if resp.status != 200:
                             logger.error(f"下载图片失败: {image_url}, status: {resp.status}")
                             await asyncio.sleep(2)

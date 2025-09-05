@@ -1,5 +1,5 @@
 [inner]
-version = "6.7.1"
+version = "6.7.2"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -495,13 +495,9 @@ chat_ids = [
     ["group", "1025509724"],   # 假设这是“产品群”的ID
     ["private", "123456789"] # 假设这是某个用户的私聊
 ]
-[maizone_intercom]
-# QQ空间互通组配置
-# 启用后，发布说说时会读取指定互通组的上下文
-enable = false
 # 定义QQ空间互通组
 # 同一个组的chat_id会共享上下文，用于生成更相关的说说
-[[maizone_intercom.groups]]
+[[cross_context.maizone_context_group]]
 name = "Maizone默认互通组"
 chat_ids = [
     ["group", "111111"], # 示例群聊1

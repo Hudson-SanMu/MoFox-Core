@@ -25,9 +25,11 @@ def get_context_groups(chat_id: str) -> Optional[List[List[str]]]:
         return None
 
     is_group = current_stream.group_info is not None
-    current_chat_raw_id = (
-        current_stream.group_info.group_id if is_group else current_stream.user_info.user_id
-    )
+    if is_group:
+        assert current_stream.group_info is not None
+        current_chat_raw_id = current_stream.group_info.group_id
+    else:
+        current_chat_raw_id = current_stream.user_info.user_id
     current_type = "group" if is_group else "private"
 
     for group in global_config.cross_context.groups:
@@ -128,5 +130,67 @@ async def build_cross_context_s4u(
 
     if not cross_context_messages:
         return ""
+
+    return "# 跨上下文参考\n" + "\n\n".join(cross_context_messages) + "\n"
+
+
+async def get_chat_history_by_group_name(group_name: str) -> str:
+    """
+    根据互通组名字获取聊天记录
+    """
+    target_group = None
+    for group in global_config.cross_context.groups:
+        if group.name == group_name:
+            target_group = group
+            break
+
+    if not target_group:
+        return f"找不到名为 {group_name} 的互通组。"
+
+    if not target_group.chat_ids:
+        return f"互通组 {group_name} 中没有配置任何聊天。"
+
+    chat_infos = target_group.chat_ids
+    chat_manager = get_chat_manager()
+
+    cross_context_messages = []
+    for chat_type, chat_raw_id in chat_infos:
+        is_group = chat_type == "group"
+
+        found_stream = None
+        for stream in chat_manager.streams.values():
+            if is_group:
+                if stream.group_info and stream.group_info.group_id == chat_raw_id:
+                    found_stream = stream
+                    break
+            else:  # private
+                if stream.user_info and stream.user_info.user_id == chat_raw_id and not stream.group_info:
+                    found_stream = stream
+                    break
+
+        if not found_stream:
+            logger.warning(f"在已加载的聊天流中找不到ID为 {chat_raw_id} 的聊天。")
+            continue
+
+        stream_id = found_stream.stream_id
+
+        try:
+            messages = get_raw_msg_before_timestamp_with_chat(
+                chat_id=stream_id,
+                timestamp=time.time(),
+                limit=5,  # 可配置
+            )
+            if messages:
+                chat_name = get_chat_manager().get_stream_name(stream_id) or chat_raw_id
+                formatted_messages, _ = build_readable_messages_with_id(
+                    messages, timestamp_mode="relative"
+                )
+                cross_context_messages.append(f'[以下是来自"{chat_name}"的近期消息]\n{formatted_messages}')
+        except Exception as e:
+            logger.error(f"获取聊天 {chat_raw_id} 的消息失败: {e}")
+            continue
+
+    if not cross_context_messages:
+        return f"无法从互通组 {group_name} 中获取任何聊天记录。"
 
     return "# 跨上下文参考\n" + "\n\n".join(cross_context_messages) + "\n"
