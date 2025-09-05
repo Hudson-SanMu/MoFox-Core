@@ -18,7 +18,7 @@ from .proactive.proactive_thinker import ProactiveThinker
 from .cycle_processor import CycleProcessor
 from .response_handler import ResponseHandler
 from .cycle_tracker import CycleTracker
-from .wakeup_manager import WakeUpManager
+from .sleep_manager.wakeup_manager import WakeUpManager
 from .proactive.events import ProactiveTriggerEvent
 
 logger = get_logger("hfc")

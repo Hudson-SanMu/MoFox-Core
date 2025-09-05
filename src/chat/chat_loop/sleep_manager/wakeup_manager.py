@@ -4,7 +4,7 @@ from typing import Optional
 from src.common.logger import get_logger
 from src.config.config import global_config
 from src.manager.local_store_manager import local_storage
-from .hfc_context import HfcContext
+from ..hfc_context import HfcContext
 
 logger = get_logger("wakeup")
 
@@ -139,7 +139,7 @@ class WakeUpManager:
 
         # 只有在休眠且非失眠状态下才累积唤醒度
         from src.schedule.schedule_manager import schedule_manager
-        from src.schedule.sleep_manager import SleepState
+        from mmc.src.chat.chat_loop.sleep_manager.sleep_manager import SleepState
 
         current_sleep_state = schedule_manager.get_current_sleep_state()
         if current_sleep_state != SleepState.SLEEPING:

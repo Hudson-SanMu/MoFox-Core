@@ -7,7 +7,7 @@ from src.chat.planner_actions.action_manager import ActionManager
 from src.chat.chat_loop.hfc_utils import CycleDetail
 
 if TYPE_CHECKING:
-    from .wakeup_manager import WakeUpManager
+    from .sleep_manager.wakeup_manager import WakeUpManager
     from .energy_manager import EnergyManager
     from .heartFC_chat import HeartFChatting
 

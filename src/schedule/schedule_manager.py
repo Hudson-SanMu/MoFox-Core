@@ -15,10 +15,10 @@ from src.llm_models.utils_model import LLMRequest
 from src.common.logger import get_logger
 from json_repair import repair_json
 from src.manager.async_task_manager import AsyncTask, async_task_manager
-from .sleep_manager import SleepManager, SleepState
+from ..chat.chat_loop.sleep_manager.sleep_manager import SleepManager, SleepState
 
 if TYPE_CHECKING:
-    from src.chat.chat_loop.wakeup_manager import WakeUpManager
+    from src.chat.chat_loop.sleep_manager.wakeup_manager import WakeUpManager
 
 
 logger = get_logger("schedule_manager")

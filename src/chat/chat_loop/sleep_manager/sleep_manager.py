@@ -10,7 +10,7 @@ from src.manager.local_store_manager import local_storage
 from src.plugin_system.apis import send_api, generator_api
 
 if TYPE_CHECKING:
-    from src.chat.chat_loop.wakeup_manager import WakeUpManager
+    from mmc.src.chat.chat_loop.sleep_manager.wakeup_manager import WakeUpManager
 
 logger = get_logger("sleep_manager")
 
