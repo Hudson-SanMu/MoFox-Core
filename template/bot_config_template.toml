@@ -478,19 +478,20 @@ pre_sleep_notification_groups = []
 # 用于生成睡前消息的提示。AI会根据这个提示生成一句晚安问候。
 pre_sleep_prompt = "我准备睡觉了，请生成一句简短自然的晚安问候。"
 
-[cross_context] # 跨群聊上下文共享配置
+[cross_context] # 跨群聊/私聊上下文共享配置
 # 这是总开关，用于一键启用或禁用此功能
-enable = false
+enable = true
 # 在这里定义您的“共享组”
-# 只有在同一个组内的群聊才会共享上下文
-# 注意：这里的chat_ids需要填写群号
+# 只有在同一个组内的聊天才会共享上下文
+# 格式：chat_ids = [["type", "id"], ["type", "id"], ...]
+# type 可选 "group" 或 "private"
 [[cross_context.groups]]
 name = "项目A技术讨论组"
 chat_ids = [
-    "111111",  # 假设这是“开发群”的ID
-    "222222"   # 假设这是“产品群”的ID
+    ["group", "169850076"],  # 假设这是“开发群”的ID
+    ["group", "1025509724"],   # 假设这是“产品群”的ID
+    ["private", "123456789"] # 假设这是某个用户的私聊
 ]
-
 [maizone_intercom]
 # QQ空间互通组配置
 # 启用后，发布说说时会读取指定互通组的上下文
@@ -500,6 +501,6 @@ enable = false
 [[maizone_intercom.groups]]
 name = "Maizone默认互通组"
 chat_ids = [
-    "111111", # 示例群聊1
-    "222222"  # 示例群聊2
+    ["group", "111111"], # 示例群聊1
+    ["private", "222222"]  # 示例私聊2
 ]
