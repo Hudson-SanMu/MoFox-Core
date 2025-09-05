@@ -5,7 +5,7 @@ from ...CONSTS import PLUGIN_NAME
 
 logger = get_logger("napcat_adapter")
 
-from src.plugin_system.core.config_manager import config_api
+from src.plugin_system.apis import config_api
 from ..message_buffer import SimpleMessageBuffer
 from ..utils import (
     get_group_info,
@@ -47,8 +47,16 @@ class MessageHandler:
     def __init__(self):
         self.server_connection: Server.ServerConnection = None
         self.bot_id_list: Dict[int, bool] = {}
+        self.plugin_config = None
         # 初始化简化消息缓冲器，传入回调函数
         self.message_buffer = SimpleMessageBuffer(merge_callback=self._send_buffered_message)
+
+    def set_plugin_config(self, plugin_config: dict):
+        """设置插件配置"""
+        self.plugin_config = plugin_config
+        # 将配置传递给消息缓冲器
+        if self.message_buffer:
+            self.message_buffer.set_plugin_config(plugin_config)
 
     async def shutdown(self):
         """关闭消息处理器，清理资源"""
@@ -89,21 +97,21 @@ class MessageHandler:
 
         # 使用新的权限管理器检查权限
         if group_id:
-            if not config_api.get_plugin_config(PLUGIN_NAME, f"features.group_allowed.{group_id}", True):
+            if not config_api.get_plugin_config(self.plugin_config, f"features.group_allowed.{group_id}", True):
                 logger.warning("群聊不在聊天权限范围内，消息被丢弃")
                 return False
         else:
-            if not config_api.get_plugin_config(PLUGIN_NAME, f"features.private_allowed.{user_id}", True):
+            if not config_api.get_plugin_config(self.plugin_config, f"features.private_allowed.{user_id}", True):
                 logger.warning("私聊不在聊天权限范围内，消息被丢弃")
                 return False
 
         # 检查全局禁止名单
-        if not ignore_global_list and config_api.get_plugin_config(PLUGIN_NAME, f"features.user_banned.{user_id}", False):
+        if not ignore_global_list and config_api.get_plugin_config(self.plugin_config, f"features.user_banned.{user_id}", False):
             logger.warning("用户在全局黑名单中，消息被丢弃")
             return False
 
         # 检查QQ官方机器人
-        if config_api.get_plugin_config(PLUGIN_NAME, "features.qq_bot_banned", False) and group_id and not ignore_bot:
+        if config_api.get_plugin_config(self.plugin_config, "features.qq_bot_banned", False) and group_id and not ignore_bot:
             logger.debug("开始判断是否为机器人")
             member_info = await get_member_info(self.get_server_connection(), group_id, user_id)
             if member_info:
@@ -148,7 +156,7 @@ class MessageHandler:
 
                 # 发送者用户信息
                 user_info: UserInfo = UserInfo(
-                    platform=config_api.get_plugin_config(PLUGIN_NAME, "maibot_server.platform_name"),
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name"),
                     user_id=sender_info.get("user_id"),
                     user_nickname=sender_info.get("nickname"),
                     user_cardname=sender_info.get("card"),
@@ -174,7 +182,7 @@ class MessageHandler:
                 nickname = fetched_member_info.get("nickname") if fetched_member_info else None
                 # 发送者用户信息
                 user_info: UserInfo = UserInfo(
-                    platform=config_api.get_plugin_config(PLUGIN_NAME, "maibot_server.platform_name"),
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name"),
                     user_id=sender_info.get("user_id"),
                     user_nickname=nickname,
                     user_cardname=None,
@@ -191,7 +199,7 @@ class MessageHandler:
                     group_name = fetched_group_info.get("group_name")
 
                 group_info: GroupInfo = GroupInfo(
-                    platform=config_api.get_plugin_config(PLUGIN_NAME, "maibot_server.platform_name"),
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name"),
                     group_id=raw_message.get("group_id"),
                     group_name=group_name,
                 )
@@ -209,7 +217,7 @@ class MessageHandler:
 
                 # 发送者用户信息
                 user_info: UserInfo = UserInfo(
-                    platform=config_api.get_plugin_config(PLUGIN_NAME, "maibot_server.platform_name"),
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name"),
                     user_id=sender_info.get("user_id"),
                     user_nickname=sender_info.get("nickname"),
                     user_cardname=sender_info.get("card"),
@@ -222,7 +230,7 @@ class MessageHandler:
                     group_name = fetched_group_info.get("group_name")
 
                 group_info: GroupInfo = GroupInfo(
-                    platform=config_api.get_plugin_config(PLUGIN_NAME, "maibot_server.platform_name"),
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name"),
                     group_id=raw_message.get("group_id"),
                     group_name=group_name,
                 )
@@ -232,12 +240,12 @@ class MessageHandler:
                 return None
 
         additional_config: dict = {}
-        if config_api.get_plugin_config(PLUGIN_NAME, "voice.use_tts"):
+        if config_api.get_plugin_config(self.plugin_config, "voice.use_tts"):
             additional_config["allow_tts"] = True
 
         # 消息信息
         message_info: BaseMessageInfo = BaseMessageInfo(
-            platform=config_api.get_plugin_config(PLUGIN_NAME, "maibot_server.platform_name"),
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name"),
             message_id=message_id,
             time=message_time,
             user_info=user_info,
@@ -259,14 +267,14 @@ class MessageHandler:
             return None
 
         # 检查是否需要使用消息缓冲
-        if config_api.get_plugin_config(PLUGIN_NAME, "features.message_buffer_enabled", False):
+        if config_api.get_plugin_config(self.plugin_config, "features.message_buffer_enabled", False):
             # 检查消息类型是否启用缓冲
             message_type = raw_message.get("message_type")
             should_use_buffer = False
 
-            if message_type == "group" and config_api.get_plugin_config(PLUGIN_NAME, "features.message_buffer_group_enabled", False):
+            if message_type == "group" and config_api.get_plugin_config(self.plugin_config, "features.message_buffer_group_enabled", False):
                 should_use_buffer = True
-            elif message_type == "private" and config_api.get_plugin_config(PLUGIN_NAME, "features.message_buffer_private_enabled", False):
+            elif message_type == "private" and config_api.get_plugin_config(self.plugin_config, "features.message_buffer_private_enabled", False):
                 should_use_buffer = True
 
             if should_use_buffer:

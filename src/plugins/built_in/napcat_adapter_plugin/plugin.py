@@ -18,7 +18,6 @@ from .src.recv_handler.meta_event_handler import meta_event_handler
 from .src.recv_handler.notice_handler import notice_handler
 from .src.recv_handler.message_sending import message_send_instance
 from .src.send_handler import send_handler
-from .src.config.features_config import features_manager
 from .src.config.migrate_features import auto_migrate_features
 from .src.mmc_com_layer import mmc_start_com, router, mmc_stop_com
 from .src.response_pool import put_response, check_timeout_response
@@ -158,11 +157,7 @@ async def graceful_shutdown():
         except Exception as e:
             logger.warning(f"停止消息重组器清理任务时出错: {e}")
 
-        # 停止功能管理器文件监控
-        try:
-            await features_manager.stop_file_watcher()
-        except Exception as e:
-            logger.warning(f"停止功能管理器文件监控时出错: {e}")
+        # 停止功能管理器文件监控（已迁移到插件系统配置，无需操作）
 
         # 关闭消息处理器（包括消息缓冲器）
         try:
@@ -234,11 +229,8 @@ class LauchNapcatAdapterHandler(BaseEventHandler):
         logger.info("启动消息重组器...")
         await reassembler.start_cleanup_task()
 
-        # 初始化功能管理器
-        logger.info("正在初始化功能管理器...")
-        features_manager.load_config()
-        await features_manager.start_file_watcher(check_interval=2.0)
-        logger.info("功能管理器初始化完成")
+        # 功能管理器已迁移到插件系统配置
+        logger.info("功能配置已迁移到插件系统")
         logger.info("开始启动Napcat Adapter")
         message_send_instance.maibot_router = router
         # 设置插件配置
@@ -250,6 +242,12 @@ class LauchNapcatAdapterHandler(BaseEventHandler):
         set_response_pool_config(self.plugin_config)
         # 设置send_handler的插件配置
         send_handler.set_plugin_config(self.plugin_config)
+        # 设置message_handler的插件配置
+        message_handler.set_plugin_config(self.plugin_config)
+        # 设置notice_handler的插件配置
+        notice_handler.set_plugin_config(self.plugin_config)
+        # 设置meta_event_handler的插件配置
+        meta_event_handler.set_plugin_config(self.plugin_config)
         # 创建单独的异步任务，防止阻塞主线程
         asyncio.create_task(napcat_server(self.plugin_config))
         asyncio.create_task(mmc_start_com(self.plugin_config))
@@ -287,6 +285,7 @@ class NapcatAdapterPlugin(BasePlugin):
         "plugin": {
             "name": ConfigField(type=str, default="napcat_adapter_plugin", description="插件名称"),
             "version": ConfigField(type=str, default="1.0.0", description="插件版本"),
+            "config_version": ConfigField(type=str, default="1.2.0", description="配置文件版本"),
             "enabled": ConfigField(type=bool, default=False, description="是否启用插件"),
         },
         "inner": {

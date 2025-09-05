@@ -145,11 +145,12 @@ class EventManager:
         logger.info(f"事件 {event_name} 已禁用")
         return True
 
-    def register_event_handler(self, handler_class: Type[BaseEventHandler]) -> bool:
+    def register_event_handler(self, handler_class: Type[BaseEventHandler], plugin_config: Optional[dict] = None) -> bool:
         """注册事件处理器
 
         Args:
             handler_class (Type[BaseEventHandler]): 事件处理器类
+            plugin_config (Optional[dict]): 插件配置字典，默认为None
 
         Returns:
             bool: 注册成功返回True，已存在返回False
@@ -163,7 +164,12 @@ class EventManager:
             logger.warning(f"事件处理器 {handler_name} 已存在，跳过注册")
             return False
 
-        self._event_handlers[handler_name] = handler_class()
+        # 创建事件处理器实例，传递插件配置
+        handler_instance = handler_class()
+        if plugin_config is not None and hasattr(handler_instance, 'set_plugin_config'):
+            handler_instance.set_plugin_config(plugin_config)
+
+        self._event_handlers[handler_name] = handler_instance
 
         # 处理init_subscribe，缓存失败的订阅
         if self._event_handlers[handler_name].init_subscribe:

@@ -248,6 +248,7 @@ class ComponentRegistry:
             logger.error(f"注册失败: {handler_name} 不是有效的EventHandler")
             return False
 
+        handler_class.plugin_name = handler_info.plugin_name
         self._event_handler_registry[handler_name] = handler_class
 
         if not handler_info.enabled:

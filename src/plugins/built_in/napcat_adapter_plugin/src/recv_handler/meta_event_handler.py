@@ -1,7 +1,7 @@
 from src.common.logger import get_logger
 
 logger = get_logger("napcat_adapter")
-from ..config import global_config
+from src.plugin_system.apis import config_api
 import time
 import asyncio
 
@@ -14,8 +14,15 @@ class MetaEventHandler:
     """
 
     def __init__(self):
-        self.interval = global_config.napcat_server.heartbeat_interval
+        self.interval = 5.0  # 默认值，稍后通过set_plugin_config设置
         self._interval_checking = False
+        self.plugin_config = None
+
+    def set_plugin_config(self, plugin_config: dict):
+        """设置插件配置"""
+        self.plugin_config = plugin_config
+        # 更新interval值
+        self.interval = config_api.get_plugin_config(self.plugin_config, "napcat_server.heartbeat_interval", 5000) / 1000
 
     async def handle_meta_event(self, message: dict) -> None:
         event_type = message.get("meta_event_type")

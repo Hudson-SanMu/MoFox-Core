@@ -7,7 +7,7 @@ from src.common.logger import get_logger
 
 logger = get_logger("napcat_adapter")
 
-from .config.features_config import features_manager
+from src.plugin_system.apis import config_api
 from .recv_handler import RealMessageType
 
 
@@ -43,6 +43,11 @@ class SimpleMessageBuffer:
         self.lock = asyncio.Lock()
         self.merge_callback = merge_callback
         self._shutdown = False
+        self.plugin_config = None
+
+    def set_plugin_config(self, plugin_config: dict):
+        """设置插件配置"""
+        self.plugin_config = plugin_config
 
     def get_session_id(self, event_data: Dict[str, Any]) -> str:
         """根据事件数据生成会话ID"""
@@ -97,8 +102,7 @@ class SimpleMessageBuffer:
             return True
 
         # 检查屏蔽前缀
-        config = features_manager.get_config()
-        block_prefixes = tuple(config.message_buffer_block_prefixes)
+        block_prefixes = tuple(config_api.get_plugin_config(self.plugin_config, "features.message_buffer_block_prefixes", []))
 
         text = text.strip()
         if text.startswith(block_prefixes):
@@ -124,15 +128,15 @@ class SimpleMessageBuffer:
         if self._shutdown:
             return False
 
-        config = features_manager.get_config()
-        if not config.enable_message_buffer:
+        # 检查是否启用消息缓冲
+        if not config_api.get_plugin_config(self.plugin_config, "features.enable_message_buffer", False):
             return False
 
         # 检查是否启用对应类型的缓冲
         message_type = event_data.get("message_type", "")
-        if message_type == "group" and not config.message_buffer_enable_group:
+        if message_type == "group" and not config_api.get_plugin_config(self.plugin_config, "features.message_buffer_enable_group", False):
             return False
-        elif message_type == "private" and not config.message_buffer_enable_private:
+        elif message_type == "private" and not config_api.get_plugin_config(self.plugin_config, "features.message_buffer_enable_private", False):
             return False
 
         # 提取文本
@@ -154,7 +158,7 @@ class SimpleMessageBuffer:
             session = self.buffer_pool[session_id]
 
             # 检查是否超过最大组件数量
-            if len(session.messages) >= config.message_buffer_max_components:
+            if len(session.messages) >= config_api.get_plugin_config(self.plugin_config, "features.message_buffer_max_components", 5):
                 logger.info(f"会话 {session_id} 消息数量达到上限，强制合并")
                 asyncio.create_task(self._force_merge_session(session_id))
                 self.buffer_pool[session_id] = BufferedSession(session_id=session_id, original_event=original_event)
@@ -187,8 +191,8 @@ class SimpleMessageBuffer:
 
     async def _wait_and_start_merge(self, session_id: str):
         """等待初始延迟后开始合并定时器"""
-        config = features_manager.get_config()
-        await asyncio.sleep(config.message_buffer_initial_delay)
+        initial_delay = config_api.get_plugin_config(self.plugin_config, "features.message_buffer_initial_delay", 0.5)
+        await asyncio.sleep(initial_delay)
 
         async with self.lock:
             session = self.buffer_pool.get(session_id)
@@ -206,8 +210,8 @@ class SimpleMessageBuffer:
 
     async def _wait_and_merge(self, session_id: str):
         """等待合并间隔后执行合并"""
-        config = features_manager.get_config()
-        await asyncio.sleep(config.message_buffer_interval)
+        interval = config_api.get_plugin_config(self.plugin_config, "features.message_buffer_interval", 2.0)
+        await asyncio.sleep(interval)
         await self._merge_session(session_id)
 
     async def _force_merge_session(self, session_id: str):

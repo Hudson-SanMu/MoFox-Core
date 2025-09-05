@@ -22,7 +22,6 @@ logger = get_logger("napcat_adapter")
 from .utils import get_image_format, convert_image_to_gif
 from .recv_handler.message_sending import message_send_instance
 from .websocket_manager import websocket_manager
-from .config.features_config import features_manager
 
 
 class SendHandler:
@@ -292,11 +291,8 @@ class SendHandler:
         """处理回复消息"""
         reply_seg = {"type": "reply", "data": {"id": id}}
 
-        # 获取功能配置
-        ft_config = features_manager.get_config()
-
         # 检查是否启用引用艾特功能
-        if not ft_config.enable_reply_at:
+        if not config_api.get_plugin_config(self.plugin_config, "features.enable_reply_at", False):
             return reply_seg
 
         try:
@@ -315,7 +311,7 @@ class SendHandler:
                 return reply_seg
 
             # 根据概率决定是否艾特用户
-            if random.random() < ft_config.reply_at_rate:
+            if random.random() < config_api.get_plugin_config(self.plugin_config, "features.reply_at_rate", 0.5):
                 at_seg = {"type": "at", "data": {"qq": str(replied_user_id)}}
                 # 在艾特后面添加一个空格
                 text_seg = {"type": "text", "data": {"text": " "}}

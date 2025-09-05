@@ -23,16 +23,19 @@ class BaseEventHandler(ABC):
     """是否拦截消息，默认为否"""
     init_subscribe: List[Union[EventType, str]] = [EventType.UNKNOWN]
     """初始化时订阅的事件名称"""
+    plugin_name = None
 
     def __init__(self):
         self.log_prefix = "[EventHandler]"
         """对应插件名"""
-        self.plugin_config: Optional[Dict] = None
-        """插件配置字典"""
+
         self.subscribed_events = []
         """订阅的事件列表"""
         if EventType.UNKNOWN in self.init_subscribe:
             raise NotImplementedError("事件处理器必须指定 event_type")
+
+        from src.plugin_system.core.component_registry import component_registry
+        self.plugin_config = component_registry.get_plugin_config(self.plugin_name)
 
     @abstractmethod
     async def execute(self, kwargs: dict | None) -> Tuple[bool, bool, Optional[str]]:
@@ -89,15 +92,7 @@ class BaseEventHandler(ABC):
             weight=cls.weight,
             intercept_message=cls.intercept_message,
         )
-
-    def set_plugin_config(self, plugin_config: Dict) -> None:
-        """设置插件配置
-
-        Args:
-            plugin_config (dict): 插件配置字典
-        """
-        self.plugin_config = plugin_config
-
+    
     def set_plugin_name(self, plugin_name: str) -> None:
         """设置插件名称
 

@@ -8,8 +8,7 @@ from src.common.logger import get_logger
 
 logger = get_logger("napcat_adapter")
 
-from ..config import global_config
-from ..config.features_config import features_manager
+from src.plugin_system.apis import config_api
 from ..database import BanUser, db_manager, is_identical
 from . import NoticeType, ACCEPT_FORMAT
 from .message_sending import message_send_instance
@@ -38,6 +37,11 @@ class NoticeHandler:
     def __init__(self):
         self.server_connection: Server.ServerConnection | None = None
         self.last_poke_time: float = 0.0  # 记录最后一次针对机器人的戳一戳时间
+        self.plugin_config = None
+
+    def set_plugin_config(self, plugin_config: dict):
+        """设置插件配置"""
+        self.plugin_config = plugin_config
 
     async def set_server_connection(self, server_connection: Server.ServerConnection) -> None:
         """设置Napcat连接"""
@@ -112,7 +116,7 @@ class NoticeHandler:
                 sub_type = raw_message.get("sub_type")
                 match sub_type:
                     case NoticeType.Notify.poke:
-                        if features_manager.is_poke_enabled() and await message_handler.check_allow_to_chat(
+                        if config_api.get_plugin_config(self.plugin_config, "features.poke_enabled", True) and await message_handler.check_allow_to_chat(
                             user_id, group_id, False, False
                         ):
                             logger.info("处理戳一戳消息")
@@ -159,13 +163,13 @@ class NoticeHandler:
             else:
                 logger.warning("无法获取notice消息所在群的名称")
             group_info = GroupInfo(
-                platform=global_config.maibot_server.platform_name,
+                platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
                 group_id=group_id,
                 group_name=group_name,
             )
 
         message_info: BaseMessageInfo = BaseMessageInfo(
-            platform=global_config.maibot_server.platform_name,
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
             message_id="notice",
             time=message_time,
             user_info=user_info,
@@ -206,7 +210,7 @@ class NoticeHandler:
         # 防抖检查：如果是针对机器人的戳一戳，检查防抖时间
         if self_id == target_id:
             current_time = time.time()
-            debounce_seconds = features_manager.get_config().poke_debounce_seconds
+            debounce_seconds = config_api.get_plugin_config(self.plugin_config, "features.poke_debounce_seconds", 2.0)
 
             if self.last_poke_time > 0:
                 time_diff = current_time - self.last_poke_time
@@ -243,7 +247,7 @@ class NoticeHandler:
 
         else:
             # 如果配置为忽略不是针对自己的戳一戳，则直接返回None
-            if features_manager.is_non_self_poke_ignored():
+            if config_api.get_plugin_config(self.plugin_config, "features.non_self_poke_ignored", False):
                 logger.info("忽略不是针对自己的戳一戳消息")
                 return None, None
 
@@ -268,7 +272,7 @@ class NoticeHandler:
             logger.warning(f"解析戳一戳消息失败: {str(e)}，将使用默认文本")
 
         user_info: UserInfo = UserInfo(
-            platform=global_config.maibot_server.platform_name,
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
             user_id=user_id,
             user_nickname=user_name,
             user_cardname=user_cardname,
@@ -299,7 +303,7 @@ class NoticeHandler:
             operator_nickname = "QQ用户"
 
         operator_info: UserInfo = UserInfo(
-            platform=global_config.maibot_server.platform_name,
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
             user_id=operator_id,
             user_nickname=operator_nickname,
             user_cardname=operator_cardname,
@@ -328,7 +332,7 @@ class NoticeHandler:
                 user_nickname = fetched_member_info.get("nickname")
                 user_cardname = fetched_member_info.get("card")
             banned_user_info: UserInfo = UserInfo(
-                platform=global_config.maibot_server.platform_name,
+                platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
                 user_id=user_id,
                 user_nickname=user_nickname,
                 user_cardname=user_cardname,
@@ -367,7 +371,7 @@ class NoticeHandler:
             operator_nickname = "QQ用户"
 
         operator_info: UserInfo = UserInfo(
-            platform=global_config.maibot_server.platform_name,
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
             user_id=operator_id,
             user_nickname=operator_nickname,
             user_cardname=operator_cardname,
@@ -393,7 +397,7 @@ class NoticeHandler:
             else:
                 logger.warning("无法获取解除禁言消息发送者的昵称，消息可能会无效")
             lifted_user_info: UserInfo = UserInfo(
-                platform=global_config.maibot_server.platform_name,
+                platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
                 user_id=user_id,
                 user_nickname=user_nickname,
                 user_cardname=user_cardname,
@@ -436,13 +440,13 @@ class NoticeHandler:
                 else:
                     logger.warning("无法获取notice消息所在群的名称")
                 group_info = GroupInfo(
-                    platform=global_config.maibot_server.platform_name,
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
                     group_id=group_id,
                     group_name=group_name,
                 )
 
                 message_info: BaseMessageInfo = BaseMessageInfo(
-                    platform=global_config.maibot_server.platform_name,
+                    platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
                     message_id="notice",
                     time=time.time(),
                     user_info=None,  # 自然解除禁言没有操作者
@@ -493,7 +497,7 @@ class NoticeHandler:
             user_cardname = fetched_member_info.get("card")
 
         lifted_user_info: UserInfo = UserInfo(
-            platform=global_config.maibot_server.platform_name,
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
             user_id=user_id,
             user_nickname=user_nickname,
             user_cardname=user_cardname,
