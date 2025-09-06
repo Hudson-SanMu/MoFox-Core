@@ -254,6 +254,8 @@ def process_human_text(
         enable_splitter: 是否启用消息分割器
         enable_chinese_typo: 是否启用错字生成器
     """
+    if isinstance(content, list):
+        content = "".join(map(str, content))
     if not isinstance(content, str):
         raise ValueError("content 必须是字符串类型")
     try:

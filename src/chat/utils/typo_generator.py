@@ -2,14 +2,12 @@
 错别字生成器 - 基于拼音和字频的中文错别字生成工具
 """
 
-import itertools
+import orjson
 import math
 import os
 import random
 import time
-
 import jieba
-import orjson
 
 from collections import defaultdict
 from pathlib import Path
@@ -32,16 +30,11 @@ class ChineseTypoGenerator:
         初始化错别字生成器。
 
         Args:
-            error_rate (float): 控制单个汉字被替换为错别字的基础概率。
-                                这个概率会根据词语长度进行调整，词语越长，单个字出错的概率越低。
-            min_freq (int): 候选替换字的最小词频阈值。一个汉字的频率低于此值时，
-                            它不会被选为替换候选字，以避免生成过于生僻的错别字。
-            tone_error_rate (float): 在寻找同音字时，有多大的概率会故意使用一个错误的声调来寻找候选字。
-                                     这可以模拟常见的声调错误，如 "shí" -> "shì"。
-            word_replace_rate (float): 控制一个多字词语被整体替换为同音词的概率。
-                                       例如，“天气” -> “天气”。
-            max_freq_diff (int): 允许的原始字与替换字之间的最大归一化频率差异。
-                                 用于确保替换字与原字的常用程度相似，避免用非常常见的字替换罕见字，反之亦然。
+            error_rate (float): 单个汉字被替换为同音字的概率。
+            min_freq (int): 候选替换字的最小词频阈值，低于此阈值的字将被忽略。
+            tone_error_rate (float): 在选择同音字时，使用错误声调的概率。
+            word_replace_rate (float): 整个词语被替换为同音词的概率。
+            max_freq_diff (int): 允许的原始字与替换字之间的最大频率差异。
         """
         self.error_rate = error_rate
         self.min_freq = min_freq
@@ -58,12 +51,11 @@ class ChineseTypoGenerator:
     def _load_or_create_char_frequency(self):
         """
         加载或创建汉字频率字典。
-        如果存在缓存文件 `depends-data/char_frequency.json`，则直接加载以提高启动速度。
-        否则，通过解析 `jieba` 的内置词典文件 `dict.txt` 来创建。
-        创建过程中，会统计每个汉字的累计频率，并进行归一化处理，然后保存为缓存文件。
+        如果存在缓存文件 `depends-data/char_frequency.json`，则直接加载。
+        否则，通过解析 `jieba` 的词典文件来创建，并保存为缓存。
 
         Returns:
-            dict: 一个将汉字映射到其归一化频率（0-1000范围）的字典。
+            dict: 一个将汉字映射到其归一化频率的字典。
         """
         cache_file = Path("depends-data/char_frequency.json")
 
@@ -100,13 +92,10 @@ class ChineseTypoGenerator:
     def _create_pinyin_dict():
         """
         创建从拼音到汉字的映射字典。
-        该方法会遍历 Unicode 中定义的常用汉字范围 (U+4E00 至 U+9FFF)，
-        为每个汉字生成带数字声调的拼音（例如 'hao3'），并构建一个从拼音到包含该拼音的所有汉字列表的映射。
-        这个字典是生成同音字和同音词的基础。
+        遍历常用汉字范围，为每个汉字生成带声调的拼音，并构建映射。
 
         Returns:
-            defaultdict: 一个将拼音字符串映射到汉字字符列表的字典。
-                         例如: {'hao3': ['好', '郝', ...]}
+            defaultdict: 一个将拼音映射到汉字列表的字典。
         """
         # 定义常用汉字的Unicode范围
         chars = [chr(i) for i in range(0x4E00, 0x9FFF)]
@@ -115,10 +104,11 @@ class ChineseTypoGenerator:
         # 为范围内的每个汉字建立拼音到汉字的映射
         for char in chars:
             try:
+                # 获取带数字声调的拼音 (e.g., 'hao3')
                 py = pinyin(char, style=Style.TONE3)
-                if py:
-                    pinyin_dict[py].append(char)
-            except (IndexError, TypeError):
+                pinyin_dict[py].append(char)
+            except Exception:
+                # 忽略无法转换拼音的字符
                 continue
 
         return pinyin_dict
@@ -154,28 +144,23 @@ class ChineseTypoGenerator:
         characters = list(sentence)
         result = []
         for char in characters:
+            # 忽略所有非中文字符
             if self._is_chinese_char(char):
-                try:
-                    py = pinyin(char, style=Style.TONE3)
-                    if py:
-                        result.append((char, py))
-                except (IndexError, TypeError):
-                    continue
+                # 获取带数字声调的拼音
+                py = pinyin(char, style=Style.TONE3)
+                result.append((char, py))
         return result
 
     @staticmethod
     def _get_similar_tone_pinyin(py):
         """
         为一个给定的拼音生成一个声调错误的相似拼音。
-        例如，输入 'hao3'，可能返回 'hao1'、'hao2' 或 'hao4'。
-        此函数用于模拟中文输入时常见的声调错误。
-        对于轻声（拼音末尾无数字声调），会随机分配一个声调。
 
         Args:
             py (str): 带数字声调的原始拼音 (e.g., 'hao3')。
 
         Returns:
-            str: 一个声调被随机改变的新拼音。
+            str: 一个声调被随机改变的拼音。
         """
         # 检查拼音是否有效
         if not py or len(py) < 1:
@@ -201,15 +186,11 @@ class ChineseTypoGenerator:
     def _calculate_replacement_probability(self, orig_freq, target_freq):
         """
         根据原始字和目标替换字的频率差异，计算替换概率。
-        这个概率模型遵循以下原则：
-        1. 如果目标字比原始字更常用，替换概率为 1.0（倾向于换成更常见的字）。
-        2. 如果频率差异超过 `max_freq_diff` 阈值，替换概率为 0.0。
-        3. 否则，使用指数衰减函数计算概率，频率差异越大，替换概率越低。
-           这使得替换更倾向于选择频率相近的字。
+        频率相近的字有更高的替换概率。
 
         Args:
-            orig_freq (float): 原始字的归一化频率。
-            target_freq (float): 目标替换字的归一化频率。
+            orig_freq (float): 原始字的频率。
+            target_freq (float): 目标替换字的频率。
 
         Returns:
             float: 替换概率，介于 0.0 和 1.0 之间。
@@ -229,19 +210,14 @@ class ChineseTypoGenerator:
     def _get_similar_frequency_chars(self, char, py, num_candidates=5):
         """
         获取与给定汉字发音相似且频率相近的候选替换字。
-        此方法首先根据 `tone_error_rate` 决定是否寻找声调错误的同音字，
-        然后合并声调正确的同音字。接着，根据字频进行过滤和排序：
-        1. 移除原始字本身和频率低于 `min_freq` 的字。
-        2. 计算每个候选字的替换概率。
-        3. 按替换概率降序排序，并返回前 `num_candidates` 个候选字。
 
         Args:
             char (str): 原始汉字。
             py (str): 原始汉字的拼音。
-            num_candidates (int): 返回的候选字数量上限。
+            num_candidates (int): 返回的候选字数量。
 
         Returns:
-            list or None: 一个包含候选替换字的列表，如果没有找到合适的候选字则返回 None。
+            list or None: 一个包含候选替换字的列表，如果没有找到则返回 None。
         """
         homophones = []
 
@@ -278,6 +254,7 @@ class ChineseTypoGenerator:
         if not candidates_with_prob:
             return None
 
+        # 根据替换概率从高到低排序
         candidates_with_prob.sort(key=lambda x: x, reverse=True)
 
         # 返回概率最高的几个候选字
@@ -292,9 +269,9 @@ class ChineseTypoGenerator:
             word (str): 输入的词语。
 
         Returns:
-            List[str]: 包含每个汉字拼音的列表。
+            list: 包含每个汉字拼音的列表。
         """
-        return ["".join(p) for p in pinyin(word, style=Style.TONE3)]
+        return [py for py in pinyin(word, style=Style.TONE3)]
 
     @staticmethod
     def _segment_sentence(sentence):
@@ -311,17 +288,14 @@ class ChineseTypoGenerator:
 
     def _get_word_homophones(self, word):
         """
-        获取一个词语的所有同音词。
-        该方法首先获取词语中每个字的拼音，然后为每个字找到所有同音字。
-        接着，使用 `itertools.product` 生成所有可能的同音字组合。
-        最后，过滤掉原始词本身，并只保留在 `jieba` 词典中存在的、有意义的词语。
-        这可以有效避免生成无意义的同音词组合。
+        获取一个词语的同音词。
+        只返回在jieba词典中存在且频率较高的有意义词语。
 
         Args:
             word (str): 原始词语。
 
         Returns:
-            List[str]: 一个包含所有有效同音词的列表。
+            list: 一个包含同音词的列表。
         """
         if len(word) <= 1:
             return []
@@ -336,28 +310,45 @@ class ChineseTypoGenerator:
                 return []  # 如果某个字没有同音字，则无法构成同音词
             candidates.append(chars)
 
-        all_combinations = itertools.product(*candidates)
-        homophones = [
-            "".join(combo)
-            for combo in all_combinations
-            if ("".join(combo) != word and "".join(combo) in jieba.dt.FREQ)
-        ]
+        # 生成所有可能的同音字组合
+        import itertools
 
-        return homophones
+        all_combinations = itertools.product(*candidates)
+
+        # 加载jieba词典以验证组合出的词是否为有效词语
+        dict_path = os.path.join(os.path.dirname(jieba.__file__), "dict.txt")
+        valid_words = {}
+        with open(dict_path, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    valid_words[parts] = float(parts[0][1])
+
+        original_word_freq = valid_words.get(word, 0)
+        # 设置一个最小词频阈值，过滤掉非常生僻的词
+        min_word_freq = original_word_freq * 0.1
+
+        homophones = []
+        for combo in all_combinations:
+            new_word = "".join(combo)
+            # 检查新词是否为有效词语且与原词不同
+            if new_word != word and new_word in valid_words:
+                new_word_freq = valid_words[new_word]
+                if new_word_freq >= min_word_freq:
+                    # 计算综合评分，结合词频和平均字频
+                    char_avg_freq = sum(self.char_frequency.get(c, 0) for c in new_word) / len(new_word)
+                    combined_score = new_word_freq * 0.7 + char_avg_freq * 0.3
+                    if combined_score >= self.min_freq:
+                        homophones.append((new_word, combined_score))
+
+        # 按综合分数排序并返回前5个结果
+        sorted_homophones = sorted(homophones, key=lambda x: x, reverse=True)
+        return [w for w, _ in sorted_homophones[:5]]
 
     def create_typo_sentence(self, sentence):
         """
         为输入句子生成一个包含错别字的版本。
-        这是核心的错别字生成方法，其流程如下：
-        1. 使用 jieba 对输入句子进行分词。
-        2. 遍历每个词语：
-           a. 如果词语长度大于1，根据 `word_replace_rate` 概率尝试进行整词替换。
-              如果找到了合适的同音词，则替换并跳过后续步骤。
-           b. 如果不进行整词替换，则遍历词语中的每个汉字。
-           c. 对每个汉字，调用 `_char_replace` 方法，根据 `error_rate` 和词语长度调整后的概率，
-              决定是否进行单字替换。
-        3. 将处理后的词语拼接成最终的错别字句子。
-        4. 从所有发生的替换中，随机选择一个作为修正建议返回。
+        该方法会先对句子进行分词，然后根据概率进行整词替换或单字替换。
 
         Args:
             sentence (str): 原始中文句子。
@@ -366,7 +357,7 @@ class ChineseTypoGenerator:
             tuple: 包含三个元素的元组：
                 - original_sentence (str): 原始句子。
                 - typo_sentence (str): 包含错别字的句子。
-                - correction_suggestion (Optional[tuple(str, str)]): 一个随机的修正建议，格式为 (错字/词, 正确字/词)，或 None。
+                - correction_suggestion (str or None): 一个随机的修正建议（可能是正确的字或词），或 None。
         """
         result = []
         typo_info = []  # 用于调试，记录详细的替换信息
@@ -406,55 +397,43 @@ class ChineseTypoGenerator:
                     word_typos.append((typo_word, word))
                     continue
 
-            new_word = "".join(
-                self._char_replace(char, py, len(word), typo_info, char_typos) for char, py in zip(word, word_pinyin)
-            )
-            result.append(new_word)
+            # 步骤2: 如果不进行整词替换，则对词中的每个字进行单字替换
+            new_word = []
+            for char, py in zip(word, word_pinyin, strict=False):
+                # 词语越长，其中单个字被替换的概率越低
+                char_error_rate = self.error_rate * (0.7 ** (len(word) - 1))
+                if random.random() < char_error_rate:
+                    similar_chars = self._get_similar_frequency_chars(char, py)
+                    if similar_chars:
+                        typo_char = random.choice(similar_chars)
+                        orig_freq = self.char_frequency.get(char, 0)
+                        typo_freq = self.char_frequency.get(typo_char, 0)
+                        # 根据频率计算最终是否替换
+                        if random.random() < self._calculate_replacement_probability(orig_freq, typo_freq):
+                            new_word.append(typo_char)
+                            typo_py = pinyin(typo_char, style=Style.TONE3)
+                            typo_info.append((char, typo_char, py, typo_py, orig_freq, typo_freq))
+                            char_typos.append((typo_char, char))
+                            continue
+                # 如果不替换，则保留原字
+                new_word.append(char)
 
-        all_typos = word_typos + char_typos
-        correction_suggestion = random.choice(all_typos) if all_typos and random.random() < 0.5 else None
+            result.append("".join(new_word))
+
+        # 步骤3: 生成修正建议
+        correction_suggestion = None
+        # 有50%的概率提供一个修正建议
+        if random.random() < 0.5:
+            # 优先从整词错误中选择
+            if word_typos:
+                _, correct_word = random.choice(word_typos)
+                correction_suggestion = correct_word
+            # 其次从单字错误中选择
+            elif char_typos:
+                _, correct_char = random.choice(char_typos)
+                correction_suggestion = correct_char
+
         return sentence, "".join(result), correction_suggestion
-
-    def _char_replace(self, char, py, word_len, typo_info, char_typos):
-        """
-        根据概率替换单个汉字。
-        这个内部方法处理单个汉字的替换逻辑。
-
-        Args:
-            char (str): 要处理的原始汉字。
-            py (str): 原始汉字的拼音。
-            word_len (int): 原始汉字所在的词语的长度。
-            typo_info (list): 用于记录详细调试信息的列表。
-            char_typos (list): 用于记录 (错字, 正确字) 的列表。
-
-        Returns:
-            str: 替换后的汉字（可能是原汉字，也可能是错别字）。
-        """
-        # 根据词语长度调整错误率：词语越长，单个字出错的概率越低。
-        # 这是一个启发式规则，模拟人们在输入长词时更不容易打错单个字。
-        char_error_rate = self.error_rate * (0.7 ** (word_len - 1))
-        if random.random() >= char_error_rate:
-            return char
-
-        # 获取发音和频率都相似的候选错别字
-        similar_chars = self._get_similar_frequency_chars(char, py)
-        if not similar_chars:
-            return char
-
-        # 从候选列表中随机选择一个
-        typo_char = random.choice(similar_chars)
-        orig_freq = self.char_frequency.get(char, 0)
-        typo_freq = self.char_frequency.get(typo_char, 0)
-
-        # 根据频率差异再次进行概率判断，决定是否执行替换
-        if random.random() >= self._calculate_replacement_probability(orig_freq, typo_freq):
-            return char
-
-        # 执行替换，并记录相关信息
-        typo_py = pinyin(typo_char, style=Style.TONE3)
-        typo_info.append((char, typo_char, py, typo_py, orig_freq, typo_freq))
-        char_typos.append((typo_char, char))
-        return typo_char
 
     @staticmethod
     def format_typo_info(typo_info):
