@@ -19,10 +19,14 @@ from .hfc_context import HfcContext
 from .response_handler import ResponseHandler
 from .cycle_tracker import CycleTracker
 
+# 日志记录器
 logger = get_logger("hfc.processor")
 
 
 class CycleProcessor:
+    """
+    循环处理器类，负责处理单次思考循环的逻辑。
+    """
     def __init__(self, context: HfcContext, response_handler: ResponseHandler, cycle_tracker: CycleTracker):
         """
         初始化循环处理器
@@ -51,14 +55,30 @@ class CycleProcessor:
         thinking_id,
         actions,
     ) -> Tuple[Dict[str, Any], str, Dict[str, float]]:
+        """
+        发送并存储回复信息
+
+        Args:
+            response_set: 回复内容集合
+            loop_start_time: 循环开始时间
+            action_message: 动作消息
+            cycle_timers: 循环计时器
+            thinking_id: 思考ID
+            actions: 动作列表
+
+        Returns:
+            Tuple[Dict[str, Any], str, Dict[str, float]]: 循环信息, 回复文本, 循环计时器
+        """
+        # 发送回复
         with Timer("回复发送", cycle_timers):
             reply_text, sent_messages = await self.response_handler.send_response(
                 response_set, loop_start_time, action_message
             )
             if sent_messages:
+                # 异步处理错别字修正
                 asyncio.create_task(self.response_handler.handle_typo_correction(sent_messages))
 
-            # 存储reply action信息
+        # 存储reply action信息
         person_info_manager = get_person_info_manager()
 
         # 获取 platform，如果不存在则从 chat_stream 获取，如果还是 None 则使用默认值
@@ -66,6 +86,7 @@ class CycleProcessor:
         if platform is None:
             platform = getattr(self.context.chat_stream, "platform", "unknown")
 
+        # 获取用户信息并生成回复提示
         person_id = person_info_manager.get_person_id(
             platform,
             action_message.get("user_id", ""),
@@ -73,6 +94,7 @@ class CycleProcessor:
         person_name = await person_info_manager.get_value(person_id, "person_name")
         action_prompt_display = f"你对{person_name}进行了回复：{reply_text}"
 
+        # 存储动作信息到数据库
         await database_api.store_action_info(
             chat_stream=self.context.chat_stream,
             action_build_into_prompt=False,
@@ -106,7 +128,7 @@ class CycleProcessor:
             interest_value: 兴趣值
 
         Returns:
-            bool: 处理是否成功
+            str: 动作类型
 
         功能说明:
         - 开始新的思考循环并记录计时
@@ -122,6 +144,15 @@ class CycleProcessor:
         # 当interest_value为0时，概率接近0（使用Focus模式）
         # 当interest_value很高时，概率接近1（使用Normal模式）
         def calculate_normal_mode_probability(interest_val: float) -> float:
+            """
+            计算普通模式的概率
+
+            Args:
+                interest_val: 兴趣值
+
+            Returns:
+                float: 概率
+            """
             # 使用sigmoid函数，调整参数使概率分布更合理
             # 当interest_value = 0时，概率约为0.1
             # 当interest_value = 1时，概率约为0.5
@@ -131,6 +162,7 @@ class CycleProcessor:
             x0 = 1.0  # 控制曲线中心点
             return 1.0 / (1.0 + math.exp(-k * (interest_val - x0)))
 
+        # 计算普通模式概率
         normal_mode_probability = (
             calculate_normal_mode_probability(interest_value)
             * 0.5
@@ -149,9 +181,11 @@ class CycleProcessor:
                 f"{self.log_prefix} 基于兴趣值 {interest_value:.2f}，概率 {normal_mode_probability:.2f}，选择Focus planner模式"
             )
 
+        # 开始新的思考循环
         cycle_timers, thinking_id = self.cycle_tracker.start_cycle()
         logger.info(f"{self.log_prefix} 开始第{self.context.cycle_counter}次思考")
 
+        # 发送正在输入状态
         if ENABLE_S4U and self.context.chat_stream and self.context.chat_stream.user_info:
             await send_typing(self.context.chat_stream.user_info.user_id)
 
@@ -176,12 +210,14 @@ class CycleProcessor:
             from src.plugin_system.core.event_manager import event_manager
             from src.plugin_system import EventType
 
+            # 触发规划前事件
             result = await event_manager.trigger_event(
                 EventType.ON_PLAN, plugin_name="SYSTEM", stream_id=self.context.chat_stream
             )
             if result and not result.all_continue_process():
                 raise UserWarning(f"插件{result.get_summary().get('stopped_handlers', '')}于规划前中断了内容生成")
 
+            # 规划动作
             with Timer("规划器", cycle_timers):
                 actions, _ = await self.action_planner.plan(
                     mode=mode,
@@ -227,6 +263,7 @@ class CycleProcessor:
                         "command": command,
                     }
                 else:
+                    # 生成回复
                     try:
                         success, response_set, _ = await generator_api.generate_reply(
                             chat_stream=self.context.chat_stream,
@@ -245,6 +282,7 @@ class CycleProcessor:
                         logger.debug(f"{self.log_prefix} 并行执行：回复生成任务已被取消")
                         return {"action_type": "reply", "success": False, "reply_text": "", "loop_info": None}
 
+                    # 发送并存储回复
                     loop_info, reply_text, cycle_timers_reply = await self._send_and_store_reply(
                         response_set,
                         loop_start_time,
@@ -323,13 +361,15 @@ class CycleProcessor:
             }
             reply_text = action_reply_text
 
+        # 停止正在输入状态
         if ENABLE_S4U:
             await stop_typing()
 
+        # 结束循环
         self.context.chat_instance.cycle_tracker.end_cycle(loop_info, cycle_timers)
         self.context.chat_instance.cycle_tracker.print_cycle_info(cycle_timers)
 
-        action_type = actions[0]["action_type"] if actions else "no_action"
+        action_type = actions["action_type"] if actions else "no_action"
         return action_type
 
     async def _handle_action(
@@ -357,6 +397,7 @@ class CycleProcessor:
         if not self.context.chat_stream:
             return False, "", ""
         try:
+            # 创建动作处理器
             action_handler = self.context.action_manager.create_action(
                 action_name=action,
                 action_data=action_data,
@@ -398,6 +439,7 @@ class CycleProcessor:
                     logger.error(f"{self.context.log_prefix} 回退方案也失败，无法创建任何动作处理器")
                     return False, "", ""
 
+            # 执行动作
             success, reply_text = await action_handler.handle_action()
             return success, reply_text, ""
         except Exception as e:

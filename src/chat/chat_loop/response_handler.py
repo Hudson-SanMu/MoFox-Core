@@ -10,11 +10,15 @@ from .hfc_context import HfcContext
 
 # 导入反注入系统
 
+# 日志记录器
 logger = get_logger("hfc")
 anti_injector_logger = get_logger("anti_injector")
 
 
 class ResponseHandler:
+    """
+    响应处理器类，负责生成和发送机器人的回复。
+    """
     def __init__(self, context: HfcContext):
         """
         初始化响应处理器
@@ -60,12 +64,15 @@ class ResponseHandler:
         - 构建并返回完整的循环信息
         - 用于上级方法的状态跟踪
         """
+        # 发送回复
         reply_text, sent_messages = await self.send_response(response_set, loop_start_time, action_message)
         if sent_messages:
+            # 异步处理错别字修正
             asyncio.create_task(self.handle_typo_correction(sent_messages))
 
         person_info_manager = get_person_info_manager()
 
+        # 获取平台信息
         platform = "default"
         if self.context.chat_stream:
             platform = (
@@ -74,11 +81,13 @@ class ResponseHandler:
                 or self.context.chat_stream.platform
             )
 
+        # 获取用户信息并生成回复提示
         user_id = action_message.get("user_id", "")
         person_id = person_info_manager.get_person_id(platform, user_id)
         person_name = await person_info_manager.get_value(person_id, "person_name")
         action_prompt_display = f"你对{person_name}进行了回复：{reply_text}"
 
+        # 存储动作信息到数据库
         await database_api.store_action_info(
             chat_stream=self.context.chat_stream,
             action_build_into_prompt=False,
@@ -89,6 +98,7 @@ class ResponseHandler:
             action_name="reply",
         )
 
+        # 构建循环信息
         loop_info: Dict[str, Any] = {
             "loop_plan_info": {
                 "action_result": plan_result.get("action_result", {}),
@@ -123,10 +133,12 @@ class ResponseHandler:
         - 正确处理元组格式的回复段
         """
         current_time = time.time()
+        # 计算新消息数量
         new_message_count = message_api.count_new_messages(
             chat_id=self.context.stream_id, start_time=thinking_start_time, end_time=current_time
         )
 
+        # 根据新消息数量决定是否需要引用回复
         need_reply = new_message_count >= random.randint(2, 4)
 
         reply_text = ""
@@ -137,6 +149,7 @@ class ResponseHandler:
         for reply_seg in reply_set:
             logger.debug(f"Processing reply_seg type: {type(reply_seg)}, content: {reply_seg}")
 
+            # 提取回复内容
             if reply_seg["type"] == "typo":
                 data = reply_seg["typo"]
             else:
@@ -144,10 +157,12 @@ class ResponseHandler:
 
             reply_text += data
 
+            # 如果是主动思考且内容为“沉默”，则不发送
             if is_proactive_thinking and data.strip() == "沉默":
                 logger.info(f"{self.context.log_prefix} 主动思考决定保持沉默，不发送消息")
                 continue
 
+            # 发送第一段回复
             if not first_replied:
                 sent_message = await send_api.text_to_stream(
                     text=data,
@@ -158,6 +173,7 @@ class ResponseHandler:
                 )
                 first_replied = True
             else:
+                # 发送后续回复
                 sent_message = await send_api.text_to_stream(
                     text=data,
                     stream_id=self.context.stream_id,
@@ -165,6 +181,7 @@ class ResponseHandler:
                     set_reply=False,
                     typing=True,
                 )
+            # 记录已发送的错别字消息
             if sent_message and reply_seg["type"] == "typo":
                 sent_messages.append(
                     {
@@ -181,9 +198,12 @@ class ResponseHandler:
         """处理错别字修正"""
         for msg in sent_messages:
             if msg["type"] == "typo":
+                # 随机等待一段时间
                 await asyncio.sleep(random.uniform(2, 4))
+                # 撤回消息
                 recalled = await send_api.recall_message(str(msg["message_id"]), self.context.stream_id)
                 if recalled:
+                    # 发送修正后的消息
                     await send_api.text_to_stream(
                         str(msg["correction"]), self.context.stream_id, reply_to_message=msg["original_message"]
                     )

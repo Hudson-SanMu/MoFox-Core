@@ -43,6 +43,7 @@ from src.chat.message_receive.message import MessageSending, MessageRecv
 from maim_message import Seg
 from src.config.config import global_config
 
+# 日志记录器
 logger = get_logger("send_api")
 
 # 适配器命令响应等待池
@@ -187,6 +188,7 @@ async def _send_to_target(
         # 创建消息段
         message_segment = Seg(type=message_type, data=content)  # type: ignore
 
+        # 处理回复消息
         if reply_to_message:
             anchor_message = message_dict_to_message_recv(message_dict=reply_to_message)
             if anchor_message and anchor_message.message_info and anchor_message.message_info.user_info:
