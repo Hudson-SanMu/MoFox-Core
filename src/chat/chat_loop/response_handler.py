@@ -154,7 +154,7 @@ class ResponseHandler:
 
             if isinstance(data, list):
                 data = "".join(map(str, data))
-            reply_text += data
+            reply_text += data.get("data",{}).get("text","")
 
             # 如果是主动思考且内容为“沉默”，则不发送
             if is_proactive_thinking and data.strip() == "沉默":

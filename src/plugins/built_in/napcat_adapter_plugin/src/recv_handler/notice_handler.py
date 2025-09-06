@@ -116,7 +116,7 @@ class NoticeHandler:
                 sub_type = raw_message.get("sub_type")
                 match sub_type:
                     case NoticeType.Notify.poke:
-                        if config_api.get_plugin_config(self.plugin_config, "features.poke_enabled", True) and await message_handler.check_allow_to_chat(
+                        if config_api.get_plugin_config(self.plugin_config, "features.enable_poke", True) and await message_handler.check_allow_to_chat(
                             user_id, group_id, False, False
                         ):
                             logger.debug("处理戳一戳消息")
@@ -247,7 +247,7 @@ class NoticeHandler:
 
         else:
             # 如果配置为忽略不是针对自己的戳一戳，则直接返回None
-            if config_api.get_plugin_config(self.plugin_config, "features.non_self_poke_ignored", False):
+            if config_api.get_plugin_config(self.plugin_config, "features.ignore_non_self_poke", False):
                 logger.debug("忽略不是针对自己的戳一戳消息")
                 return None, None
 
