@@ -613,6 +613,8 @@ class SleepSystemConfig(ValidatedConfigBase):
     sleep_by_schedule: bool = Field(default=True, description="是否根据日程表进行睡觉")
     fixed_sleep_time: str = Field(default="23:00", description="固定的睡觉时间")
     fixed_wake_up_time: str = Field(default="07:00", description="固定的起床时间")
+    sleep_time_offset_minutes: int = Field(default=15, ge=0, le=60, description="睡觉时间随机偏移量范围（分钟），实际睡觉时间会在±该值范围内随机")
+    wake_up_time_offset_minutes: int = Field(default=15, ge=0, le=60, description="起床时间随机偏移量范围（分钟），实际起床时间会在±该值范围内随机")
     wakeup_threshold: float = Field(default=15.0, ge=1.0, description="唤醒阈值，达到此值时会被唤醒")
     private_message_increment: float = Field(default=3.0, ge=0.1, description="私聊消息增加的唤醒度")
     group_mention_increment: float = Field(default=2.0, ge=0.1, description="群聊艾特增加的唤醒度")

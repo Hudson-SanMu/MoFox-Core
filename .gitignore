@@ -338,3 +338,4 @@ MaiBot.code-workspace
 /tests
 .kilocode/rules/MoFox.md
 src/chat/planner_actions/planner (2).py
+rust_video/Cargo.lock

@@ -1,4 +1,6 @@
 {
+    
+    "manifest_version": 1,
     "name": "Set Typing Status",
     "description": "一个在LLM生成回复时设置私聊输入状态的插件。",
     "version": "1.0.0",

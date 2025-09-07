@@ -29,7 +29,6 @@ class SetTypingStatusHandler(BaseEventHandler):
         user_id = message.message_info.user_info.user_id
         if not user_id:
             return HandlerResult(success=False, continue_process=True, message="无法获取用户ID")
-
         try:
             params = {"user_id": user_id, "event_type": 1}
             await send_api.adapter_command_to_stream(

@@ -287,6 +287,7 @@ class DefaultReplyer:
                 return False, None, None
             from src.plugin_system.core.event_manager import event_manager
 
+            # 触发 POST_LLM 事件（请求 LLM 之前）
             if not from_plugin:
                 result = await event_manager.trigger_event(
                     EventType.POST_LLM, plugin_name="SYSTEM", prompt=prompt, stream_id=stream_id
@@ -308,6 +309,7 @@ class DefaultReplyer:
                     "model": model_name,
                     "tool_calls": tool_call,
                 }
+                
                 # 触发 AFTER_LLM 事件
                 if not from_plugin:
                     result = await event_manager.trigger_event(
