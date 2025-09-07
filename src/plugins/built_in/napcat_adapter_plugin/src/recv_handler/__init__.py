@@ -32,6 +32,7 @@ class NoticeType:  # 通知事件
     group_recall = "group_recall"  # 群聊消息撤回
     notify = "notify"
     group_ban = "group_ban"  # 群禁言
+    group_msg_emoji_like = "group_msg_emoji_like"   # 群聊表情回复
 
     class Notify:
         poke = "poke"  # 戳一戳

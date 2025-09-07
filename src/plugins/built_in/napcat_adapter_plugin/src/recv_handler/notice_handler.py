@@ -24,7 +24,7 @@ from ..utils import (
     read_ban_list,
 )
 
-from ...CONSTS import PLUGIN_NAME
+from ...CONSTS import PLUGIN_NAME, QQ_FACE
 
 notice_queue: asyncio.Queue[MessageBase] = asyncio.Queue(maxsize=100)
 unsuccessful_notice_queue: asyncio.Queue[MessageBase] = asyncio.Queue(maxsize=3)
@@ -130,6 +130,13 @@ class NoticeHandler:
                         await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.FRIEND_INPUT, permission_group=PLUGIN_NAME)
                     case _:
                         logger.warning(f"不支持的notify类型: {notice_type}.{sub_type}")
+            case NoticeType.group_msg_emoji_like:    
+                # 该事件转移到 handle_group_emoji_like_notify函数内触发
+                if config_api.get_plugin_config(self.plugin_config, "features.enable_emoji_like", True):
+                    logger.debug("处理群聊表情回复")
+                    handled_message, user_info = await self.handle_group_emoji_like_notify(raw_message,group_id,user_id)
+                else:
+                    logger.warning("群聊表情回复被禁用，取消群聊表情回复处理")
             case NoticeType.group_ban:
                 sub_type = raw_message.get("sub_type")
                 match sub_type:
@@ -284,6 +291,50 @@ class NoticeHandler:
         )
         return seg_data, user_info
 
+    async def handle_group_emoji_like_notify(self, raw_message: dict, group_id: int, user_id: int):
+        if not group_id:
+            logger.error("群ID不能为空，无法处理群聊表情回复通知")
+            return None, None  
+
+        user_qq_info: dict = await get_member_info(self.get_server_connection(), group_id, user_id)
+        if user_qq_info:
+            user_name = user_qq_info.get("nickname")
+            user_cardname = user_qq_info.get("card")
+        else:
+            user_name = "QQ用户"
+            user_cardname = "QQ用户"
+            logger.debug("无法获取表情回复对方的用户昵称")
+        
+        from src.plugin_system.core.event_manager import event_manager
+        from ...event_types import NapcatEvent
+
+        target_message = await event_manager.trigger_event(NapcatEvent.MESSAGE.GET_MSG,message_id=raw_message.get("message_id",""))
+        target_message_text = target_message.get_message_result().get("data",{}).get("raw_message","")
+        if not target_message:
+            logger.error("未找到对应消息")
+            return None, None
+        if len(target_message_text) > 15:
+            target_message_text = target_message_text[:15] + "..."
+        
+        user_info: UserInfo = UserInfo(
+            platform=config_api.get_plugin_config(self.plugin_config, "maibot_server.platform_name", "qq"),
+            user_id=user_id,
+            user_nickname=user_name,
+            user_cardname=user_cardname,
+        )
+        
+        like_emoji_id = raw_message.get("likes")[0].get("emoji_id")
+        await event_manager.trigger_event(
+                        NapcatEvent.ON_RECEIVED.EMOJI_LIEK, 
+                        permission_group=PLUGIN_NAME, 
+                        group_id=group_id,
+                        user_id=user_id,
+                        message_id=raw_message.get("message_id",""),
+                        emoji_id=like_emoji_id
+                        )     
+        seg_data = Seg(type="text",data=f"{user_name}使用Emoji表情{QQ_FACE.get(like_emoji_id,"")}回复了你的消息[{target_message_text}]")
+        return seg_data, user_info
+    
     async def handle_ban_notify(self, raw_message: dict, group_id: int) -> Tuple[Seg, UserInfo] | Tuple[None, None]:
         if not group_id:
             logger.error("群ID不能为空，无法处理禁言通知")

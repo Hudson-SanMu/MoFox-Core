@@ -297,8 +297,8 @@ class NapcatAdapterPlugin(BasePlugin):
     config_schema: dict = {
         "plugin": {
             "name": ConfigField(type=str, default="napcat_adapter_plugin", description="插件名称"),
-            "version": ConfigField(type=str, default="1.0.0", description="插件版本"),
-            "config_version": ConfigField(type=str, default="1.3.0", description="配置文件版本"),
+            "version": ConfigField(type=str, default="1.1.0", description="插件版本"),
+            "config_version": ConfigField(type=str, default="1.3.1", description="配置文件版本"),
             "enabled": ConfigField(type=bool, default=False, description="是否启用插件"),
         },
         "inner": {
@@ -345,6 +345,7 @@ class NapcatAdapterPlugin(BasePlugin):
             "poke_debounce_seconds": ConfigField(type=int, default=3, description="戳一戳防抖时间（秒），在指定时间内第二次针对机器人的戳一戳将被忽略"),
             "enable_reply_at": ConfigField(type=bool, default=True, description="是否启用引用回复时艾特用户的功能"),
             "reply_at_rate": ConfigField(type=float, default=0.5, description="引用回复时艾特用户的几率 (0.0 ~ 1.0)"),
+            "enable_emoji_like": ConfigField(type=bool, default=True, description="是否启用群聊表情回复功能"),
             
             # 视频处理设置
             "enable_video_analysis": ConfigField(type=bool, default=True, description="是否启用视频识别功能"),

@@ -126,7 +126,7 @@ class PlusCommand(ABC):
             return True
 
         # 检查是否为群聊消息
-        is_group = hasattr(self.message, "is_group_message") and self.message.is_group_message
+        is_group = hasattr(self.message.message_info, "group_info") and self.message.message_info.group_info
 
         if self.chat_type_allow == ChatType.GROUP and is_group:
             return True

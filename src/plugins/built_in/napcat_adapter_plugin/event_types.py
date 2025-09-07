@@ -35,6 +35,8 @@ class NapcatEvent:
         """接收到魔法猜拳消息"""
         FRIEND_INPUT = "napcat_on_friend_input"
         """好友正在输入"""
+        EMOJI_LIEK = "napcat_on_received_emoji_like"
+        """接收到群聊表情回复"""
 
     class ACCOUNT(Enum):
         """
@@ -682,7 +684,7 @@ class NapcatEvent:
         GET_MSG = "napcat_get_msg"
         """获取消息详情
         
-        Args: 
+        Args:
             message_id (Optional[str|int]): 消息id(必需)
             raw (Optional[dict]): 原始请求体
 
