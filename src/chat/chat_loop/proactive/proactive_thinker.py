@@ -8,6 +8,7 @@ from src.plugin_system.base.component_types import ChatMode
 from ..hfc_context import HfcContext
 from .events import ProactiveTriggerEvent
 from src.plugin_system.apis import generator_api
+from src.plugin_system.apis.generator_api import process_human_text
 from src.schedule.schedule_manager import schedule_manager
 from src.plugin_system import tool_api
 from src.plugin_system.base.component_types import ComponentType
@@ -184,8 +185,6 @@ class ProactiveThinker:
             mood_block = f"你现在的心情是：{mood_manager.get_mood_by_chat_id(self.context.stream_id).mood_state}"
 
             final_prompt = f"""
-# 主动对话生成
-
 ## 你的角色
 {identity_block}
 
@@ -209,6 +208,12 @@ class ProactiveThinker:
 - 巧妙地将日程安排或最新信息融入到你的开场白中。
 - 风格要符合你的角色设定。
 - 直接输出你想要说的内容，不要包含其他额外信息。
+
+你的回复应该：
+1.  可以分享你的看法、提出相关问题，或者开个合适的玩笑。
+2.  目的是让对话更有趣、更深入。
+3.  不要浮夸，不要夸张修辞，不要输出多余内容(包括前后缀，冒号和引号，括号()，表情包，at或 @等 )。
+最终请输出一条简短、完整且口语化的回复。
 """
 
             # 5. 调用生成器API并发送
@@ -219,8 +224,11 @@ class ProactiveThinker:
             )
 
             if response_text:
-                # 不要将纯文本包装成 ResponseSet 格式！
-                response_set = [response_text]
+                response_set = process_human_text(
+                    content=response_text,
+                    enable_splitter=global_config.response_splitter.enable,
+                    enable_chinese_typo=global_config.chinese_typo.enable,
+                )
                 await self.cycle_processor.response_handler.send_response(
                     response_set, time.time(), action_result.get("action_message")
                 )
