@@ -93,6 +93,7 @@ class ChatConfig(ValidatedConfigBase):
     )
     delta_sigma: int = Field(default=120, description="采用正态分布随机时间间隔")
     planner_size: float = Field(default=5.0, ge=1.0, description="小脑（sub-planner）的尺寸，决定每个小脑处理多少个action")
+    include_personality: bool = Field(default=False, description="是否在小脑决策中包含角色人设信息")
 
     def get_current_talk_frequency(self, chat_stream_id: Optional[str] = None) -> float:
         """

@@ -156,6 +156,7 @@ def init_prompt():
     Prompt(
         """
 {name_block}
+{personality_block}
 
 {chat_context_description}，{time_block}，现在请你根据以下聊天内容，选择一个或多个合适的action。如果没有合适的action，请选择no_action。,
 {chat_content_block}
@@ -423,6 +424,19 @@ class ActionPlanner:
             bot_nickname = f",也有人叫你{','.join(global_config.bot.alias_names)}" if global_config.bot.alias_names else ""
             name_block = f"你的名字是{bot_name}{bot_nickname}，请注意哪些是你自己的发言。"
 
+            # 构建人格信息块（仅在启用时）
+            personality_block = ""
+            if global_config.chat.include_personality:
+                personality_core = global_config.personality.personality_core
+                personality_side = global_config.personality.personality_side
+                if personality_core or personality_side:
+                    personality_parts = []
+                    if personality_core:
+                        personality_parts.append(f"核心人格：{personality_core}")
+                    if personality_side:
+                        personality_parts.append(f"人格侧面：{personality_side}")
+                    personality_block = "你的人格特征是：" + "；".join(personality_parts)
+
             planner_prompt_template = await global_prompt_manager.get_prompt_async("sub_planner_prompt")
             prompt = planner_prompt_template.format(
                 time_block=time_block,
@@ -432,6 +446,7 @@ class ActionPlanner:
                 action_options_text=action_options_block,
                 moderation_prompt=moderation_prompt_block,
                 name_block=name_block,
+                personality_block=personality_block,
             )
         except Exception as e:
             logger.error(f"构建小脑提示词时出错: {e}\n{traceback.format_exc()}")
