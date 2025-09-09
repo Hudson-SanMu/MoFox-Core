@@ -76,6 +76,8 @@ def init_prompt():
 
 {action_options_text}
 
+- 如果用户明确要求使用某个动作，请优先选择该动作。
+- 当一个动作可以作为另一个动作的补充时，你应该同时选择它们。例如，在回复的同时可以发送表情包（emoji）。
 你必须从上面列出的可用action中选择一个或多个，并说明触发action的消息id（不是消息原文）和选择该action的原因。消息id格式:m+数字
 
 请根据动作示例，以严格的 JSON 格式输出，返回一个包含所有选定动作的JSON列表。如果只选择一个动作，也请将其包含在列表中。如果没有任何合适的动作，返回一个空列表[]。不要输出markdown格式```json等内容，直接输出且仅包含 JSON 列表内容：
@@ -407,6 +409,23 @@ class ActionPlanner:
         # --- 3. 后处理 ---
         final_actions = self._filter_no_actions(final_actions)
 
+        # === 强制后处理：确保100%概率的动作在回复时被附带 ===
+        has_reply_action = any(a.get("action_type") == "reply" for a in final_actions)
+        if has_reply_action:
+            for action_name, action_info in available_actions.items():
+                if action_info.activation_type == ActionActivationType.RANDOM and action_info.random_activation_probability >= 1.0:
+                    # 检查此动作是否已被选择
+                    is_already_chosen = any(a.get("action_type") == action_name for a in final_actions)
+                    if not is_already_chosen:
+                        logger.info(f"{self.log_prefix}强制添加100%概率动作: {action_name}")
+                        final_actions.append({
+                            "action_type": action_name,
+                            "reasoning": "根据100%概率设置强制添加",
+                            "action_data": {},
+                            "action_message": self.get_latest_message(used_message_id_list),
+                            "available_actions": available_actions,
+                        })
+
         if not final_actions:
             final_actions = [
                 {
@@ -531,9 +550,13 @@ class ActionPlanner:
 
             if mode == ChatMode.FOCUS:
                 no_action_block = """
-- 'no_reply' 表示不进行回复，等待合适的回复时机
-- 当你刚刚发送了消息，没有人回复时，选择no_reply
-- 当你一次发送了太多消息，为了避免打扰聊天节奏，选择no_reply
+动作：no_action
+动作描述：不选择任何动作
+{{
+    "action": "no_action",
+    "reason":"不动作的原因"
+}}
+
 动作：no_reply
 动作描述：不进行回复，等待合适的回复时机
 - 当你刚刚发送了消息，没有人回复时，选择no_reply

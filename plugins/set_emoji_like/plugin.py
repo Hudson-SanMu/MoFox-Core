@@ -46,7 +46,7 @@ class SetEmojiLikeAction(BaseAction):
 
     # === 基本信息（必须填写）===
     action_name = "set_emoji_like"
-    action_description = "为消息设置表情回应/贴表情"
+    action_description = "为一个已存在的消息添加点赞或表情回应（也叫‘贴表情’）"
     activation_type = ActionActivationType.ALWAYS  # 消息接收时激活(?)
     chat_type_allow = ChatType.GROUP
     parallel_action = True
@@ -64,10 +64,9 @@ class SetEmojiLikeAction(BaseAction):
         "set": "是否设置回应 (True/False)",
     }
     action_require = [
-        "当需要对消息贴表情时使用",
-        "当你想回应某条消息但又不想发文字时使用",
-        "不要连续发送，如果你已经贴表情包，就不要选择此动作",
-        "当你想用贴表情回应某条消息时使用",
+        "当需要对一个已存在消息进行‘贴表情’回应时使用",
+        "这是一个对旧消息的操作，而不是发送新消息",
+        "如果你想发送一个新的表情包消息，请使用 'emoji' 动作",
     ]
     llm_judge_prompt = """
     判定是否需要使用贴表情动作的条件：

@@ -205,7 +205,9 @@ class ActionModifier:
 
             elif activation_type == ActionActivationType.RANDOM:
                 probability = action_info.random_activation_probability
-                if random.random() >= probability:
+                if probability >= 1.0:
+                    continue  # 概率为100%或更高，直接激活
+                if random.random() > probability:
                     reason = f"RANDOM类型未触发（概率{probability}）"
                     deactivated_actions.append((action_name, reason))
                     logger.debug(f"{self.log_prefix}未激活动作: {action_name}，原因: {reason}")

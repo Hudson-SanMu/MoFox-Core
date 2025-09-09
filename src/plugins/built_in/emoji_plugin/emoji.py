@@ -8,10 +8,9 @@ from src.plugin_system import BaseAction, ActionActivationType, ChatMode
 from src.common.logger import get_logger
 
 # 导入API模块 - 标准Python包方式
-from src.plugin_system.apis import emoji_api, llm_api, message_api
-
-# 注释：不再需要导入NoReplyAction，因为计数器管理已移至heartFC_chat.py
-# from src.plugins.built_in.core_actions.no_reply import NoReplyAction
+from src.plugin_system.apis import llm_api, message_api
+from src.chat.emoji_system.emoji_manager import get_emoji_manager
+from src.chat.utils.utils_image import image_path_to_base64
 from src.config.config import global_config
 
 
@@ -55,7 +54,6 @@ class EmojiAction(BaseAction):
     associated_types = ["emoji"]
 
     async def execute(self) -> Tuple[bool, str]:
-        # sourcery skip: assign-if-exp, introduce-default-else, swap-if-else-branches, use-named-expression
         """执行表情动作"""
         logger.info(f"{self.log_prefix} 决定发送表情")
 
@@ -64,30 +62,46 @@ class EmojiAction(BaseAction):
             reason = self.action_data.get("reason", "表达当前情绪")
             logger.info(f"{self.log_prefix} 发送表情原因: {reason}")
 
-            # 2. 随机获取20个表情包
-            sampled_emojis = await emoji_api.get_random(30)
-            if not sampled_emojis:
-                logger.warning(f"{self.log_prefix} 无法获取随机表情包")
-                return False, "无法获取随机表情包"
+            # 2. 获取所有表情包
+            emoji_manager = get_emoji_manager()
+            all_emojis_obj = [e for e in emoji_manager.emoji_objects if not e.is_deleted]
+            if not all_emojis_obj:
+                logger.warning(f"{self.log_prefix} 无法获取任何表情包")
+                return False, "无法获取任何表情包"
 
-            # 3. 准备情感数据
+            # 3. 准备情感数据和后备列表
             emotion_map = {}
-            for b64, desc, emo in sampled_emojis:
-                if emo not in emotion_map:
-                    emotion_map[emo] = []
-                emotion_map[emo].append((b64, desc))
+            all_emojis_data = [] 
+            
+            for emoji in all_emojis_obj:
+                b64 = image_path_to_base64(emoji.full_path)
+                if not b64:
+                    continue
+                
+                desc = emoji.description
+                emotions = emoji.emotion
+                all_emojis_data.append((b64, desc))
+
+                for emo in emotions:
+                    if emo not in emotion_map:
+                        emotion_map[emo] = []
+                    emotion_map[emo].append((b64, desc))
+
+            if not all_emojis_data:
+                logger.warning(f"{self.log_prefix} 无法加载任何有效的表情包数据")
+                return False, "无法加载任何有效的表情包数据"
 
             available_emotions = list(emotion_map.keys())
+            emoji_base64, emoji_description = "", ""
 
             if not available_emotions:
                 logger.warning(f"{self.log_prefix} 获取到的表情包均无情感标签, 将随机发送")
-                emoji_base64, emoji_description, _ = random.choice(sampled_emojis)
+                emoji_base64, emoji_description = random.choice(all_emojis_data)
             else:
                 # 获取最近的5条消息内容用于判断
                 recent_messages = message_api.get_recent_messages(chat_id=self.chat_id, limit=5)
                 messages_text = ""
                 if recent_messages:
-                    # 使用message_api构建可读的消息字符串
                     messages_text = message_api.build_readable_messages(
                         messages=recent_messages,
                         timestamp_mode="normal_no_YMD",
@@ -113,7 +127,7 @@ class EmojiAction(BaseAction):
 
                 # 5. 调用LLM
                 models = llm_api.get_available_models()
-                chat_model_config = models.get("utils_small")  # 使用字典访问方式
+                chat_model_config = models.get("utils_small")
                 if not chat_model_config:
                     logger.error(f"{self.log_prefix} 未找到'utils_small'模型配置，无法调用LLM")
                     return False, "未找到'utils_small'模型配置"
@@ -123,21 +137,20 @@ class EmojiAction(BaseAction):
                 )
 
                 if not success:
-                    logger.error(f"{self.log_prefix} LLM调用失败: {chosen_emotion}")
-                    return False, f"LLM调用失败: {chosen_emotion}"
-
-                chosen_emotion = chosen_emotion.strip().replace('"', "").replace("'", "")
-                logger.info(f"{self.log_prefix} LLM选择的情感: {chosen_emotion}")
-
-                # 6. 根据选择的情感匹配表情包
-                if chosen_emotion in emotion_map:
-                    emoji_base64, emoji_description = random.choice(emotion_map[chosen_emotion])
-                    logger.info(f"{self.log_prefix} 找到匹配情感 '{chosen_emotion}' 的表情包: {emoji_description}")
+                    logger.warning(f"{self.log_prefix} LLM调用失败: {chosen_emotion}, 将随机选择一个表情包")
+                    emoji_base64, emoji_description = random.choice(all_emojis_data)
                 else:
-                    logger.warning(
-                        f"{self.log_prefix} LLM选择的情感 '{chosen_emotion}' 不在可用列表中, 将随机选择一个表情包"
-                    )
-                    emoji_base64, emoji_description, _ = random.choice(sampled_emojis)
+                    chosen_emotion = chosen_emotion.strip().replace('"', "").replace("'", "")
+                    logger.info(f"{self.log_prefix} LLM选择的情感: {chosen_emotion}")
+
+                    if chosen_emotion in emotion_map:
+                        emoji_base64, emoji_description = random.choice(emotion_map[chosen_emotion])
+                        logger.info(f"{self.log_prefix} 找到匹配情感 '{chosen_emotion}' 的表情包: {emoji_description}")
+                    else:
+                        logger.warning(
+                            f"{self.log_prefix} LLM选择的情感 '{chosen_emotion}' 不在可用列表中, 将随机选择一个表情包"
+                        )
+                        emoji_base64, emoji_description = random.choice(all_emojis_data)
 
             # 7. 发送表情包
             success = await self.send_emoji(emoji_base64)
@@ -145,8 +158,6 @@ class EmojiAction(BaseAction):
             if not success:
                 logger.error(f"{self.log_prefix} 表情包发送失败")
                 return False, "表情包发送失败"
-
-            # no_reply计数器现在由heartFC_chat.py统一管理，无需在此重置
 
             return True, f"发送表情包: {emoji_description}"
 

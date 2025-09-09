@@ -299,63 +299,67 @@ class CycleProcessor:
                     "error": str(e),
                 }
 
-        # 创建所有动作的后台任务
-        action_tasks = [asyncio.create_task(execute_action(action)) for action in actions]
-
-        # 并行执行所有任务
-        results = await asyncio.gather(*action_tasks, return_exceptions=True)
-
-        # 处理执行结果
+        # 分离 reply 动作和其他动作
+        reply_actions = [a for a in actions if a.get("action_type") == "reply"]
+        other_actions = [a for a in actions if a.get("action_type") != "reply"]
+        
         reply_loop_info = None
         reply_text_from_reply = ""
-        action_success = False
-        action_reply_text = ""
-        action_command = ""
+        other_actions_results = []
 
-        for i, result in enumerate(results):
-            if isinstance(result, BaseException):
-                logger.error(f"{self.log_prefix} 动作执行异常: {result}")
-                continue
-
-            action_info = actions[i]
-            if result["action_type"] != "reply":
-                action_success = result["success"]
-                action_reply_text = result["reply_text"]
-                action_command = result.get("command", "")
-            elif result["action_type"] == "reply":
-                if result["success"]:
-                    reply_loop_info = result["loop_info"]
-                    reply_text_from_reply = result["reply_text"]
+        # 1. 首先串行执行所有 reply 动作（通常只有一个）
+        if reply_actions:
+            logger.info(f"{self.log_prefix} 正在执行文本回复...")
+            for action in reply_actions:
+                result = await execute_action(action)
+                if isinstance(result, Exception):
+                    logger.error(f"{self.log_prefix} 回复动作执行异常: {result}")
+                    continue
+                if result.get("success"):
+                    reply_loop_info = result.get("loop_info")
+                    reply_text_from_reply = result.get("reply_text", "")
                 else:
                     logger.warning(f"{self.log_prefix} 回复动作执行失败")
 
+        # 2. 然后并行执行所有其他动作
+        if other_actions:
+            logger.info(f"{self.log_prefix} 正在执行附加动作: {[a.get('action_type') for a in other_actions]}")
+            other_action_tasks = [asyncio.create_task(execute_action(action)) for action in other_actions]
+            results = await asyncio.gather(*other_action_tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, BaseException):
+                    logger.error(f"{self.log_prefix} 附加动作执行异常: {result}")
+                    continue
+                other_actions_results.append(result)
+
         # 构建最终的循环信息
         if reply_loop_info:
-            # 如果有回复信息，使用回复的loop_info作为基础
             loop_info = reply_loop_info
-            # 更新动作执行信息
-            loop_info["loop_action_info"].update(
-                {
-                    "action_taken": action_success,
-                    "command": action_command,
-                    "taken_time": time.time(),
-                }
-            )
+            # 将其他动作的结果合并到loop_info中
+            if "other_actions" not in loop_info["loop_action_info"]:
+                loop_info["loop_action_info"]["other_actions"] = []
+            loop_info["loop_action_info"]["other_actions"].extend(other_actions_results)
             reply_text = reply_text_from_reply
         else:
             # 没有回复信息，构建纯动作的loop_info
+            # 即使没有回复，也要正确处理其他动作
+            final_action_taken = any(res.get("success", False) for res in other_actions_results)
+            final_reply_text = " ".join(res.get("reply_text", "") for res in other_actions_results if res.get("reply_text"))
+            final_command = " ".join(res.get("command", "") for res in other_actions_results if res.get("command"))
+
             loop_info = {
                 "loop_plan_info": {
                     "action_result": actions,
                 },
                 "loop_action_info": {
-                    "action_taken": action_success,
-                    "reply_text": action_reply_text,
-                    "command": action_command,
+                    "action_taken": final_action_taken,
+                    "reply_text": final_reply_text,
+                    "command": final_command,
                     "taken_time": time.time(),
+                    "other_actions": other_actions_results,
                 },
             }
-            reply_text = action_reply_text
+            reply_text = final_reply_text
 
         # 停止正在输入状态
         if ENABLE_S4U:
@@ -421,7 +425,7 @@ class CycleProcessor:
                 if fallback_action and fallback_action != action:
                     logger.info(f"{self.context.log_prefix} 使用回退动作: {fallback_action}")
                     action_handler = self.context.action_manager.create_action(
-                        action_name=fallback_action if isinstance(fallback_action, list) else fallback_action,
+                        action_name=fallback_action,
                         action_data=action_data,
                         reasoning=f"原动作'{action}'不可用，自动回退。{reasoning}",
                         cycle_timers=cycle_timers,
