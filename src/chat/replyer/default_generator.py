@@ -868,6 +868,9 @@ class DefaultReplyer:
             sender, target = self._parse_reply_target(reply_to)
         else:
             # 获取 platform，如果不存在则从 chat_stream 获取，如果还是 None 则使用默认值
+            if reply_message is None:
+                logger.warning("reply_message 为 None，无法构建prompt")
+                return ""
             platform = reply_message.get("chat_info_platform")
             person_id = person_info_manager.get_person_id(
                 platform,  # type: ignore

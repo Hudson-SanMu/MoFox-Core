@@ -319,7 +319,7 @@ class ActionPlanner:
             action_data = {k: v for k, v in action_json.items() if k not in ["action", "reason"]}
 
             target_message = None
-            if action not in ["no_action", "no_reply"]:
+            if action not in ["no_action", "no_reply", "do_nothing"]:
                 if target_message_id := action_json.get("target_message_id"):
                     target_message = self.find_message_by_id(target_message_id, message_id_list)
                     if target_message is None:
@@ -329,7 +329,7 @@ class ActionPlanner:
                     logger.warning(f"{self.log_prefix}动作'{action}'缺少target_message_id")
 
             available_action_names = [name for name, _ in current_available_actions]
-            if action not in ["no_action", "no_reply", "reply"] and action not in available_action_names:
+            if action not in ["no_action", "no_reply", "reply", "do_nothing"] and action not in available_action_names:
                 logger.warning(
                     f"{self.log_prefix}LLM 返回了当前不可用或无效的动作: '{action}' (可用: {available_action_names})，将强制使用 'no_action'"
                 )
