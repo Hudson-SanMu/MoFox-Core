@@ -51,6 +51,8 @@ class PersonalityConfig(ValidatedConfigBase):
     personality_core: str = Field(..., description="核心人格")
     personality_side: str = Field(..., description="人格侧写")
     identity: str = Field(default="", description="身份特征")
+    background_story: str = Field(default="", description="世界观背景故事，这部分内容会作为背景知识，LLM被指导不应主动复述")
+    safety_guidelines: List[str] = Field(default_factory=list, description="安全与互动底线，Bot在任何情况下都必须遵守的原则")
     reply_style: str = Field(default="", description="表达风格")
     prompt_mode: Literal["s4u", "normal"] = Field(default="s4u", description="Prompt模式")
     compress_personality: bool = Field(default=True, description="是否压缩人格")
