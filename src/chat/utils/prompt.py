@@ -550,7 +550,7 @@ class Prompt:
             # 构建表达习惯块
             if selected_expressions:
                 style_habits_str = "\n".join([f"- {expr}" for expr in selected_expressions])
-                expression_habits_block = f"你可以参考以下的语言习惯，当情景合适就使用，但不要生硬使用，以合理的方式结合到你的回复中：\n{style_habits_str}"
+                expression_habits_block = f"- 你可以参考以下的语言习惯，当情景合适就使用，但不要生硬使用，以合理的方式结合到你的回复中：\n{style_habits_str}"
             else:
                 expression_habits_block = ""
             
@@ -654,7 +654,7 @@ class Prompt:
             
             # 构建工具信息块
             if tool_results:
-                tool_info_parts = ["以下是你通过工具获取到的实时信息："]
+                tool_info_parts = ["## 工具信息","以下是你通过工具获取到的实时信息："]
                 for tool_result in tool_results:
                     tool_name = tool_result.get("tool_name", "unknown")
                     content = tool_result.get("content", "")
@@ -699,7 +699,7 @@ class Prompt:
             
             # 构建知识块
             if knowledge_results and knowledge_results.get("knowledge_items"):
-                knowledge_parts = ["以下是与你当前对话相关的知识信息："]
+                knowledge_parts = ["## 知识库信息","以下是与你当前对话相关的知识信息："]
                 
                 for item in knowledge_results["knowledge_items"]:
                     content = item.get("content", "")

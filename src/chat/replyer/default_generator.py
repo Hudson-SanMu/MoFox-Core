@@ -85,7 +85,6 @@ def init_prompt():
 ### 当前群聊中的所有人的聊天记录：
 {background_dialogue_prompt}
 
-### 其他群聊中的聊天记录
 {cross_context_block}
 
 ### 当前群聊中正在与你对话的聊天记录
@@ -96,14 +95,10 @@ def init_prompt():
 {reply_style}
 {keywords_reaction_prompt}
 
-- (如果有)你可以参考以下你在聊天中学到的表达方式：
 {expression_habits_block}
-## 工具信息
-(如果有)你可以参考以下可能有帮助的工具返回的信息：
+
 {tool_info_block}
 
-## 知识库信息
-(如果有)你可以参考以下可能有帮助的知识库中的信息：
 {knowledge_prompt}
 
 ## 其他信息
@@ -113,8 +108,8 @@ def init_prompt():
 {action_descriptions}
 
 ## 任务
-### 梗概
-- 你正在一个QQ群里聊天，你需要理解整个群的聊天动态和话题走向，并做出自然的回应。
+
+*你正在一个QQ群里聊天，你需要理解整个群的聊天动态和话题走向，并做出自然的回应。*
 
 ### 核心任务
 - 你现在的主要任务是和 {sender_name} 聊天。同时，也有其他用户会参与聊天，你可以参考他们的回复内容，但是你现在想回复{sender_name}的发言。

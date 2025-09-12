@@ -117,7 +117,7 @@ async def build_cross_context_s4u(
     if not cross_context_messages:
         return ""
 
-    return "# 跨上下文参考\n" + "\n\n".join(cross_context_messages) + "\n"
+    return "### 其他群聊中的聊天记录\n" + "\n\n".join(cross_context_messages) + "\n"
 
 
 async def get_chat_history_by_group_name(group_name: str) -> str:
