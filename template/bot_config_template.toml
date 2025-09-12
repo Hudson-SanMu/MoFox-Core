@@ -489,8 +489,6 @@ max_sleep_delay_minutes = 60
 
 # 是否在进入“准备入睡”状态时发送一条消息通知。
 enable_pre_sleep_notification = false
-# 接收睡前消息的群组列表。格式为: ["platform:group_id1", "platform:group_id2"]，例如 ["qq:12345678"]
-pre_sleep_notification_groups = []
 # 用于生成睡前消息的提示。AI会根据这个提示生成一句晚安问候。
 pre_sleep_prompt = "我准备睡觉了，请生成一句简短自然的晚安问候。"
 insomnia_duration_minutes = [30, 60] # 单次失眠状态的持续时间范围（分钟）

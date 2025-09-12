@@ -662,9 +662,6 @@ class SleepSystemConfig(ValidatedConfigBase):
     )
     max_sleep_delay_minutes: int = Field(default=60, description="单日最大延迟入睡分钟数")
     enable_pre_sleep_notification: bool = Field(default=True, description="是否启用睡前消息")
-    pre_sleep_notification_groups: List[str] = Field(
-        default_factory=list, description='接收睡前消息的群号列表, 格式: ["platform:group_id1", "platform:group_id2"]'
-    )
     pre_sleep_prompt: str = Field(
         default="我准备睡觉了，请生成一句简短自然的晚安问候。", description="用于生成睡前消息的提示"
     )
