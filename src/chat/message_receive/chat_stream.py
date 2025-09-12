@@ -83,7 +83,8 @@ class ChatStream:
         self.sleep_pressure = data.get("sleep_pressure", 0.0) if data else 0.0
         self.saved = False
         self.context: ChatMessageContext = None  # type: ignore # 用于存储该聊天的上下文信息
-        self.focus_energy = 1
+        # 从配置文件中读取focus_value，如果没有则使用默认值1.0
+        self.focus_energy = data.get("focus_energy", global_config.chat.focus_value) if data else global_config.chat.focus_value
         self.no_reply_consecutive = 0
         self.breaking_accumulated_interest = 0.0
 
@@ -98,6 +99,7 @@ class ChatStream:
             "last_active_time": self.last_active_time,
             "energy_value": self.energy_value,
             "sleep_pressure": self.sleep_pressure,
+            "focus_energy": self.focus_energy,
             "breaking_accumulated_interest": self.breaking_accumulated_interest,
         }
 
@@ -360,6 +362,7 @@ class ChatManager:
                     "group_name": group_info_d["group_name"] if group_info_d else "",
                     "energy_value": s_data_dict.get("energy_value", 5.0),
                     "sleep_pressure": s_data_dict.get("sleep_pressure", 0.0),
+                    "focus_energy": s_data_dict.get("focus_energy", global_config.chat.focus_value),
                 }
 
                 # 根据数据库类型选择插入语句
@@ -421,6 +424,7 @@ class ChatManager:
                         "last_active_time": model_instance.last_active_time,
                         "energy_value": model_instance.energy_value,
                         "sleep_pressure": model_instance.sleep_pressure,
+                        "focus_energy": getattr(model_instance, "focus_energy", global_config.chat.focus_value),
                     }
                     loaded_streams_data.append(data_for_from_dict)
                 session.commit()

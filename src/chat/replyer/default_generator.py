@@ -139,8 +139,6 @@ def init_prompt():
  --------------------------------
 {time_block}
 
-{reply_target_block}
-
 注意不要复读你前面发过的内容，意思相近也不行。
 
 请注意不要输出多余内容(包括前后缀，冒号和引号，at或 @等 )。只输出回复内容。
@@ -878,16 +876,22 @@ class DefaultReplyer:
                 reply_message.get("user_id"),  # type: ignore
             )
             person_name = await person_info_manager.get_value(person_id, "person_name")
-            sender = person_name
+            
+            # 检查是否是bot自己的名字，如果是则替换为"(你)"
+            bot_user_id = str(global_config.bot.qq_account)
+            current_user_id = person_info_manager.get_value_sync(person_id, "user_id")
+            current_platform = reply_message.get("chat_info_platform")
+            
+            if current_user_id == bot_user_id and current_platform == global_config.bot.platform:
+                sender = f"{person_name}(你)"
+            else:
+                # 如果不是bot自己，直接使用person_name
+                sender = person_name
             target = reply_message.get("processed_plain_text")
 
         person_info_manager = get_person_info_manager()
         person_id = person_info_manager.get_person_id_by_person_name(sender)
-        user_id = person_info_manager.get_value_sync(person_id, "user_id")
         platform = chat_stream.platform
-        if user_id == global_config.bot.qq_account and platform == global_config.bot.platform:
-            logger.warning("选取了自身作为回复对象，跳过构建prompt")
-            return ""
 
         target = replace_user_references_sync(target, chat_stream.platform, replace_bot_name=True)
 

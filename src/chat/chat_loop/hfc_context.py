@@ -5,6 +5,7 @@ from src.person_info.relationship_builder_manager import RelationshipBuilder
 from src.chat.express.expression_learner import ExpressionLearner
 from src.chat.planner_actions.action_manager import ActionManager
 from src.chat.chat_loop.hfc_utils import CycleDetail
+from src.config.config import global_config
 
 if TYPE_CHECKING:
     from .sleep_manager.wakeup_manager import WakeUpManager
@@ -64,7 +65,8 @@ class HfcContext:
         self.energy_manager: Optional["EnergyManager"] = None
         self.sleep_manager: Optional["SleepManager"] = None
 
-        self.focus_energy = 1
+        # 从聊天流获取focus_energy，如果没有则使用配置文件中的值
+        self.focus_energy = getattr(self.chat_stream, "focus_energy", global_config.chat.focus_value)
         self.no_reply_consecutive = 0
         self.total_interest = 0.0
         # breaking形式下的累积兴趣值
