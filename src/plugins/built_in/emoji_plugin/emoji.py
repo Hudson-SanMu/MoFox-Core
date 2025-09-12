@@ -98,6 +98,7 @@ class EmojiAction(BaseAction):
 
             available_emotions = list(emotion_map.keys())
             emoji_base64, emoji_description = "", ""
+            chosen_emotion = "表情包"  # 默认描述，避免变量未定义错误
 
             # 4. 根据配置选择不同的表情选择模式
             if global_config.emoji.emoji_selection_mode == "emotion":
@@ -207,18 +208,29 @@ class EmojiAction(BaseAction):
                     emoji_base64, emoji_description = random.choice(all_emojis_data)
                 else:
                     chosen_description = chosen_description.strip().replace('"', "").replace("'", "")
+                    chosen_emotion = chosen_description  # 在描述模式下，用描述作为情感标签
                     logger.info(f"{self.log_prefix} LLM选择的描述: {chosen_description}")
 
-                    # 查找与选择的描述匹配的表情包
-                    matched_emoji = next((item for item in all_emojis_data if item == chosen_description), None)
+                    # 简单关键词匹配
+                    matched_emoji = next((item for item in all_emojis_data if chosen_description.lower() in item[1].lower() or item[1].lower() in chosen_description.lower()), None)
+                    
+                    # 如果包含匹配失败，尝试关键词匹配
+                    if not matched_emoji:
+                        keywords = ['惊讶', '困惑', '呆滞', '震惊', '懵', '无语', '萌', '可爱']
+                        for keyword in keywords:
+                            if keyword in chosen_description:
+                                for item in all_emojis_data:
+                                    if any(k in item[1] for k in ['呆', '萌', '惊', '困惑', '无语']):
+                                        matched_emoji = item
+                                        break
+                                if matched_emoji:
+                                    break
 
                     if matched_emoji:
                         emoji_base64, emoji_description = matched_emoji
-                        logger.info(f"{self.log_prefix} 找到匹配描述 '{chosen_description}' 的表情包")
+                        logger.info(f"{self.log_prefix} 找到匹配描述的表情包: {emoji_description}")
                     else:
-                        logger.warning(
-                            f"{self.log_prefix} LLM选择的描述 '{chosen_description}' 不在可用列表中, 将随机选择一个表情包"
-                        )
+                        logger.warning(f"{self.log_prefix} LLM选择的描述无法匹配任何表情包, 将随机选择")
                         emoji_base64, emoji_description = random.choice(all_emojis_data)
             else:
                 logger.error(f"{self.log_prefix} 无效的表情选择模式: {global_config.emoji.emoji_selection_mode}")
@@ -229,9 +241,9 @@ class EmojiAction(BaseAction):
 
             if not success:
                 logger.error(f"{self.log_prefix} 表情包发送失败")
-                await self.store_action_info(action_build_into_prompt = True,action_prompt_display =f"发送了一个{chosen_emotion}的表情包,但失败了",action_done= False)
+                await self.store_action_info(action_build_into_prompt = True,action_prompt_display =f"发送了一个表情包,但失败了",action_done= False)
                 return False, "表情包发送失败"
-            await self.store_action_info(action_build_into_prompt = True,action_prompt_display =f"发送了一个{chosen_emotion}的表情包",action_done= True)
+            await self.store_action_info(action_build_into_prompt = True,action_prompt_display =f"发送了一个表情包",action_done= True)
 
             return True, f"发送表情包: {emoji_description}"
 
