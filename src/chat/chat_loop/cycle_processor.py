@@ -299,7 +299,8 @@ class CycleProcessor:
             logger.info(f"{self.log_prefix} 正在执行文本回复...")
             for action in reply_actions:
                 target_user_id = action.get("action_message",{}).get("chat_info_user_id","")
-                logger.info(action.get("action_message",{}))
+                action_message_test =action.get("action_message",{})
+                logger.info(f"如果你探到这条日志请把它复制下来发到Q群里,如果你探到这条日志请把它复制下来发到Q群里,如果你探到这条日志请把它复制下来发到Q群里,调试内容:{action_message_test}")
                 if target_user_id == global_config.bot.qq_account and not global_config.chat.allow_reply_self:
                     logger.warning("选取的reply的目标为bot自己，跳过reply action")
                     continue
