@@ -162,10 +162,10 @@ class ProactiveThinker:
                     web_search_tool = tool_api.get_tool_instance("web_search")
                     if web_search_tool:
                         try:
-                            search_result_dict = await web_search_tool.execute(search_query=topic, max_results=10)
+                            search_result_dict = await web_search_tool.execute(function_args={"keyword": topic, "max_results": 10})
                         except TypeError:
                             try:
-                                search_result_dict = await web_search_tool.execute(keyword=topic, max_results=10)
+                                search_result_dict = await web_search_tool.execute(function_args={"keyword": topic, "max_results": 10})
                             except TypeError:
                                 logger.warning(f"{self.context.log_prefix} 网络搜索工具参数不匹配，跳过搜索")
                                 news_block = "跳过网络搜索。"
