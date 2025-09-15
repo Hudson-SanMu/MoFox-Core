@@ -43,10 +43,16 @@ class SearchKnowledgeFromLPMMTool(BaseTool):
 
             logger.debug(f"知识库查询结果: {knowledge_info}")
 
-            if knowledge_info:
-                content = f"你知道这些知识: {knowledge_info}"
+            if knowledge_info and knowledge_info.get("knowledge_items"):
+                knowledge_parts = []
+                for i, item in enumerate(knowledge_info["knowledge_items"]):
+                    knowledge_parts.append(f"- {item.get('content', 'N/A')}")
+                
+                knowledge_text = "\n".join(knowledge_parts)
+                summary = knowledge_info.get('summary', '无总结')
+                content = f"关于 '{query}', 你知道以下信息：\n{knowledge_text}\n\n总结: {summary}"
             else:
-                content = f"你不太了解有关{query}的知识"
+                content = f"关于 '{query}'，你的知识库里好像没有相关的信息呢"
             return {"type": "lpmm_knowledge", "id": query, "content": content}
         except Exception as e:
             # 捕获异常并记录错误

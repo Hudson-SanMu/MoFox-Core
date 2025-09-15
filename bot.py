@@ -21,6 +21,7 @@ initialize_logging()
 from src.main import MainSystem  # noqa
 from src import BaseMain  # noqa
 from src.manager.async_task_manager import async_task_manager  # noqa
+from src.chat.knowledge.knowledge_lib import initialize_lpmm_knowledge # noqa
 from src.config.config import global_config  # noqa
 from src.common.database.database import initialize_sql_database  # noqa
 from src.common.database.sqlalchemy_models import initialize_database as init_db  # noqa
@@ -228,6 +229,7 @@ if __name__ == "__main__":
         try:
             # 执行初始化和任务调度
             loop.run_until_complete(main_system.initialize())
+            initialize_lpmm_knowledge()
             # Schedule tasks returns a future that runs forever.
             # We can run console_input_loop concurrently.
             main_tasks = loop.create_task(main_system.schedule_tasks())

@@ -369,7 +369,7 @@ class Prompt:
                 task_names.append("cross_context")
             
             # 性能优化
-            base_timeout = 10.0
+            base_timeout = 20.0
             task_timeout = 2.0
             timeout_seconds = min(
                 max(base_timeout, len(tasks) * task_timeout),
@@ -676,22 +676,21 @@ class Prompt:
             return {"knowledge_prompt": ""}
         
         try:
-            from src.chat.knowledge.knowledge_lib import QAManager
+            from src.chat.knowledge.knowledge_lib import qa_manager
             
             # 获取问题文本（当前消息）
             question = self.parameters.target or ""
             if not question:
                 return {"knowledge_prompt": ""}
             
-            # 创建QA管理器
-            qa_manager = QAManager()
+            # 检查QA管理器是否已成功初始化
+            if not qa_manager:
+                logger.warning("QA管理器未初始化 (可能lpmm_knowledge被禁用)，跳过知识库搜索。")
+                return {"knowledge_prompt": ""}
             
             # 搜索相关知识
             knowledge_results = await qa_manager.get_knowledge(
-                question=question,
-                chat_id=self.parameters.chat_id,
-                max_results=5,
-                min_similarity=0.5
+                question=question
             )
             
             # 构建知识块
@@ -704,13 +703,10 @@ class Prompt:
                     relevance = item.get("relevance", 0.0)
                     
                     if content:
-                        if source:
-                            knowledge_parts.append(f"- [{relevance:.2f}] {content} (来源: {source})")
-                        else:
-                            knowledge_parts.append(f"- [{relevance:.2f}] {content}")
+                        knowledge_parts.append(f"- [相关度: {relevance}] {content}")
                 
-                if knowledge_results.get("summary"):
-                    knowledge_parts.append(f"\n知识总结: {knowledge_results['summary']}")
+                if summary := knowledge_results.get("summary"):
+                    knowledge_parts.append(f"\n知识总结: {summary}")
                 
                 knowledge_prompt = "\n".join(knowledge_parts)
             else:

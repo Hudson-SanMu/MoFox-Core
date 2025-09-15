@@ -1,5 +1,5 @@
 import time
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict, Optional, Any
 
 from .global_logger import logger
 from .embedding_store import EmbeddingManager
@@ -98,30 +98,46 @@ class QAManager:
 
         return result, ppr_node_weights
 
-    async def get_knowledge(self, question: str) -> Optional[str]:
-        """获取知识"""
-        # 处理查询
-        processed_result = await self.process_query(question)
-        if processed_result is not None:
-            query_res = processed_result[0]
-            # 检查查询结果是否为空
-            if not query_res:
-                logger.debug("知识库查询结果为空，可能是知识库中没有相关内容")
-                return None
+    async def get_knowledge(self, question: str) -> Optional[Dict[str, Any]]:
+        """
+        获取知识，返回结构化字典
+        
+        Args:
+            question: 用户提出的问题
 
-            knowledge = [
-                (
-                    self.embed_manager.paragraphs_embedding_store.store[res[0]].str,
-                    res[1],
-                )
-                for res in query_res
-            ]
-            found_knowledge = "\n".join(
-                [f"第{i + 1}条知识：{k[0]}\n 该条知识对于问题的相关性：{k[1]}" for i, k in enumerate(knowledge)]
-            )
-            if len(found_knowledge) > MAX_KNOWLEDGE_LENGTH:
-                found_knowledge = found_knowledge[:MAX_KNOWLEDGE_LENGTH] + "\n"
-            return found_knowledge
-        else:
-            logger.debug("LPMM知识库并未初始化，可能是从未导入过知识...")
+        Returns:
+            一个包含 'knowledge_items' 和 'summary' 的字典，或者在没有结果时返回 None
+        """
+        processed_result = await self.process_query(question)
+        if not processed_result or not processed_result[0]:
+            logger.debug("知识库查询结果为空。")
             return None
+
+        query_res = processed_result[0]
+        
+        knowledge_items = []
+        for res_hash, relevance, *_ in query_res:
+            if store_item := self.embed_manager.paragraphs_embedding_store.store.get(res_hash):
+                knowledge_items.append({
+                    "content": store_item.str,
+                    "source": "内部知识库",
+                    "relevance": f"{relevance:.4f}"
+                })
+
+        if not knowledge_items:
+            return None
+            
+        # 使用LLM生成总结
+        knowledge_text_for_summary = "\n\n".join([item['content'] for item in knowledge_items[:5]]) # 最多总结前5条
+        summary_prompt = f"根据以下信息，为问题 '{question}' 生成一个简洁的、不超过50字的摘要：\n\n{knowledge_text_for_summary}"
+        
+        try:
+            summary, (_, _, _) = await self.qa_model.generate_response_async(summary_prompt)
+        except Exception as e:
+            logger.error(f"生成知识摘要失败: {e}")
+            summary = "无法生成摘要。"
+
+        return {
+            "knowledge_items": knowledge_items,
+            "summary": summary.strip() if summary else "没有可用的摘要。"
+        }
