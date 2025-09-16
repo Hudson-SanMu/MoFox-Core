@@ -97,7 +97,7 @@ class ActionPlanner:
             # 2. 兴趣度评分 - 只对未读消息进行评分
             if unread_messages:
                 bot_nickname = global_config.bot.nickname
-                interest_scores = self.interest_scoring.calculate_interest_scores(
+                interest_scores = await self.interest_scoring.calculate_interest_scores(
                     unread_messages, bot_nickname
                 )
 
@@ -175,33 +175,14 @@ class ActionPlanner:
 
         return final_actions_dict, final_target_message_dict
 
-    def _build_return_result(self, plan: Plan) -> Tuple[List[Dict], Optional[Dict]]:
-        """构建返回结果"""
-        final_actions = plan.decided_actions or []
-        final_target_message = next(
-            (act.action_message for act in final_actions if act.action_message), None
-        )
-
-        final_actions_dict = [asdict(act) for act in final_actions]
-
-        if final_target_message:
-            if hasattr(final_target_message, '__dataclass_fields__'):
-                final_target_message_dict = asdict(final_target_message)
-            else:
-                final_target_message_dict = final_target_message
-        else:
-            final_target_message_dict = None
-
-        return final_actions_dict, final_target_message_dict
-
     def get_user_relationship(self, user_id: str) -> float:
         """获取用户关系分"""
         return self.interest_scoring.get_user_relationship(user_id)
 
     def update_interest_keywords(self, new_keywords: Dict[str, List[str]]):
-        """更新兴趣关键词"""
-        self.interest_scoring.interest_keywords.update(new_keywords)
-        logger.info(f"已更新兴趣关键词: {list(new_keywords.keys())}")
+        """更新兴趣关键词（已弃用，仅保留用于兼容性）"""
+        logger.info("传统关键词匹配已移除，此方法仅保留用于兼容性")
+        # 此方法已弃用，因为现在完全使用embedding匹配
 
     def get_planner_stats(self) -> Dict[str, any]:
         """获取规划器统计"""
@@ -226,5 +207,4 @@ class ActionPlanner:
         }
 
 
-# 全局兴趣度评分系统实例
-interest_scoring_system = InterestScoringSystem()
+# 全局兴趣度评分系统实例 - 在 individuality 模块中创建

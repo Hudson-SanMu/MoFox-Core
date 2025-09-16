@@ -6,6 +6,7 @@ import asyncio
 import time
 from typing import Dict, List
 
+from src.config.config import global_config
 from src.chat.planner_actions.action_manager import ActionManager
 from src.common.data_models.info_data_model import Plan, ActionPlannerInfo
 from src.common.logger import get_logger
@@ -122,6 +123,16 @@ class PlanExecutor:
         try:
             logger.info(f"执行回复动作: {action_info.action_type}, 原因: {action_info.reasoning}")
 
+            if action_info.action_message.get("user_id","") == str(global_config.bot.qq_account):
+                logger.warning("尝试回复自己，跳过此动作以防止死循环。")
+                return {
+                    "action_type": action_info.action_type,
+                    "success": False,
+                    "error_message": "尝试回复自己，跳过此动作以防止死循环。",
+                    "execution_time": 0,
+                    "reasoning": action_info.reasoning,
+                    "reply_content": "",
+                }
             # 构建回复动作参数
             action_params = {
                 "chat_id": plan.chat_id,

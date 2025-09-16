@@ -300,6 +300,26 @@ class PersonInfo(Base):
     )
 
 
+class BotPersonalityInterests(Base):
+    """机器人人格兴趣标签模型"""
+
+    __tablename__ = "bot_personality_interests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    personality_id = Column(get_string_field(100), nullable=False, index=True)
+    personality_description = Column(Text, nullable=False)
+    interest_tags = Column(Text, nullable=False)  # JSON格式存储的兴趣标签列表
+    embedding_model = Column(get_string_field(100), nullable=False, default="text-embedding-ada-002")
+    version = Column(Integer, nullable=False, default=1)
+    last_updated = Column(DateTime, nullable=False, default=datetime.datetime.now, index=True)
+
+    __table_args__ = (
+        Index("idx_botpersonality_personality_id", "personality_id"),
+        Index("idx_botpersonality_version", "version"),
+        Index("idx_botpersonality_last_updated", "last_updated"),
+    )
+
+
 class Memory(Base):
     """记忆模型"""
 
