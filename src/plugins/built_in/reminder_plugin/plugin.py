@@ -13,7 +13,7 @@ from src.plugin_system import (
     register_plugin,
     ActionActivationType,
 )
-from src.plugin_system.apis import send_api, llm_api
+from src.plugin_system.apis import send_api, llm_api, generator_api
 from src.plugin_system.base.component_types import ChatType, ComponentType
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 # ============================ AsyncTask ============================
 
 class ReminderTask(AsyncTask):
-    def __init__(self, delay: float, stream_id: str, group_id: Optional[str], is_group: bool, target_user_id: str, target_user_name: str, event_details: str, creator_name: str):
+    def __init__(self, delay: float, stream_id: str, group_id: Optional[str], is_group: bool, target_user_id: str, target_user_name: str, event_details: str, creator_name: str, chat_stream: "ChatStream"):
         super().__init__(task_name=f"ReminderTask_{target_user_id}_{datetime.now().timestamp()}")
         self.delay = delay
         self.stream_id = stream_id
@@ -32,6 +32,7 @@ class ReminderTask(AsyncTask):
         self.target_user_name = target_user_name
         self.event_details = event_details
         self.creator_name = creator_name
+        self.chat_stream = chat_stream
 
     async def run(self):
         try:
@@ -41,22 +42,43 @@ class ReminderTask(AsyncTask):
             
             logger.info(f"执行提醒任务: 给 {self.target_user_name} 发送关于 '{self.event_details}' 的提醒")
 
-            reminder_text = f"叮咚！这是 {self.creator_name} 让我准时提醒你的事情：\n\n{self.event_details}"
+            extra_info = f"现在是提醒时间，请你以一种符合你人设的、俏皮的方式提醒 {self.target_user_name}。\n提醒内容: {self.event_details}\n设置提醒的人: {self.creator_name}"
+            success, reply_set, _ = await generator_api.generate_reply(
+                chat_stream=self.chat_stream,
+                extra_info=extra_info,
+                reply_message=self.chat_stream.context.get_last_message().to_dict(),
+                request_type="plugin.reminder.remind_message"
+            )
 
-            if self.is_group:
-                # 在群聊中，构造 @ 消息段并发送
-                message_payload = [
-                    {"type": "at", "data": {"qq": self.target_user_id}},
-                    {"type": "text", "data": {"text": f" {reminder_text}"}}
-                ]
-                await send_api.adapter_command_to_stream(
-                    action="send_group_msg",
-                    params={"group_id": self.group_id, "message": message_payload},
-                    stream_id=self.stream_id
-                )
+            if success and reply_set:
+                for _, text in reply_set:
+                    if self.is_group:
+                        message_payload = [
+                            {"type": "at", "data": {"qq": self.target_user_id}},
+                            {"type": "text", "data": {"text": f" {text}"}}
+                        ]
+                        await send_api.adapter_command_to_stream(
+                            action="send_group_msg",
+                            params={"group_id": self.group_id, "message": message_payload},
+                            stream_id=self.stream_id
+                        )
+                    else:
+                        await send_api.text_to_stream(text=text, stream_id=self.stream_id)
             else:
-                # 在私聊中，直接发送文本
-                await send_api.text_to_stream(text=reminder_text, stream_id=self.stream_id)
+                # Fallback message
+                reminder_text = f"叮咚！这是 {self.creator_name} 让我准时提醒你的事情：\n\n{self.event_details}"
+                if self.is_group:
+                    message_payload = [
+                        {"type": "at", "data": {"qq": self.target_user_id}},
+                        {"type": "text", "data": {"text": f" {reminder_text}"}}
+                    ]
+                    await send_api.adapter_command_to_stream(
+                        action="send_group_msg",
+                        params={"group_id": self.group_id, "message": message_payload},
+                        stream_id=self.stream_id
+                    )
+                else:
+                    await send_api.text_to_stream(text=reminder_text, stream_id=self.stream_id)
 
             logger.info(f"提醒任务 {self.task_name} 成功完成。")
 
@@ -261,13 +283,27 @@ class RemindAction(BaseAction):
                 target_user_id=str(user_id_to_remind),
                 target_user_name=str(user_name_to_remind),
                 event_details=str(event_details),
-                creator_name=str(self.user_nickname)
+                creator_name=str(self.user_nickname),
+                chat_stream=self.chat_stream
             )
             await async_task_manager.add_task(reminder_task)
             
-            # 4. 发送确认消息
-            confirm_message = f"好的，我记下了。\n将在 {target_time.strftime('%Y-%m-%d %H:%M:%S')} 提醒 {user_name_to_remind}：\n{event_details}"
-            await self.send_text(confirm_message)
+            # 4. 生成并发送确认消息
+            extra_info = f"你已经成功设置了一个提醒，请以一种符合你人设的、俏皮的方式回复用户。\n提醒时间: {target_time.strftime('%Y-%m-%d %H:%M:%S')}\n提醒对象: {user_name_to_remind}\n提醒内容: {event_details}"
+            last_message = self.chat_stream.context.get_last_message()
+            success, reply_set, _ = await generator_api.generate_reply(
+                chat_stream=self.chat_stream,
+                extra_info=extra_info,
+                reply_message=last_message.to_dict(),
+                request_type="plugin.reminder.confirm_message"
+            )
+            if success and reply_set:
+                for _, text in reply_set:
+                    await self.send_text(text)
+            else:
+                # Fallback message
+                fallback_message = f"好的，我记下了。\n将在 {target_time.strftime('%Y-%m-%d %H:%M:%S')} 提醒 {user_name_to_remind}：\n{event_details}"
+                await self.send_text(fallback_message)
             
             return True, "提醒设置成功"
         except Exception as e:
