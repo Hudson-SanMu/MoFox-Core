@@ -100,14 +100,22 @@ class RemindAction(BaseAction):
                 raise ValueError("未找到 'planner' 决策模型配置，无法解析时间")
             model_to_use = available_models["planner"]
 
+            bot_name = self.chat_stream.user_info.user_nickname
+
             prompt = f"""
             从以下用户输入中提取提醒事件的关键信息。
             用户输入: "{self.chat_stream.context.message.processed_plain_text}"
+            Bot的名字是: "{bot_name}"
 
+            请仔细分析句子结构，以确定谁是提醒的真正目标。Bot自身不应被视为被提醒人。
             请以JSON格式返回提取的信息，包含以下字段:
             - "user_name": 需要被提醒的人的姓名。如果未指定，则默认为"自己"。
             - "remind_time": 描述提醒时间的自然语言字符串。
             - "event_details": 需要提醒的具体事件内容。
+
+            示例:
+            - 用户输入: "提醒我十分钟后开会" -> {{"user_name": "自己", "remind_time": "十分钟后", "event_details": "开会"}}
+            - 用户输入: "{bot_name}，提醒一闪一分钟后睡觉" -> {{"user_name": "一闪", "remind_time": "一分钟后", "event_details": "睡觉"}}
 
             如果无法提取完整信息，请返回一个包含空字符串的JSON对象，例如：{{"user_name": "", "remind_time": "", "event_details": ""}}
             """
@@ -209,13 +217,36 @@ class RemindAction(BaseAction):
             user_id_to_remind = self.user_id
             user_name_to_remind = self.user_nickname
         else:
+            # 1. 精确匹配
             user_info = await person_manager.get_person_info_by_name(user_name)
+
+            # 2. 包含匹配
+            if not user_info:
+                for person_id, name in person_manager.person_name_list.items():
+                    if user_name in name:
+                        user_info = await person_manager.get_values(person_id, ["user_id", "user_nickname"])
+                        break
+            
+            # 3. 模糊匹配 (此处简化为字符串相似度)
+            if not user_info:
+                best_match = None
+                highest_similarity = 0
+                for person_id, name in person_manager.person_name_list.items():
+                    import difflib
+                    similarity = difflib.SequenceMatcher(None, user_name, name).ratio()
+                    if similarity > highest_similarity:
+                        highest_similarity = similarity
+                        best_match = person_id
+                
+                if best_match and highest_similarity > 0.6: # 相似度阈值
+                    user_info = await person_manager.get_values(best_match, ["user_id", "user_nickname"])
+
             if not user_info or not user_info.get("user_id"):
                 logger.warning(f"[ReminderPlugin] 找不到名为 '{user_name}' 的用户")
                 await self.send_text(f"抱歉，我的联系人里找不到叫做 '{user_name}' 的人，提醒设置失败。")
                 return False, f"用户 '{user_name}' 不存在"
             user_id_to_remind = user_info.get("user_id")
-            user_name_to_remind = user_name
+            user_name_to_remind = user_info.get("user_nickname") or user_name
 
         # 3. 创建并调度异步任务
         try:
