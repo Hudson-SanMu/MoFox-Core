@@ -1,4 +1,6 @@
 sqlalchemy
+aiosqlite
+aiomysql
 APScheduler
 aiohttp
 aiohttp-cors

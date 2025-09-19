@@ -6,9 +6,11 @@
 
 import traceback
 import time
+import asyncio
 from typing import Dict, List, Any, Union, Type, Optional
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import desc, asc, func, and_
+from sqlalchemy import desc, asc, func, and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.logger import get_logger
 from src.common.database.sqlalchemy_models import (
     Base,
@@ -56,7 +58,7 @@ MODEL_MAPPING = {
 }
 
 
-def build_filters(session, model_class: Type[Base], filters: Dict[str, Any]):
+async def build_filters(model_class, filters: Dict[str, Any]):
     """构建查询过滤条件"""
     conditions = []
 
@@ -94,7 +96,7 @@ def build_filters(session, model_class: Type[Base], filters: Dict[str, Any]):
 
 
 async def db_query(
-    model_class: Type[Base],
+    model_class,
     data: Optional[Dict[str, Any]] = None,
     query_type: Optional[str] = "get",
     filters: Optional[Dict[str, Any]] = None,
@@ -102,7 +104,7 @@ async def db_query(
     order_by: Optional[List[str]] = None,
     single_result: Optional[bool] = False,
 ) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
-    """执行数据库查询操作
+    """执行异步数据库查询操作
 
     Args:
         model_class: SQLAlchemy模型类
@@ -120,15 +122,15 @@ async def db_query(
         if query_type not in ["get", "create", "update", "delete", "count"]:
             raise ValueError("query_type must be 'get', 'create', 'update', 'delete' or 'count'")
 
-        with get_db_session() as session:
+        async with get_db_session() as session:
             if query_type == "get":
-                query = session.query(model_class)
+                query = select(model_class)
 
                 # 应用过滤条件
                 if filters:
-                    conditions = build_filters(session, model_class, filters)
+                    conditions = await build_filters(model_class, filters)
                     if conditions:
-                        query = query.filter(and_(*conditions))
+                        query = query.where(and_(*conditions))
 
                 # 应用排序
                 if order_by:
@@ -146,14 +148,15 @@ async def db_query(
                     query = query.limit(limit)
 
                 # 执行查询
-                results = query.all()
+                result = await session.execute(query)
+                results = result.scalars().all()
 
                 # 转换为字典格式
                 result_dicts = []
-                for result in results:
+                for result_obj in results:
                     result_dict = {}
-                    for column in result.__table__.columns:
-                        result_dict[column.name] = getattr(result, column.name)
+                    for column in result_obj.__table__.columns:
+                        result_dict[column.name] = getattr(result_obj, column.name)
                     result_dicts.append(result_dict)
 
                 if single_result:
@@ -167,7 +170,7 @@ async def db_query(
                 # 创建新记录
                 new_record = model_class(**data)
                 session.add(new_record)
-                session.flush()  # 获取自动生成的ID
+                await session.flush()  # 获取自动生成的ID
 
                 # 转换为字典格式返回
                 result_dict = {}
@@ -179,43 +182,60 @@ async def db_query(
                 if not data:
                     raise ValueError("更新记录需要提供data参数")
 
-                query = session.query(model_class)
+                query = select(model_class)
 
                 # 应用过滤条件
                 if filters:
-                    conditions = build_filters(session, model_class, filters)
+                    conditions = await build_filters(model_class, filters)
                     if conditions:
-                        query = query.filter(and_(*conditions))
+                        query = query.where(and_(*conditions))
 
-                # 执行更新
-                affected_rows = query.update(data)
+                # 首先获取要更新的记录
+                result = await session.execute(query)
+                records_to_update = result.scalars().all()
+                
+                # 更新每个记录
+                affected_rows = 0
+                for record in records_to_update:
+                    for field, value in data.items():
+                        if hasattr(record, field):
+                            setattr(record, field, value)
+                    affected_rows += 1
+                
                 return affected_rows
 
             elif query_type == "delete":
-                query = session.query(model_class)
+                query = select(model_class)
 
                 # 应用过滤条件
                 if filters:
-                    conditions = build_filters(session, model_class, filters)
+                    conditions = await build_filters(model_class, filters)
                     if conditions:
-                        query = query.filter(and_(*conditions))
+                        query = query.where(and_(*conditions))
 
-                # 执行删除
-                affected_rows = query.delete()
+                # 首先获取要删除的记录
+                result = await session.execute(query)
+                records_to_delete = result.scalars().all()
+                
+                # 删除记录
+                affected_rows = 0
+                for record in records_to_delete:
+                    session.delete(record)
+                    affected_rows += 1
+                
                 return affected_rows
 
             elif query_type == "count":
-                query = session.query(func.count(model_class.id))
+                query = select(func.count(model_class.id))
 
                 # 应用过滤条件
                 if filters:
-                    base_query = session.query(model_class)
-                    conditions = build_filters(session, model_class, filters)
+                    conditions = await build_filters(model_class, filters)
                     if conditions:
-                        base_query = base_query.filter(and_(*conditions))
-                    query = session.query(func.count()).select_from(base_query.subquery())
+                        query = query.where(and_(*conditions))
 
-                return query.scalar()
+                result = await session.execute(query)
+                return result.scalar()
 
     except SQLAlchemyError as e:
         logger.error(f"[SQLAlchemy] 数据库操作出错: {e}")
@@ -238,9 +258,9 @@ async def db_query(
 
 
 async def db_save(
-    model_class: Type[Base], data: Dict[str, Any], key_field: Optional[str] = None, key_value: Optional[Any] = None
+    model_class, data: Dict[str, Any], key_field: Optional[str] = None, key_value: Optional[Any] = None
 ) -> Optional[Dict[str, Any]]:
-    """保存数据到数据库（创建或更新）
+    """异步保存数据到数据库（创建或更新）
 
     Args:
         model_class: SQLAlchemy模型类
@@ -252,13 +272,13 @@ async def db_save(
         保存后的记录数据或None
     """
     try:
-        with get_db_session() as session:
+        async with get_db_session() as session:
             # 如果提供了key_field和key_value，尝试更新现有记录
             if key_field and key_value is not None:
                 if hasattr(model_class, key_field):
-                    existing_record = (
-                        session.query(model_class).filter(getattr(model_class, key_field) == key_value).first()
-                    )
+                    query = select(model_class).where(getattr(model_class, key_field) == key_value)
+                    result = await session.execute(query)
+                    existing_record = result.scalars().first()
 
                     if existing_record:
                         # 更新现有记录
@@ -266,7 +286,7 @@ async def db_save(
                             if hasattr(existing_record, field):
                                 setattr(existing_record, field, value)
 
-                        session.flush()
+                        await session.flush()
 
                         # 转换为字典格式返回
                         result_dict = {}
@@ -277,8 +297,7 @@ async def db_save(
             # 创建新记录
             new_record = model_class(**data)
             session.add(new_record)
-            session.commit()
-            session.flush()
+            await session.flush()
 
             # 转换为字典格式返回
             result_dict = {}
@@ -297,13 +316,13 @@ async def db_save(
 
 
 async def db_get(
-    model_class: Type[Base],
+    model_class,
     filters: Optional[Dict[str, Any]] = None,
     limit: Optional[int] = None,
     order_by: Optional[str] = None,
     single_result: Optional[bool] = False,
 ) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
-    """从数据库获取记录
+    """异步从数据库获取记录
 
     Args:
         model_class: SQLAlchemy模型类
@@ -335,7 +354,7 @@ async def store_action_info(
     action_data: Optional[dict] = None,
     action_name: str = "",
 ) -> Optional[Dict[str, Any]]:
-    """存储动作信息到数据库
+    """异步存储动作信息到数据库
 
     Args:
         chat_stream: 聊天流对象
