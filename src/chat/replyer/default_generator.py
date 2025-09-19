@@ -112,8 +112,9 @@ def init_prompt():
 *你正在一个{chat_context_type}里聊天，你需要理解整个{chat_context_type}的聊天动态和话题走向，并做出自然的回应。*
 
 ### 核心任务
-- 你现在的主要任务是和 {sender_name} 聊天。
-- {reply_target_block} ，你需要生成一段紧密相关且能推动对话的回复。
+- 你现在的主要任务是和 {sender_name} 聊天。{relation_info_block}同时，也有其他用户会参与聊天，你可以参考他们的回复内容，但是你现在想回复{sender_name}的发言。
+
+-  {reply_target_block} 你需要生成一段紧密相关且能推动对话的回复。
 
 ## 规则
 {safety_guidelines_block}
@@ -202,6 +203,10 @@ If you need to use the search tool, please directly call the function "lpmm_sear
 {keywords_reaction_prompt}
 请注意不要输出多余内容(包括前后缀，冒号和引号，at或 @等 )。只输出回复内容。
 {moderation_prompt}
+你的核心任务是针对 {reply_target_block} 中提到的内容，{relation_info_block}生成一段紧密相关且能推动对话的回复。你的回复应该：
+1.  明确回应目标消息，而不是宽泛地评论。
+2.  可以分享你的看法、提出相关问题，或者开个合适的玩笑。
+3.  目的是让对话更有趣、更深入。
 最终请输出一条简短、完整且口语化的回复。
 现在，你说：
 """,

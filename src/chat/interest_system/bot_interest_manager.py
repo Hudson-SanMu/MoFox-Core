@@ -9,6 +9,7 @@ from datetime import datetime
 import numpy as np
 
 from src.common.logger import get_logger
+from src.config.config import global_config
 from src.common.data_models.bot_interest_data_model import (
     BotPersonalityInterests, BotInterestTag, InterestMatchResult
 )
@@ -433,9 +434,10 @@ class BotInterestManager:
         low_similarity_count = 0
 
         # 分级相似度阈值
-        high_threshold = 0.55
-        medium_threshold = 0.47
-        low_threshold = 0.3
+        affinity_config = global_config.affinity_flow
+        high_threshold = affinity_config.high_match_interest_threshold
+        medium_threshold = affinity_config.medium_match_interest_threshold
+        low_threshold = affinity_config.low_match_interest_threshold
 
         logger.debug(f"🔍 使用分级相似度阈值: 高={high_threshold}, 中={medium_threshold}, 低={low_threshold}")
 
@@ -449,7 +451,7 @@ class BotInterestManager:
                 # 根据相似度等级应用不同的加成
                 if similarity > high_threshold:
                     # 高相似度：强加成
-                    enhanced_score = weighted_score * 1.8
+                    enhanced_score = weighted_score * affinity_config.high_match_keyword_multiplier
                     match_count += 1
                     high_similarity_count += 1
                     result.add_match(tag.tag_name, enhanced_score, [tag.tag_name])
@@ -457,7 +459,7 @@ class BotInterestManager:
 
                 elif similarity > medium_threshold:
                     # 中相似度：中等加成
-                    enhanced_score = weighted_score * 1.4
+                    enhanced_score = weighted_score * affinity_config.medium_match_keyword_multiplier
                     match_count += 1
                     medium_similarity_count += 1
                     result.add_match(tag.tag_name, enhanced_score, [tag.tag_name])
@@ -465,7 +467,7 @@ class BotInterestManager:
 
                 elif similarity > low_threshold:
                     # 低相似度：轻微加成
-                    enhanced_score = weighted_score * 1.15
+                    enhanced_score = weighted_score * affinity_config.low_match_keyword_multiplier
                     match_count += 1
                     low_similarity_count += 1
                     result.add_match(tag.tag_name, enhanced_score, [tag.tag_name])
@@ -506,6 +508,7 @@ class BotInterestManager:
         if not keywords or not matched_tags:
             return {}
 
+        affinity_config = global_config.affinity_flow
         bonus_dict = {}
 
         for tag_name in matched_tags:
@@ -518,21 +521,21 @@ class BotInterestManager:
 
                 # 完全匹配
                 if keyword_lower == tag_name_lower:
-                    bonus += 0.3
-                    logger.debug(f"   🎯 关键词完全匹配: '{keyword}' == '{tag_name}' (+0.3)")
+                    bonus += affinity_config.high_match_interest_threshold * 0.6  # 使用高匹配阈值的60%作为完全匹配奖励
+                    logger.debug(f"   🎯 关键词完全匹配: '{keyword}' == '{tag_name}' (+{affinity_config.high_match_interest_threshold * 0.6:.3f})")
 
                 # 包含匹配
                 elif keyword_lower in tag_name_lower or tag_name_lower in keyword_lower:
-                    bonus += 0.15
-                    logger.debug(f"   🎯 关键词包含匹配: '{keyword}' ⊃ '{tag_name}' (+0.15)")
+                    bonus += affinity_config.medium_match_interest_threshold * 0.3  # 使用中匹配阈值的30%作为包含匹配奖励
+                    logger.debug(f"   🎯 关键词包含匹配: '{keyword}' ⊃ '{tag_name}' (+{affinity_config.medium_match_interest_threshold * 0.3:.3f})")
 
                 # 部分匹配（编辑距离）
                 elif self._calculate_partial_match(keyword_lower, tag_name_lower):
-                    bonus += 0.08
-                    logger.debug(f"   🎯 关键词部分匹配: '{keyword}' ≈ '{tag_name}' (+0.08)")
+                    bonus += affinity_config.low_match_interest_threshold * 0.4  # 使用低匹配阈值的40%作为部分匹配奖励
+                    logger.debug(f"   🎯 关键词部分匹配: '{keyword}' ≈ '{tag_name}' (+{affinity_config.low_match_interest_threshold * 0.4:.3f})")
 
             if bonus > 0:
-                bonus_dict[tag_name] = min(bonus, 0.5)  # 最大奖励限制为0.5
+                bonus_dict[tag_name] = min(bonus, affinity_config.max_match_bonus)  # 使用配置的最大奖励限制
 
         return bonus_dict
 

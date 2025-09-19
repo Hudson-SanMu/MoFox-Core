@@ -703,3 +703,34 @@ class PermissionConfig(ValidatedConfigBase):
     master_users: List[List[str]] = Field(
         default_factory=list, description="Master用户列表，格式: [[platform, user_id], ...]"
     )
+
+
+class AffinityFlowConfig(ValidatedConfigBase):
+    """亲和流配置类（兴趣度评分和人物关系系统）"""
+
+    # 兴趣评分系统参数
+    reply_action_interest_threshold: float = Field(default=0.4, description="回复动作兴趣阈值")
+    non_reply_action_interest_threshold: float = Field(default=0.2, description="非回复动作兴趣阈值")
+    high_match_interest_threshold: float = Field(default=0.8, description="高匹配兴趣阈值")
+    medium_match_interest_threshold: float = Field(default=0.5, description="中匹配兴趣阈值")
+    low_match_interest_threshold: float = Field(default=0.2, description="低匹配兴趣阈值")
+    high_match_keyword_multiplier: float = Field(default=1.5, description="高匹配关键词兴趣倍率")
+    medium_match_keyword_multiplier: float = Field(default=1.2, description="中匹配关键词兴趣倍率")
+    low_match_keyword_multiplier: float = Field(default=1.0, description="低匹配关键词兴趣倍率")
+    match_count_bonus: float = Field(default=0.1, description="匹配数关键词加成值")
+    max_match_bonus: float = Field(default=0.5, description="最大匹配数加成值")
+
+    # 回复决策系统参数
+    no_reply_threshold_adjustment: float = Field(default=0.1, description="不回复兴趣阈值调整值")
+    reply_cooldown_reduction: int = Field(default=2, description="回复后减少的不回复计数")
+    max_no_reply_count: int = Field(default=5, description="最大不回复计数次数")
+
+    # 综合评分权重
+    keyword_match_weight: float = Field(default=0.4, description="兴趣关键词匹配度权重")
+    mention_bot_weight: float = Field(default=0.3, description="提及bot分数权重")
+    relationship_weight: float = Field(default=0.3, description="人物关系分数权重")
+
+    # 提及bot相关参数
+    mention_bot_adjustment_threshold: float = Field(default=0.3, description="提及bot后的调整阈值")
+    mention_bot_interest_score: float = Field(default=0.6, description="提及bot的兴趣分")
+    base_relationship_score: float = Field(default=0.5, description="基础人物关系分")

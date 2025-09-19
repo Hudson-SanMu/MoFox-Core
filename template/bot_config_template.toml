@@ -1,5 +1,5 @@
 [inner]
-version = "6.8.9"
+version = "6.9.6"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -547,3 +547,31 @@ chat_ids = [
     ["group", "111111"], # 示例群聊1
     ["private", "222222"]  # 示例私聊2
 ]
+
+[affinity_flow]
+# 兴趣评分系统参数
+reply_action_interest_threshold = 0.62 # 回复动作兴趣阈值
+non_reply_action_interest_threshold = 0.48 # 非回复动作兴趣阈值
+high_match_interest_threshold = 0.65 # 高匹配兴趣阈值
+medium_match_interest_threshold = 0.5 # 中匹配兴趣阈值
+low_match_interest_threshold = 0.2 # 低匹配兴趣阈值
+high_match_keyword_multiplier = 1.8 # 高匹配关键词兴趣倍率
+medium_match_keyword_multiplier = 1.4 # 中匹配关键词兴趣倍率
+low_match_keyword_multiplier = 1.15 # 低匹配关键词兴趣倍率
+match_count_bonus = 0.05 # 匹配数关键词加成值
+max_match_bonus = 0.3 # 最大匹配数加成值
+
+# 回复决策系统参数
+no_reply_threshold_adjustment = 0.1 # 不回复兴趣阈值调整值
+reply_cooldown_reduction = 2 # 回复后减少的不回复计数
+max_no_reply_count = 5 # 最大不回复计数次数
+
+# 综合评分权重
+keyword_match_weight = 0.4 # 兴趣关键词匹配度权重
+mention_bot_weight = 0.3 # 提及bot分数权重
+relationship_weight = 0.3 # 人物关系分数权重
+
+# 提及bot相关参数
+mention_bot_adjustment_threshold = 0.3 # 提及bot后的调整阈值
+mention_bot_interest_score = 0.6 # 提及bot的兴趣分
+base_relationship_score = 0.3 # 基础人物关系分

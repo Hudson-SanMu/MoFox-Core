@@ -8,7 +8,7 @@ import time
 from typing import Dict, List, Optional
 
 from src.common.logger import get_logger
-from src.config.config import model_config
+from src.config.config import model_config, global_config
 from src.llm_models.utils_model import LLMRequest
 from src.common.database.sqlalchemy_database_api import get_db_session
 from src.common.database.sqlalchemy_models import UserRelationships, Messages
@@ -79,7 +79,7 @@ class UserRelationshipTracker:
             del self.tracking_users[oldest_user]
 
         # 获取当前关系分
-        current_relationship_score = 0.3  # 默认值
+        current_relationship_score = global_config.affinity_flow.base_relationship_score  # 默认值
         if self.interest_scoring_system:
             current_relationship_score = self.interest_scoring_system.get_user_relationship(user_id)
 
@@ -139,7 +139,7 @@ Bot回复: {interaction["bot_reply"]}
                     # 清理LLM响应，移除可能的格式标记
                     cleaned_response = self._clean_llm_json_response(llm_response)
                     response_data = json.loads(cleaned_response)
-                    new_score = max(0.0, min(1.0, float(response_data.get("new_relationship_score", 0.3))))
+                    new_score = max(0.0, min(1.0, float(response_data.get("new_relationship_score", global_config.affinity_flow.base_relationship_score))))
 
                     if self.interest_scoring_system:
                         self.interest_scoring_system.update_user_relationship(
@@ -258,7 +258,7 @@ Bot回复: {interaction["bot_reply"]}
             # 检查缓存是否过期
             cache_time = cache_data.get("last_tracked", 0)
             if time.time() - cache_time < self.cache_expiry_hours * 3600:
-                return cache_data.get("relationship_score", 0.3)
+                return cache_data.get("relationship_score", global_config.affinity_flow.base_relationship_score)
 
         # 缓存过期或不存在，从数据库获取
         relationship_data = self._get_user_relationship_from_db(user_id)
@@ -266,13 +266,13 @@ Bot回复: {interaction["bot_reply"]}
             # 更新缓存
             self.user_relationship_cache[user_id] = {
                 "relationship_text": relationship_data.get("relationship_text", ""),
-                "relationship_score": relationship_data.get("relationship_score", 0.3),
+                "relationship_score": relationship_data.get("relationship_score", global_config.affinity_flow.base_relationship_score),
                 "last_tracked": time.time(),
             }
-            return relationship_data.get("relationship_score", 0.3)
+            return relationship_data.get("relationship_score", global_config.affinity_flow.base_relationship_score)
 
         # 数据库中也没有，返回默认值
-        return 0.3
+        return global_config.affinity_flow.base_relationship_score
 
     def _get_user_relationship_from_db(self, user_id: str) -> Optional[Dict]:
         """从数据库获取用户关系数据"""
@@ -357,7 +357,7 @@ Bot回复: {interaction["bot_reply"]}
 
             # 获取当前关系数据
             current_relationship = self._get_user_relationship_from_db(user_id)
-            current_score = current_relationship.get("relationship_score", 0.3) if current_relationship else 0.3
+            current_score = current_relationship.get("relationship_score", global_config.affinity_flow.base_relationship_score) if current_relationship else global_config.affinity_flow.base_relationship_score
             current_text = current_relationship.get("relationship_text", "新用户") if current_relationship else "新用户"
 
             # 使用LLM分析并更新关系

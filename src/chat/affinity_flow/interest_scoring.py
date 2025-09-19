@@ -23,21 +23,22 @@ class InterestScoringSystem:
         # 智能兴趣匹配配置
         self.use_smart_matching = True
 
-        # 评分权重
+        # 从配置加载评分权重
+        affinity_config = global_config.affinity_flow
         self.score_weights = {
-            "interest_match": 0.5,  # 兴趣匹配度权重
-            "relationship": 0.3,  # 关系分权重
-            "mentioned": 0.2,  # 是否提及bot权重
+            "interest_match": affinity_config.keyword_match_weight,  # 兴趣匹配度权重
+            "relationship": affinity_config.relationship_weight,  # 关系分权重
+            "mentioned": affinity_config.mention_bot_weight,  # 是否提及bot权重
         }
 
         # 评分阈值
-        self.reply_threshold = 0.62  # 默认回复阈值
-        self.mention_threshold = 0.3  # 提及阈值
+        self.reply_threshold = affinity_config.reply_action_interest_threshold  # 回复动作兴趣阈值
+        self.mention_threshold = affinity_config.mention_bot_adjustment_threshold  # 提及bot后的调整阈值
 
         # 连续不回复概率提升
         self.no_reply_count = 0
-        self.max_no_reply_count = 10
-        self.probability_boost_per_no_reply = 0.01  # 每次不回复增加5%概率
+        self.max_no_reply_count = affinity_config.max_no_reply_count
+        self.probability_boost_per_no_reply = affinity_config.no_reply_threshold_adjustment / affinity_config.max_no_reply_count  # 每次不回复增加的概率
 
         # 用户关系数据
         self.user_relationships: Dict[str, float] = {}  # user_id -> relationship_score
@@ -151,7 +152,8 @@ class InterestScoringSystem:
                 logger.debug(f"   🔢 匹配详情: {match_result.match_scores}")
 
                 # 返回匹配分数，考虑置信度和匹配标签数量
-                match_count_bonus = min(len(match_result.matched_tags) * 0.05, 0.3)  # 每多匹配一个标签+0.05，最高+0.3
+                affinity_config = global_config.affinity_flow
+                match_count_bonus = min(len(match_result.matched_tags) * affinity_config.match_count_bonus, affinity_config.max_match_bonus)
                 final_score = match_result.overall_score * 1.15 * match_result.confidence + match_count_bonus
                 logger.debug(
                     f"⚖️  最终分数计算: 总分({match_result.overall_score:.3f}) × 1.3 × 置信度({match_result.confidence:.3f}) + 标签数量奖励({match_count_bonus:.3f}) = {final_score:.3f}"
@@ -254,7 +256,7 @@ class InterestScoringSystem:
                 logger.warning(f"从全局关系追踪器获取关系分失败: {e}")
 
         # 默认新用户的基础分
-        return 0.3
+        return global_config.affinity_flow.base_relationship_score
 
     def _calculate_mentioned_score(self, msg: DatabaseMessages, bot_nickname: str) -> float:
         """计算提及分数"""
@@ -262,7 +264,7 @@ class InterestScoringSystem:
             return 0.0
 
         if msg.is_mentioned or (bot_nickname and bot_nickname in msg.processed_plain_text):
-            return 1.0
+            return global_config.affinity_flow.mention_bot_interest_score
 
         return 0.0
 
@@ -280,7 +282,7 @@ class InterestScoringSystem:
         logger.debug(f"📋 基础阈值: {base_threshold:.3f}")
 
         # 如果被提及，降低阈值
-        if score.mentioned_score >= 1.0:
+        if score.mentioned_score >= global_config.affinity_flow.mention_bot_interest_score * 0.5:  # 使用提及bot兴趣分的一半作为判断阈值
             base_threshold = self.mention_threshold
             logger.debug(f"📣 消息提及了机器人，使用降低阈值: {base_threshold:.3f}")
 
@@ -308,7 +310,7 @@ class InterestScoringSystem:
         old_count = self.no_reply_count
 
         if did_reply:
-            self.no_reply_count = max(0, self.no_reply_count - 3)
+            self.no_reply_count = max(0, self.no_reply_count - global_config.affinity_flow.reply_cooldown_reduction)
             action = "✅ reply动作可用"
         else:
             self.no_reply_count += 1
@@ -323,7 +325,7 @@ class InterestScoringSystem:
 
     def update_user_relationship(self, user_id: str, relationship_change: float):
         """更新用户关系"""
-        old_score = self.user_relationships.get(user_id, 0.3)  # 默认新用户分数
+        old_score = self.user_relationships.get(user_id, global_config.affinity_flow.base_relationship_score)  # 默认新用户分数
         new_score = max(0.0, min(1.0, old_score + relationship_change))
 
         self.user_relationships[user_id] = new_score
