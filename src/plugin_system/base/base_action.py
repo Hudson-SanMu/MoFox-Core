@@ -211,7 +211,7 @@ class BaseAction(ABC):
 
                 # 检查新消息
                 current_time = time.time()
-                new_message_count = await message_api.count_new_messages(
+                new_message_count = message_api.count_new_messages(
                     chat_id=self.chat_id, start_time=loop_start_time, end_time=current_time
                 )
 
