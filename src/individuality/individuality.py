@@ -80,8 +80,9 @@ class Individuality:
         prompt_personality = f"{personality}\n{identity}"
         return f"你的名字是{bot_name}{bot_nickname}，你{prompt_personality}"
 
+    @staticmethod
     def _get_config_hash(
-        self, bot_nickname: str, personality_core: str, personality_side: str, identity: str
+            bot_nickname: str, personality_core: str, personality_side: str, identity: str
     ) -> tuple[str, str]:
         """获取personality和identity配置的哈希值
 

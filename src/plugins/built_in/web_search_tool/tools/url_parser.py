@@ -89,7 +89,7 @@ class URLParserTool(BaseTool):
             title = soup.title.string if soup.title else "无标题"
             for script in soup(["script", "style"]):
                 script.extract()
-            text = soup.get_text(separator="\n", strip=True)
+            text = soup.get_text(strip=True)
 
             if not text:
                 return {"error": "无法从页面提取有效文本内容。"}

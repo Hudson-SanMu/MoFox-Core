@@ -2,19 +2,18 @@ import time
 import traceback
 from typing import TYPE_CHECKING, Dict, Any
 
+from src.chat.utils.chat_message_builder import get_raw_msg_before_timestamp_with_chat, build_readable_messages_with_id
+from src.common.database.sqlalchemy_database_api import store_action_info
 from src.common.logger import get_logger
-from src.plugin_system.base.component_types import ChatMode
-from ..hfc_context import HfcContext
-from .events import ProactiveTriggerEvent
+from src.config.config import global_config
+from src.mood.mood_manager import mood_manager
+from src.plugin_system import tool_api
 from src.plugin_system.apis import generator_api
 from src.plugin_system.apis.generator_api import process_human_text
+from src.plugin_system.base.component_types import ChatMode
 from src.schedule.schedule_manager import schedule_manager
-from src.plugin_system import tool_api
-from src.config.config import global_config
-from src.chat.utils.chat_message_builder import get_raw_msg_before_timestamp_with_chat, build_readable_messages_with_id
-from src.mood.mood_manager import mood_manager
-from src.common.database.sqlalchemy_database_api import store_action_info, db_get
-from src.common.database.sqlalchemy_models import Messages
+from .events import ProactiveTriggerEvent
+from ..hfc_context import HfcContext
 
 if TYPE_CHECKING:
     from ..cycle_processor import CycleProcessor

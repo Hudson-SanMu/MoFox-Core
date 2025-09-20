@@ -57,7 +57,8 @@ class MessageSenderContainer:
         """恢复发送。"""
         self._paused_event.set()
 
-    def _calculate_typing_delay(self, text: str) -> float:
+    @staticmethod
+    def _calculate_typing_delay(text: str) -> float:
         """根据文本长度计算模拟打字延迟。"""
         chars_per_second = s4u_config.chars_per_second
         min_delay = s4u_config.min_typing_delay
@@ -149,6 +150,10 @@ class MessageSenderContainer:
         if self._task:
             await self._task
 
+    @property
+    def task(self):
+        return self._task
+
 
 class S4UChatManager:
     def __init__(self):
@@ -176,6 +181,7 @@ class S4UChat:
     def __init__(self, chat_stream: ChatStream):
         """初始化 S4UChat 实例。"""
 
+        self.last_msg_id = self.msg_id
         self.chat_stream = chat_stream
         self.stream_id = chat_stream.stream_id
         self.stream_name = get_chat_manager().get_stream_name(self.stream_id) or self.stream_id
@@ -205,7 +211,8 @@ class S4UChat:
 
         logger.info(f"[{self.stream_name}] S4UChat with two-queue system initialized.")
 
-    def _get_priority_info(self, message: MessageRecv) -> dict:
+    @staticmethod
+    def _get_priority_info(message: MessageRecv) -> dict:
         """安全地从消息中提取和解析 priority_info"""
         priority_info_raw = message.priority_info
         priority_info = {}
@@ -218,7 +225,8 @@ class S4UChat:
             priority_info = priority_info_raw
         return priority_info
 
-    def _is_vip(self, priority_info: dict) -> bool:
+    @staticmethod
+    def _is_vip(priority_info: dict) -> bool:
         """检查消息是否来自VIP用户。"""
         return priority_info.get("message_type") == "vip"
 
@@ -467,7 +475,6 @@ class S4UChat:
                 await asyncio.sleep(1)
 
     def get_processing_message_id(self):
-        self.last_msg_id = self.msg_id
         self.msg_id = f"{time.time()}_{random.randint(1000, 9999)}"
 
     async def _generate_and_send(self, message: MessageRecv):
@@ -564,7 +571,7 @@ class S4UChat:
 
             # 确保发送器被妥善关闭（即使已关闭，再次调用也是安全的）
             sender_container.resume()
-            if not sender_container._task.done():
+            if not sender_container.task.done():
                 await sender_container.close()
                 await sender_container.join()
             logger.info(f"[{self.stream_name}] _generate_and_send 任务结束，资源已清理。")
@@ -585,3 +592,7 @@ class S4UChat:
             await self._processing_task
         except asyncio.CancelledError:
             logger.info(f"处理任务已成功取消: {self.stream_name}")
+
+    @property
+    def new_message_event(self):
+        return self._new_message_event

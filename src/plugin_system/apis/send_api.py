@@ -118,10 +118,10 @@ async def wait_adapter_response(request_id: str, timeout: float = 30.0) -> dict:
         response = await asyncio.wait_for(future, timeout=timeout)
         return response
     except asyncio.TimeoutError:
-        _adapter_response_pool.pop(request_id, None)
+        await _adapter_response_pool.pop(request_id, None)
         return {"status": "error", "message": "timeout"}
     except Exception as e:
-        _adapter_response_pool.pop(request_id, None)
+        await _adapter_response_pool.pop(request_id, None)
         return {"status": "error", "message": str(e)}
 
 

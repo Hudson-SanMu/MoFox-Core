@@ -926,7 +926,7 @@ class EntorhinalCortex:
             timestamp_start = target_timestamp
             timestamp_end = target_timestamp + time_window_seconds
 
-            if chosen_message := get_raw_msg_by_timestamp(
+            if chosen_message := await get_raw_msg_by_timestamp(
                 timestamp_start=timestamp_start,
                 timestamp_end=timestamp_end,
                 limit=1,
@@ -934,7 +934,7 @@ class EntorhinalCortex:
             ):
                 chat_id: str = chosen_message[0].get("chat_id")  # type: ignore
 
-                if messages := get_raw_msg_by_timestamp_with_chat(
+                if messages := await get_raw_msg_by_timestamp_with_chat(
                     timestamp_start=timestamp_start,
                     timestamp_end=timestamp_end,
                     limit=chat_size,

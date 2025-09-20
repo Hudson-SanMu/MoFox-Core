@@ -249,7 +249,8 @@ class AntiPromptInjector:
                 await self._update_message_in_storage(message_data, modified_content)
                 logger.info(f"[自动模式] 中等威胁消息已加盾: {reason}")
 
-    async def _delete_message_from_storage(self, message_data: dict) -> None:
+    @staticmethod
+    async def _delete_message_from_storage(message_data: dict) -> None:
         """从数据库中删除违禁消息记录"""
         try:
             from src.common.database.sqlalchemy_models import Messages, get_db_session
@@ -274,7 +275,8 @@ class AntiPromptInjector:
         except Exception as e:
             logger.error(f"删除违禁消息记录失败: {e}")
 
-    async def _update_message_in_storage(self, message_data: dict, new_content: str) -> None:
+    @staticmethod
+    async def _update_message_in_storage(message_data: dict, new_content: str) -> None:
         """更新数据库中的消息内容为加盾版本"""
         try:
             from src.common.database.sqlalchemy_models import Messages, get_db_session

@@ -58,7 +58,7 @@ def require_permission(permission_node: str, deny_message: Optional[str] = None)
 
             if chat_stream is None:
                 logger.error(f"权限装饰器无法找到 ChatStream 对象，函数: {func.__name__}")
-                return
+                return None
 
             # 检查权限
             has_permission = permission_api.check_permission(
@@ -72,7 +72,7 @@ def require_permission(permission_node: str, deny_message: Optional[str] = None)
                 # 对于PlusCommand的execute方法，需要返回适当的元组
                 if func.__name__ == "execute" and hasattr(args[0], "send_text"):
                     return False, "权限不足", True
-                return
+                return None
 
             # 权限检查通过，执行原函数
             return await func(*args, **kwargs)
@@ -90,7 +90,7 @@ def require_permission(permission_node: str, deny_message: Optional[str] = None)
 
             if chat_stream is None:
                 logger.error(f"权限装饰器无法找到 ChatStream 对象，函数: {func.__name__}")
-                return
+                return None
 
             # 检查权限
             has_permission = permission_api.check_permission(
@@ -101,7 +101,7 @@ def require_permission(permission_node: str, deny_message: Optional[str] = None)
                 logger.warning(
                     f"用户 {chat_stream.platform}:{chat_stream.user_info.user_id} 没有权限 {permission_node}"
                 )
-                return
+                return None
 
             # 权限检查通过，执行原函数
             return func(*args, **kwargs)
@@ -156,7 +156,7 @@ def require_master(deny_message: Optional[str] = None):
 
             if chat_stream is None:
                 logger.error(f"Master权限装饰器无法找到 ChatStream 对象，函数: {func.__name__}")
-                return
+                return None
 
             # 检查是否为Master用户
             is_master = permission_api.is_master(chat_stream.platform, chat_stream.user_info.user_id)
@@ -166,7 +166,7 @@ def require_master(deny_message: Optional[str] = None):
                 await text_to_stream(message, chat_stream.stream_id)
                 if func.__name__ == "execute" and hasattr(args[0], "send_text"):
                     return False, "需要Master权限", True
-                return
+                return None
 
             # 权限检查通过，执行原函数
             return await func(*args, **kwargs)
@@ -184,14 +184,14 @@ def require_master(deny_message: Optional[str] = None):
 
             if chat_stream is None:
                 logger.error(f"Master权限装饰器无法找到 ChatStream 对象，函数: {func.__name__}")
-                return
+                return None
 
             # 检查是否为Master用户
             is_master = permission_api.is_master(chat_stream.platform, chat_stream.user_info.user_id)
 
             if not is_master:
                 logger.warning(f"用户 {chat_stream.platform}:{chat_stream.user_info.user_id} 不是Master用户")
-                return
+                return None
 
             # 权限检查通过，执行原函数
             return func(*args, **kwargs)

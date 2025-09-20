@@ -3,7 +3,7 @@ import traceback
 import os
 import pickle
 import random
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Coroutine
 from src.config.config import global_config
 from src.common.logger import get_logger
 from src.person_info.relationship_manager import get_relationship_manager
@@ -203,7 +203,7 @@ class RelationshipBuilder:
         messages = get_raw_msg_by_timestamp_with_chat_inclusive(self.chat_id, start_time, end_time)
         return len(messages)
 
-    def _count_messages_between(self, start_time: float, end_time: float) -> int:
+    def _count_messages_between(self, start_time: float, end_time: float) -> Coroutine[Any, Any, int]:
         """计算两个时间点之间的消息数量（不包含边界），用于间隔检查"""
         return num_new_messages_since(self.chat_id, start_time, end_time)
 
@@ -316,18 +316,12 @@ class RelationshipBuilder:
         if not self.person_engaged_cache:
             return f"{self.log_prefix} 关系缓存为空"
 
-        status_lines = [f"{self.log_prefix} 关系缓存状态："]
-        status_lines.append(
-            f"最后处理消息时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_processed_message_time)) if self.last_processed_message_time > 0 else '未设置'}"
-        )
-        status_lines.append(
-            f"最后清理时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_cleanup_time)) if self.last_cleanup_time > 0 else '未执行'}"
-        )
-        status_lines.append(f"总用户数：{len(self.person_engaged_cache)}")
-        status_lines.append(
-            f"清理配置：{'启用' if SEGMENT_CLEANUP_CONFIG['enable_cleanup'] else '禁用'} (最大保存{SEGMENT_CLEANUP_CONFIG['max_segment_age_days']}天, 每用户最多{SEGMENT_CLEANUP_CONFIG['max_segments_per_user']}段)"
-        )
-        status_lines.append("")
+        status_lines = [f"{self.log_prefix} 关系缓存状态：",
+                        f"最后处理消息时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_processed_message_time)) if self.last_processed_message_time > 0 else '未设置'}",
+                        f"最后清理时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_cleanup_time)) if self.last_cleanup_time > 0 else '未执行'}",
+                        f"总用户数：{len(self.person_engaged_cache)}",
+                        f"清理配置：{'启用' if SEGMENT_CLEANUP_CONFIG['enable_cleanup'] else '禁用'} (最大保存{SEGMENT_CLEANUP_CONFIG['max_segment_age_days']}天, 每用户最多{SEGMENT_CLEANUP_CONFIG['max_segments_per_user']}段)",
+                        ""]
 
         for person_id, segments in self.person_engaged_cache.items():
             total_count = self._get_total_message_count(person_id)

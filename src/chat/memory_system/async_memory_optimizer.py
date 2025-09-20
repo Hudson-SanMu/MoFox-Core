@@ -137,7 +137,8 @@ class AsyncMemoryQueue:
                 except Exception:
                     pass
 
-    async def _handle_store_task(self, task: MemoryTask) -> Any:
+    @staticmethod
+    async def _handle_store_task(task: MemoryTask) -> Any:
         """处理记忆存储任务"""
         # 这里需要根据具体的记忆系统来实现
         # 为了避免循环导入，这里使用延迟导入
@@ -156,7 +157,8 @@ class AsyncMemoryQueue:
             logger.error(f"记忆存储失败: {e}")
             return False
 
-    async def _handle_retrieve_task(self, task: MemoryTask) -> Any:
+    @staticmethod
+    async def _handle_retrieve_task(task: MemoryTask) -> Any:
         """处理记忆检索任务"""
         try:
             # 获取包装器实例
@@ -173,7 +175,8 @@ class AsyncMemoryQueue:
             logger.error(f"记忆检索失败: {e}")
             return []
 
-    async def _handle_build_task(self, task: MemoryTask) -> Any:
+    @staticmethod
+    async def _handle_build_task(task: MemoryTask) -> Any:
         """处理记忆构建任务（海马体系统）"""
         try:
             # 延迟导入避免循环依赖

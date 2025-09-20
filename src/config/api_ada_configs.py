@@ -22,7 +22,6 @@ class APIProvider(ValidatedConfigBase):
     enable_content_obfuscation: bool = Field(default=False, description="是否启用内容混淆（用于特定场景下的内容处理）")
     obfuscation_intensity: int = Field(default=1, ge=1, le=3, description="混淆强度（1-3级，数值越高混淆程度越强）")
 
-    @field_validator("base_url")
     @classmethod
     def validate_base_url(cls, v):
         """验证base_url，确保URL格式正确"""
@@ -30,7 +29,6 @@ class APIProvider(ValidatedConfigBase):
             raise ValueError("base_url必须以http://或https://开头")
         return v
 
-    @field_validator("api_key")
     @classmethod
     def validate_api_key(cls, v):
         """验证API密钥不能为空"""
@@ -75,7 +73,6 @@ class ModelInfo(ValidatedConfigBase):
     extra_params: Dict[str, Any] = Field(default_factory=dict, description="额外参数（用于API调用时的额外配置）")
     anti_truncation: bool = Field(default=False, description="是否启用反截断功能，防止模型输出被截断")
 
-    @field_validator("price_in", "price_out")
     @classmethod
     def validate_prices(cls, v):
         """验证价格必须为非负数"""
@@ -83,7 +80,6 @@ class ModelInfo(ValidatedConfigBase):
             raise ValueError("价格不能为负数")
         return v
 
-    @field_validator("model_identifier")
     @classmethod
     def validate_model_identifier(cls, v):
         """验证模型标识符不能为空且不能包含特殊字符"""
@@ -94,7 +90,6 @@ class ModelInfo(ValidatedConfigBase):
             raise ValueError("模型标识符不能包含空格或换行符")
         return v
 
-    @field_validator("name")
     @classmethod
     def validate_name(cls, v):
         """验证模型名称不能为空"""
@@ -111,7 +106,6 @@ class TaskConfig(ValidatedConfigBase):
     temperature: float = Field(default=0.7, description="模型温度")
     concurrency_count: int = Field(default=1, description="并发请求数量")
 
-    @field_validator("model_list")
     @classmethod
     def validate_model_list(cls, v):
         """验证模型列表不能为空"""
@@ -178,7 +172,6 @@ class APIAdapterConfig(ValidatedConfigBase):
         self.api_providers_dict = {provider.name: provider for provider in self.api_providers}
         self.models_dict = {model.name: model for model in self.models}
 
-    @field_validator("models")
     @classmethod
     def validate_models_list(cls, v):
         """验证模型列表"""
@@ -197,7 +190,6 @@ class APIAdapterConfig(ValidatedConfigBase):
 
         return v
 
-    @field_validator("api_providers")
     @classmethod
     def validate_api_providers_list(cls, v):
         """验证API提供商列表"""

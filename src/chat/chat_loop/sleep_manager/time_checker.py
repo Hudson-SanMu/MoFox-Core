@@ -34,7 +34,8 @@ class TimeChecker:
         
         return self._daily_sleep_offset, self._daily_wake_offset
 
-    def get_today_schedule(self) -> Optional[List[Dict[str, Any]]]:
+    @staticmethod
+    def get_today_schedule() -> Optional[List[Dict[str, Any]]]:
         """从全局 ScheduleManager 获取今天的日程安排。"""
         return schedule_manager.today_schedule
 

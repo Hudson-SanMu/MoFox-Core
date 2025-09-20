@@ -25,7 +25,8 @@ class DatabaseProxy:
         self._engine = None
         self._session = None
 
-    def initialize(self, *args, **kwargs):
+    @staticmethod
+    def initialize(*args, **kwargs):
         """初始化数据库连接"""
         return initialize_database_compat()
 

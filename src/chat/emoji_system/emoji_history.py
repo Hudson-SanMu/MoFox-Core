@@ -2,9 +2,8 @@
 """
 表情包发送历史记录模块
 """
-import os
-from typing import List, Dict
 from collections import deque
+from typing import List, Dict
 
 from src.common.logger import get_logger
 

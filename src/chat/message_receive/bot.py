@@ -80,7 +80,8 @@ class ChatBot:
         # 初始化反注入系统
         self._initialize_anti_injector()
 
-    def _initialize_anti_injector(self):
+    @staticmethod
+    def _initialize_anti_injector():
         """初始化反注入系统"""
         try:
             initialize_anti_injector()
@@ -100,7 +101,8 @@ class ChatBot:
 
             self._started = True
 
-    async def _process_plus_commands(self, message: MessageRecv):
+    @staticmethod
+    async def _process_plus_commands(message: MessageRecv):
         """独立处理PlusCommand系统"""
         try:
             text = message.processed_plain_text
@@ -220,7 +222,8 @@ class ChatBot:
             logger.error(f"处理PlusCommand时出错: {e}")
             return False, None, True  # 出错时继续处理消息
 
-    async def _process_commands_with_new_system(self, message: MessageRecv):
+    @staticmethod
+    async def _process_commands_with_new_system(message: MessageRecv):
         # sourcery skip: use-named-expression
         """使用新插件系统处理命令"""
         try:
@@ -310,7 +313,8 @@ class ChatBot:
 
         return False
 
-    async def handle_adapter_response(self, message: MessageRecv):
+    @staticmethod
+    async def handle_adapter_response(message: MessageRecv):
         """处理适配器命令响应"""
         try:
             from src.plugin_system.apis.send_api import put_adapter_response

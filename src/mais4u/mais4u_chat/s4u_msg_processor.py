@@ -161,7 +161,8 @@ class S4UMessageProcessor:
         else:
             logger.info(f"[S4U]{userinfo.user_nickname}:{message.processed_plain_text}")
 
-    async def handle_internal_message(self, message: MessageRecvS4U):
+    @staticmethod
+    async def handle_internal_message(message: MessageRecvS4U):
         if message.is_internal:
             group_info = GroupInfo(platform="amaidesu_default", group_id=660154, group_name="内心")
 
@@ -173,7 +174,7 @@ class S4UMessageProcessor:
             message.message_info.platform = s4u_chat.chat_stream.platform
 
             s4u_chat.internal_message.append(message)
-            s4u_chat._new_message_event.set()
+            s4u_chat.new_message_event.set()
 
             logger.info(
                 f"[{s4u_chat.stream_name}] 添加内部消息-------------------------------------------------------: {message.processed_plain_text}"
@@ -182,20 +183,23 @@ class S4UMessageProcessor:
             return True
         return False
 
-    async def handle_screen_message(self, message: MessageRecvS4U):
+    @staticmethod
+    async def handle_screen_message(message: MessageRecvS4U):
         if message.is_screen:
             screen_manager.set_screen(message.screen_info)
             return True
         return False
 
-    async def hadle_if_voice_done(self, message: MessageRecvS4U):
+    @staticmethod
+    async def hadle_if_voice_done(message: MessageRecvS4U):
         if message.voice_done:
             s4u_chat = get_s4u_chat_manager().get_or_create_chat(message.chat_stream)
             s4u_chat.voice_done = message.voice_done
             return True
         return False
 
-    async def check_if_fake_gift(self, message: MessageRecvS4U) -> bool:
+    @staticmethod
+    async def check_if_fake_gift(message: MessageRecvS4U) -> bool:
         """检查消息是否为假礼物"""
         if message.is_gift:
             return False
@@ -227,7 +231,8 @@ class S4UMessageProcessor:
 
         return True  # 非礼物消息，继续正常处理
 
-    async def _handle_context_web_update(self, chat_id: str, message: MessageRecv):
+    @staticmethod
+    async def _handle_context_web_update(chat_id: str, message: MessageRecv):
         """处理上下文网页更新的独立task
 
         Args:

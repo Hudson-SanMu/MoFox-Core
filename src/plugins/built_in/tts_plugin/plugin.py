@@ -74,7 +74,8 @@ class TTSAction(BaseAction):
             logger.error(f"{self.log_prefix} 执行TTS动作时出错: {e}")
             return False, f"执行TTS动作时出错: {e}"
 
-    def _process_text_for_tts(self, text: str) -> str:
+    @staticmethod
+    def _process_text_for_tts(text: str) -> str:
         """
         处理文本使其更适合TTS使用
         - 移除不必要的特殊字符和表情符号

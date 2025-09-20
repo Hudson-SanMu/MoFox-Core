@@ -203,7 +203,8 @@ class ChatManager:
         key = "_".join(components)
         return hashlib.md5(key.encode()).hexdigest()
 
-    def get_stream_id(self, platform: str, id: str, is_group: bool = True) -> str:
+    @staticmethod
+    def get_stream_id(platform: str, id: str, is_group: bool = True) -> str:
         """获取聊天流ID"""
         components = [platform, id] if is_group else [platform, id, "private"]
         key = "_".join(components)

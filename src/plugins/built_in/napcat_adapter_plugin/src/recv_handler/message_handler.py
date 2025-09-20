@@ -26,7 +26,7 @@ import json
 import websockets as Server
 import base64
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Coroutine
 import uuid
 
 from maim_message import (
@@ -351,6 +351,7 @@ class MessageHandler:
 
         logger.debug("发送到Maibot处理信息")
         await message_send_instance.message_send(message_base)
+        return None
 
     async def handle_real_message(self, raw_message: dict, in_reply: bool = False) -> List[Seg] | None:
         # sourcery skip: low-code-quality
@@ -518,7 +519,8 @@ class MessageHandler:
         logger.debug(f"handle_real_message完成，处理了{len(real_message)}个消息段，生成了{len(seg_message)}个seg")
         return seg_message
 
-    async def handle_text_message(self, raw_message: dict) -> Seg:
+    @staticmethod
+    async def handle_text_message(raw_message: dict) -> Seg:
         """
         处理纯文本信息
         Parameters:
@@ -530,7 +532,8 @@ class MessageHandler:
         plain_text: str = message_data.get("text")
         return Seg(type="text", data=plain_text)
 
-    async def handle_face_message(self, raw_message: dict) -> Seg | None:
+    @staticmethod
+    async def handle_face_message(raw_message: dict) -> Seg | None:
         """
         处理表情消息
         Parameters:
@@ -547,7 +550,8 @@ class MessageHandler:
             logger.warning(f"不支持的表情：{face_raw_id}")
             return None
 
-    async def handle_image_message(self, raw_message: dict) -> Seg | None:
+    @staticmethod
+    async def handle_image_message(raw_message: dict) -> Seg | None:
         """
         处理图片消息与表情包消息
         Parameters:
@@ -603,6 +607,7 @@ class MessageHandler:
                     return Seg(type="at", data=f"{member_info.get('nickname')}:{member_info.get('user_id')}")
                 else:
                     return None
+        return None
 
     async def handle_record_message(self, raw_message: dict) -> Seg | None:
         """
@@ -631,7 +636,8 @@ class MessageHandler:
             return None
         return Seg(type="voice", data=audio_base64)
 
-    async def handle_video_message(self, raw_message: dict) -> Seg | None:
+    @staticmethod
+    async def handle_video_message(raw_message: dict) -> Seg | None:
         """
         处理视频消息
         Parameters:
@@ -762,7 +768,7 @@ class MessageHandler:
             return None
 
         processed_message: Seg
-        if image_count < 5 and image_count > 0:
+        if 5 > image_count > 0:
             # 处理图片数量小于5的情况，此时解析图片为base64
             logger.debug("图片数量小于5，开始解析图片为base64")
             processed_message = await self._recursive_parse_image_seg(handled_message, True)
@@ -779,15 +785,18 @@ class MessageHandler:
         forward_hint = Seg(type="text", data="这是一条转发消息：\n")
         return Seg(type="seglist", data=[forward_hint, processed_message])
 
-    async def handle_dice_message(self, raw_message: dict) -> Seg:
+    @staticmethod
+    async def handle_dice_message(raw_message: dict) -> Seg:
         message_data: dict = raw_message.get("data", {})
         res = message_data.get("result", "")
         return Seg(type="text", data=f"[扔了一个骰子，点数是{res}]")
 
-    async def handle_shake_message(self, raw_message: dict) -> Seg:
+    @staticmethod
+    async def handle_shake_message(raw_message: dict) -> Seg:
         return Seg(type="text", data="[向你发送了窗口抖动，现在你的屏幕猛烈地震了一下！]")
 
-    async def handle_json_message(self, raw_message: dict) -> Seg:
+    @staticmethod
+    async def handle_json_message(raw_message: dict) -> Seg | None:
         """
         处理JSON消息
         Parameters:
@@ -906,7 +915,8 @@ class MessageHandler:
             logger.error(f"处理JSON消息时出错: {e}")
             return None
 
-    async def handle_rps_message(self, raw_message: dict) -> Seg:
+    @staticmethod
+    async def handle_rps_message(raw_message: dict) -> Seg:
         message_data: dict = raw_message.get("data", {})
         res = message_data.get("result", "")
         if res == "1":
@@ -1089,7 +1099,8 @@ class MessageHandler:
             return None
         return response_data.get("messages")
 
-    async def _send_buffered_message(self, session_id: str, merged_text: str, original_event: Dict[str, Any]):
+    @staticmethod
+    async def _send_buffered_message(session_id: str, merged_text: str, original_event: Dict[str, Any]):
         """发送缓冲的合并消息"""
         try:
             # 从原始事件数据中提取信息

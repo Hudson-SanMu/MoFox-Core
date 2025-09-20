@@ -775,7 +775,8 @@ class StatisticOutputTask(AsyncTask):
         output.append("")
         return "\n".join(output)
 
-    def _get_chat_display_name_from_id(self, chat_id: str) -> str:
+    @staticmethod
+    def _get_chat_display_name_from_id(chat_id: str) -> str:
         """从chat_id获取显示名称"""
         try:
             # 首先尝试从chat_stream获取真实群组名称
@@ -1121,7 +1122,8 @@ class StatisticOutputTask(AsyncTask):
 
         return chart_data
 
-    def _collect_interval_data(self, now: datetime, hours: int, interval_minutes: int) -> dict:
+    @staticmethod
+    def _collect_interval_data(now: datetime, hours: int, interval_minutes: int) -> dict:
         """收集指定时间范围内每个间隔的数据"""
         # 生成时间点
         start_time = now - timedelta(hours=hours)
@@ -1211,7 +1213,8 @@ class StatisticOutputTask(AsyncTask):
             "message_by_chat": message_by_chat,
         }
 
-    def _generate_chart_tab(self, chart_data: dict) -> str:
+    @staticmethod
+    def _generate_chart_tab(chart_data: dict) -> str:
         # sourcery skip: extract-duplicate-method, move-assign-in-block
         """生成图表选项卡HTML内容"""
 
@@ -1575,13 +1578,13 @@ class AsyncStatisticOutputTask(AsyncTask):
         return StatisticOutputTask._generate_chart_data(self, stat)  # type: ignore
 
     def _collect_interval_data(self, now: datetime, hours: int, interval_minutes: int) -> dict:
-        return StatisticOutputTask._collect_interval_data(self, now, hours, interval_minutes)  # type: ignore
+        return StatisticOutputTask._collect_interval_data(now, hours, interval_minutes)  # type: ignore
 
     def _generate_chart_tab(self, chart_data: dict) -> str:
-        return StatisticOutputTask._generate_chart_tab(self, chart_data)  # type: ignore
+        return StatisticOutputTask._generate_chart_tab(chart_data)  # type: ignore
 
     def _get_chat_display_name_from_id(self, chat_id: str) -> str:
-        return StatisticOutputTask._get_chat_display_name_from_id(self, chat_id)  # type: ignore
+        return StatisticOutputTask._get_chat_display_name_from_id(chat_id)  # type: ignore
 
     def _convert_defaultdict_to_dict(self, data):
         return StatisticOutputTask._convert_defaultdict_to_dict(self, data)  # type: ignore

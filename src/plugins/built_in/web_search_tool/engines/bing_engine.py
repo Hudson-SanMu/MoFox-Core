@@ -111,7 +111,8 @@ class BingSearchEngine(BaseSearchEngine):
         logger.debug(f"Bing搜索 [{keyword}] 完成，总共 {len(list_result)} 个结果")
         return list_result[:num_results] if len(list_result) > num_results else list_result
 
-    def _parse_html(self, url: str) -> List[Dict[str, Any]]:
+    @staticmethod
+    def _parse_html(url: str) -> List[Dict[str, Any]]:
         """解析处理结果"""
         try:
             logger.debug(f"访问Bing搜索URL: {url}")

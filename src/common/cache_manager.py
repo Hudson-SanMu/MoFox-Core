@@ -53,7 +53,8 @@ class CacheManager:
             self._initialized = True
             logger.info("缓存管理器已初始化: L1 (内存+FAISS), L2 (数据库+ChromaDB)")
 
-    def _validate_embedding(self, embedding_result: Any) -> Optional[np.ndarray]:
+    @staticmethod
+    def _validate_embedding(embedding_result: Any) -> Optional[np.ndarray]:
         """
         验证和标准化嵌入向量格式
         """
@@ -90,7 +91,8 @@ class CacheManager:
             logger.error(f"验证嵌入向量时发生错误: {e}")
             return None
 
-    def _generate_key(self, tool_name: str, function_args: Dict[str, Any], tool_file_path: Union[str, Path]) -> str:
+    @staticmethod
+    def _generate_key(tool_name: str, function_args: Dict[str, Any], tool_file_path: Union[str, Path]) -> str:
         """生成确定性的缓存键，包含文件修改时间以实现自动失效。"""
         try:
             tool_file_path = Path(tool_file_path)

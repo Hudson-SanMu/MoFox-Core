@@ -533,7 +533,8 @@ class RelationshipManager:
         
 
 
-    def calculate_time_weight(self, point_time: str, current_time: str) -> float:
+    @staticmethod
+    def calculate_time_weight(point_time: str, current_time: str) -> float:
         """计算基于时间的权重系数"""
         try:
             point_timestamp = datetime.strptime(point_time, "%Y-%m-%d %H:%M:%S")
@@ -557,7 +558,69 @@ class RelationshipManager:
             logger.error(f"计算时间权重失败: {e}")
             return 0.5  # 发生错误时返回中等权重
 
-init_prompt()
+    @staticmethod
+    def tfidf_similarity(s1, s2):
+        """
+        使用 TF-IDF 和余弦相似度计算两个句子的相似性。
+        """
+        # 确保输入是字符串类型
+        if isinstance(s1, list):
+            s1 = " ".join(str(x) for x in s1)
+        if isinstance(s2, list):
+            s2 = " ".join(str(x) for x in s2)
+
+        # 转换为字符串类型
+        s1 = str(s1)
+        s2 = str(s2)
+
+        # 1. 使用 jieba 进行分词
+        s1_words = " ".join(jieba.cut(s1))
+        s2_words = " ".join(jieba.cut(s2))
+
+        # 2. 将两句话放入一个列表中
+        corpus = [s1_words, s2_words]
+
+        # 3. 创建 TF-IDF 向量化器并进行计算
+        try:
+            vectorizer = TfidfVectorizer()
+            tfidf_matrix = vectorizer.fit_transform(corpus)
+        except ValueError:
+            # 如果句子完全由停用词组成，或者为空，可能会报错
+            return 0.0
+
+        # 4. 计算余弦相似度
+        similarity_matrix = cosine_similarity(tfidf_matrix)
+
+        # 返回 s1 和 s2 的相似度
+        return similarity_matrix[0, 1]
+
+    @staticmethod
+    def sequence_similarity(s1, s2):
+        """
+        使用 SequenceMatcher 计算两个句子的相似性。
+        """
+        return SequenceMatcher(None, s1, s2).ratio()
+
+    def check_similarity(self, text1, text2, tfidf_threshold=0.5, seq_threshold=0.6):
+        """
+        使用两种方法检查文本相似度，只要其中一种方法达到阈值就认为是相似的。
+
+        Args:
+            text1: 第一个文本
+            text2: 第二个文本
+            tfidf_threshold: TF-IDF相似度阈值
+            seq_threshold: SequenceMatcher相似度阈值
+
+        Returns:
+            bool: 如果任一方法达到阈值则返回True
+        """
+        # 计算两种相似度
+        tfidf_sim = self.tfidf_similarity(text1, text2)
+        seq_sim = self.sequence_similarity(text1, text2)
+
+        # 只要其中一种方法达到阈值就认为是相似的
+        return tfidf_sim > tfidf_threshold or seq_sim > seq_threshold
+
 
 relationship_manager = None
 

@@ -36,7 +36,8 @@ class ReplyTrackerService:
         self._load_data()
         logger.debug(f"ReplyTrackerService initialized with data file: {self.reply_record_file}")
 
-    def _validate_data(self, data: Any) -> bool:
+    @staticmethod
+    def _validate_data(data: Any) -> bool:
         """验证加载的数据格式是否正确"""
         if not isinstance(data, dict):
             logger.error("加载的数据不是字典格式")

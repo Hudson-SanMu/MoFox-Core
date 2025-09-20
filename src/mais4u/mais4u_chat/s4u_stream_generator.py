@@ -49,7 +49,8 @@ class S4UStreamGenerator:
 
         self.chat_stream = None
 
-    async def build_last_internal_message(self, message: MessageRecvS4U, previous_reply_context: str = ""):
+    @staticmethod
+    async def build_last_internal_message(message: MessageRecvS4U, previous_reply_context: str = ""):
         # person_id = PersonInfoManager.get_person_id(
         #     message.chat_stream.user_info.platform, message.chat_stream.user_info.user_id
         # )

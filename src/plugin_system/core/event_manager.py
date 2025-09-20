@@ -7,6 +7,7 @@ from typing import Dict, Type, List, Optional, Any, Union
 from threading import Lock
 
 from src.common.logger import get_logger
+from src.plugin_system import BaseEventHandler
 from src.plugin_system.base.base_event import BaseEvent, HandlerResultsCollection
 from src.plugin_system.base.base_events_handler import BaseEventHandler
 from src.plugin_system.base.component_types import EventType
@@ -198,7 +199,7 @@ class EventManager:
         """
         return self._event_handlers.get(handler_name)
 
-    def get_all_event_handlers(self) -> Dict[str, BaseEventHandler]:
+    def get_all_event_handlers(self) -> dict[str, type[BaseEventHandler]]:
         """获取所有已注册的事件处理器
 
         Returns:

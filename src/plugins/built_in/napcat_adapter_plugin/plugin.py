@@ -400,9 +400,8 @@ class NapcatAdapterPlugin(BasePlugin):
     def get_plugin_components(self):
         self.register_events()
 
-        components = []
-        components.append((LauchNapcatAdapterHandler.get_handler_info(), LauchNapcatAdapterHandler))
-        components.append((StopNapcatAdapterHandler.get_handler_info(), StopNapcatAdapterHandler))
+        components = [(LauchNapcatAdapterHandler.get_handler_info(), LauchNapcatAdapterHandler),
+                      (StopNapcatAdapterHandler.get_handler_info(), StopNapcatAdapterHandler)]
         for handler in get_classes_in_module(event_handlers):
             if issubclass(handler, BaseEventHandler):
                 components.append((handler.get_handler_info(), handler))

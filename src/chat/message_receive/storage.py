@@ -1,15 +1,15 @@
 import re
 import json
 import traceback
-import orjson
 from typing import Union
 
-from src.common.database.sqlalchemy_models import Messages, Images
+import orjson
+from sqlalchemy import select, desc, update
+
+from src.common.database.sqlalchemy_models import Messages, Images, get_db_session
 from src.common.logger import get_logger
 from .chat_stream import ChatStream
 from .message import MessageSending, MessageRecv
-from src.common.database.sqlalchemy_database_api import get_db_session
-from sqlalchemy import select, update, desc
 
 logger = get_logger("message_storage")
 
@@ -117,21 +117,13 @@ class MessageStorage:
                 user_nickname=user_info_dict.get("user_nickname"),
                 user_cardname=user_info_dict.get("user_cardname"),
                 processed_plain_text=filtered_processed_plain_text,
-                display_message=filtered_display_message,
-                memorized_times=message.memorized_times,
-                interest_value=interest_value,
                 priority_mode=priority_mode,
                 priority_info=priority_info_json,
                 is_emoji=is_emoji,
                 is_picid=is_picid,
-                is_notify=is_notify,
-                is_command=is_command,
-                key_words=key_words,
-                key_words_lite=key_words_lite,
             )
             async with get_db_session() as session:
-                session.add(new_message)
-                await session.commit()
+                await session.add(new_message)
 
         except Exception:
             logger.exception("存储消息失败")
@@ -154,8 +146,7 @@ class MessageStorage:
                 qq_message_id = message.message_segment.data.get("id")
             elif message.message_segment.type == "reply":
                 qq_message_id = message.message_segment.data.get("id")
-                if qq_message_id:
-                    logger.debug(f"从reply消息段获取到消息ID: {qq_message_id}")
+                logger.debug(f"从reply消息段获取到消息ID: {qq_message_id}")
             elif message.message_segment.type == "adapter_response":
                 logger.debug("适配器响应消息，不需要更新ID")
                 return
@@ -198,7 +189,6 @@ class MessageStorage:
                 f"segment_type={getattr(message.message_segment, 'type', 'N/A')}"
             )
 
-    @staticmethod
     async def replace_image_descriptions(text: str) -> str:
         """将[图片：描述]替换为[picid:image_id]"""
         # 先检查文本中是否有图片标记

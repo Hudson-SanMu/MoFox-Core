@@ -48,7 +48,8 @@ class BaseMain:
         """初始化基础主程序"""
         self.easter_egg()
 
-    def easter_egg(self):
+    @staticmethod
+    def easter_egg():
         # 彩蛋
         init()
         items = [

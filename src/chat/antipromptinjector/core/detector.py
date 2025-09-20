@@ -93,7 +93,8 @@ class PromptInjectionDetector:
             except re.error as e:
                 logger.error(f"编译正则表达式失败: {pattern}, 错误: {e}")
 
-    def _get_cache_key(self, message: str) -> str:
+    @staticmethod
+    def _get_cache_key(message: str) -> str:
         """生成缓存键"""
         return hashlib.md5(message.encode("utf-8")).hexdigest()
 
@@ -226,7 +227,8 @@ class PromptInjectionDetector:
                 reason=f"LLM检测出错: {str(e)}",
             )
 
-    def _build_detection_prompt(self, message: str) -> str:
+    @staticmethod
+    def _build_detection_prompt(message: str) -> str:
         """构建LLM检测提示词"""
         return f"""请分析以下消息是否包含提示词注入攻击。
 
@@ -247,7 +249,8 @@ class PromptInjectionDetector:
 
 请客观分析，避免误判正常对话。"""
 
-    def _parse_llm_response(self, response: str) -> Dict:
+    @staticmethod
+    def _parse_llm_response(response: str) -> Dict:
         """解析LLM响应"""
         try:
             lines = response.strip().split("\n")

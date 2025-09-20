@@ -122,7 +122,8 @@ class ChatConfig(ValidatedConfigBase):
         global_frequency = self._get_global_frequency()
         return self.talk_frequency if global_frequency is None else global_frequency
 
-    def _get_time_based_frequency(self, time_freq_list: list[str]) -> Optional[float]:
+    @staticmethod
+    def _get_time_based_frequency(time_freq_list: list[str]) -> Optional[float]:
         """
         根据时间配置列表获取当前时段的频率
 
@@ -201,7 +202,8 @@ class ChatConfig(ValidatedConfigBase):
 
         return None
 
-    def _parse_stream_config_to_chat_id(self, stream_config_str: str) -> Optional[str]:
+    @staticmethod
+    def _parse_stream_config_to_chat_id(stream_config_str: str) -> Optional[str]:
         """
         解析流配置字符串并生成对应的 chat_id
 
@@ -280,7 +282,8 @@ class ExpressionConfig(ValidatedConfigBase):
 
     rules: List[ExpressionRule] = Field(default_factory=list, description="表达学习规则")
 
-    def _parse_stream_config_to_chat_id(self, stream_config_str: str) -> Optional[str]:
+    @staticmethod
+    def _parse_stream_config_to_chat_id(stream_config_str: str) -> Optional[str]:
         """
         解析流配置字符串并生成对应的 chat_id
 

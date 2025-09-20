@@ -58,7 +58,7 @@ class MessageBuilder:
         self,
         image_format: str,
         image_base64: str,
-        support_formats: list[str] = SUPPORTED_IMAGE_FORMATS,  # 默认支持格式
+            support_formats=None,  # 默认支持格式
     ) -> "MessageBuilder":
         """
         添加图片内容
@@ -66,6 +66,8 @@ class MessageBuilder:
         :param image_base64: 图片的base64编码
         :return: MessageBuilder对象
         """
+        if support_formats is None:
+            support_formats = SUPPORTED_IMAGE_FORMATS
         if image_format.lower() not in support_formats:
             raise ValueError("不受支持的图片格式")
         if not image_base64:

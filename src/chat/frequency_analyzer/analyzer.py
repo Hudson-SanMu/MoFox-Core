@@ -40,7 +40,8 @@ class ChatFrequencyAnalyzer:
         self._analysis_cache: dict[str, tuple[float, list[tuple[time, time]]]] = {}
         self._cache_ttl_seconds = 60 * 30  # 缓存30分钟
 
-    def _find_peak_windows(self, timestamps: List[float]) -> List[Tuple[datetime, datetime]]:
+    @staticmethod
+    def _find_peak_windows(timestamps: List[float]) -> List[Tuple[datetime, datetime]]:
         """
         使用滑动窗口算法来识别时间戳列表中的高峰时段。
 

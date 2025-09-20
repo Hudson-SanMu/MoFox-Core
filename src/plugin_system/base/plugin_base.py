@@ -277,7 +277,8 @@ class PluginBase(ABC):
                 return config_version_field.default
         return "1.0.0"
 
-    def _get_current_config_version(self, config: Dict[str, Any]) -> str:
+    @staticmethod
+    def _get_current_config_version(config: Dict[str, Any]) -> str:
         """从配置文件中获取当前版本号"""
         if "plugin" in config and "config_version" in config["plugin"]:
             return str(config["plugin"]["config_version"])

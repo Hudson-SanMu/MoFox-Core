@@ -18,7 +18,8 @@ logger = get_logger("anti_injector.counter_attack")
 class CounterAttackGenerator:
     """反击消息生成器"""
 
-    def get_personality_context(self) -> str:
+    @staticmethod
+    def get_personality_context() -> str:
         """获取人格上下文信息
 
         Returns:

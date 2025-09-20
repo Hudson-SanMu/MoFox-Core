@@ -243,7 +243,8 @@ class VectorInstantMemoryV2:
             logger.error(f"查找相似消息失败: {e}")
             return []
 
-    def _format_time_ago(self, timestamp: float) -> str:
+    @staticmethod
+    def _format_time_ago(timestamp: float) -> str:
         """格式化时间差显示"""
         if timestamp <= 0:
             return "未知时间"

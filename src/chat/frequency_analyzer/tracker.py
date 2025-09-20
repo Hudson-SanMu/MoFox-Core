@@ -21,7 +21,8 @@ class ChatFrequencyTracker:
     def __init__(self):
         self._timestamps: Dict[str, List[float]] = self._load_timestamps()
 
-    def _load_timestamps(self) -> Dict[str, List[float]]:
+    @staticmethod
+    def _load_timestamps() -> Dict[str, List[float]]:
         """从本地文件加载时间戳数据。"""
         if not TRACKER_FILE.exists():
             return {}

@@ -80,7 +80,8 @@ class PlanManager:
         finally:
             self.generation_running = False
 
-    def _get_previous_month(self, current_month: str) -> str:
+    @staticmethod
+    def _get_previous_month(current_month: str) -> str:
         try:
             year, month = map(int, current_month.split("-"))
             if month == 1:
@@ -90,7 +91,8 @@ class PlanManager:
         except Exception:
             return "1900-01"
 
-    async def archive_current_month_plans(self, target_month: Optional[str] = None):
+    @staticmethod
+    async def archive_current_month_plans(target_month: Optional[str] = None):
         try:
             if target_month is None:
                 target_month = datetime.now().strftime("%Y-%m")
@@ -100,6 +102,7 @@ class PlanManager:
         except Exception as e:
             logger.error(f" 归档 {target_month} 月度计划时发生错误: {e}")
 
-    async def get_plans_for_schedule(self, month: str, max_count: int) -> List:
+    @staticmethod
+    async def get_plans_for_schedule(month: str, max_count: int) -> List:
         avoid_days = global_config.planning_system.avoid_repetition_days
         return await get_smart_plans_for_daily_schedule(month, max_count=max_count, avoid_days=avoid_days)

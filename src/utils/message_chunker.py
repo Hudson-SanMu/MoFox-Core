@@ -58,7 +58,8 @@ class MessageReassembler:
             except Exception as e:
                 logger.error(f"清理过期切片时出错: {e}")
 
-    def is_chunk_message(self, message: Dict[str, Any]) -> bool:
+    @staticmethod
+    def is_chunk_message(message: Dict[str, Any]) -> bool:
         """检查是否是来自 Ada 的切片消息"""
         return (
             isinstance(message, dict)

@@ -162,7 +162,8 @@ class DependencyManager:
 
         return False, all_errors
 
-    def _normalize_dependencies(self, dependencies: Any) -> List[PythonDependency]:
+    @staticmethod
+    def _normalize_dependencies(dependencies: Any) -> List[PythonDependency]:
         """将依赖列表标准化为PythonDependency对象"""
         normalized = []
 
@@ -191,7 +192,8 @@ class DependencyManager:
 
         return normalized
 
-    def _check_single_dependency(self, dep: PythonDependency) -> bool:
+    @staticmethod
+    def _check_single_dependency(dep: PythonDependency) -> bool:
         """检查单个依赖是否满足要求"""
 
         def _try_check(import_name: str) -> bool:

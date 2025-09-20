@@ -49,7 +49,8 @@ class _SimpleQZoneAPI:
         if p_skey:
             self.gtk2 = self._generate_gtk(p_skey)
 
-    def _generate_gtk(self, skey: str) -> str:
+    @staticmethod
+    def _generate_gtk(skey: str) -> str:
         hash_val = 5381
         for char in skey:
             hash_val += (hash_val << 5) + ord(char)

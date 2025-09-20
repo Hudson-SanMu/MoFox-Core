@@ -7,7 +7,7 @@ import numpy as np
 
 from collections import Counter
 from maim_message import UserInfo
-from typing import Optional, Tuple, Dict, List, Any
+from typing import Optional, Tuple, Dict, List, Any, Coroutine
 
 from src.common.logger import get_logger
 from src.common.message_repository import find_messages, count_messages
@@ -540,7 +540,8 @@ def get_western_ratio(paragraph):
     return western_count / len(alnum_chars)
 
 
-def count_messages_between(start_time: float, end_time: float, stream_id: str) -> tuple[int, int]:
+def count_messages_between(start_time: float, end_time: float, stream_id: str) -> tuple[int, int] | tuple[
+    Coroutine[Any, Any, int], int]:
     """计算两个时间点之间的消息数量和文本总长度
 
     Args:

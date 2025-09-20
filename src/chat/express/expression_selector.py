@@ -76,7 +76,8 @@ class ExpressionSelector:
             model_set=model_config.model_task_config.utils_small, request_type="expression.selector"
         )
 
-    def can_use_expression_for_chat(self, chat_id: str) -> bool:
+    @staticmethod
+    def can_use_expression_for_chat(chat_id: str) -> bool:
         """
         检查指定聊天流是否允许使用表达
 
@@ -193,7 +194,8 @@ class ExpressionSelector:
 
             return selected_style, selected_grammar
 
-    async def update_expressions_count_batch(self, expressions_to_update: List[Dict[str, Any]], increment: float = 0.1):
+    @staticmethod
+    async def update_expressions_count_batch(expressions_to_update: List[Dict[str, Any]], increment: float = 0.1):
         """对一批表达方式更新count值，按chat_id+type分组后一次性写入数据库"""
         if not expressions_to_update:
             return

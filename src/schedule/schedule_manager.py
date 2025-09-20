@@ -3,6 +3,8 @@ import asyncio
 from datetime import datetime, time, timedelta
 from typing import Optional, List, Dict, Any
 
+from sqlalchemy import select
+
 from src.common.database.sqlalchemy_models import Schedule, get_db_session
 from src.config.config import global_config
 from src.common.logger import get_logger
@@ -115,7 +117,8 @@ class ScheduleManager:
             self.schedule_generation_running = False
             logger.info("日程生成任务结束")
 
-    async def _save_schedule_to_db(self, date_str: str, schedule_data: List[Dict[str, Any]]):
+    @staticmethod
+    async def _save_schedule_to_db(date_str: str, schedule_data: List[Dict[str, Any]]):
         async with get_db_session() as session:
             schedule_json = orjson.dumps(schedule_data).decode("utf-8")
             result = await session.execute(select(Schedule).filter(Schedule.date == date_str))
@@ -128,7 +131,8 @@ class ScheduleManager:
                 session.add(new_schedule)
             await session.commit()
 
-    def _log_generated_schedule(self, date_str: str, schedule_data: List[Dict[str, Any]]):
+    @staticmethod
+    def _log_generated_schedule(date_str: str, schedule_data: List[Dict[str, Any]]):
         schedule_str = f"✅ 成功生成并保存今天的日程 ({date_str})：\n"
         for item in schedule_data:
             schedule_str += f"  - {item.get('time_range', '未知时间')}: {item.get('activity', '未知活动')}\n"
@@ -153,7 +157,8 @@ class ScheduleManager:
                 logger.warning(f"解析日程事件失败: {event}, 错误: {e}")
         return None
 
-    def _validate_schedule_with_pydantic(self, schedule_data) -> bool:
+    @staticmethod
+    def _validate_schedule_with_pydantic(schedule_data) -> bool:
         try:
             ScheduleData(schedule=schedule_data)
             return True

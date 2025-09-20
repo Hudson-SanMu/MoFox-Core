@@ -290,7 +290,8 @@ class PluginHotReloadManager:
             logger.error(f"❌ 重载插件 {plugin_name} 时发生错误: {e}", exc_info=True)
             return False
 
-    def _resolve_plugin_name(self, folder_name: str) -> str:
+    @staticmethod
+    def _resolve_plugin_name(folder_name: str) -> str:
         """
         将文件夹名称解析为实际的插件名称
         通过检查插件管理器中的路径映射来找到对应的插件名
@@ -349,7 +350,8 @@ class PluginHotReloadManager:
             # 出错时尝试简单重载
             return self._reload_plugin(plugin_name)
 
-    def _force_clear_plugin_modules(self, plugin_name: str):
+    @staticmethod
+    def _force_clear_plugin_modules(plugin_name: str):
         """强制清理插件相关的模块缓存"""
 
         # 找到所有相关的模块名
@@ -366,7 +368,8 @@ class PluginHotReloadManager:
                 logger.debug(f"🗑️ 清理模块缓存: {module_name}")
                 del sys.modules[module_name]
 
-    def _force_reimport_plugin(self, plugin_name: str):
+    @staticmethod
+    def _force_reimport_plugin(plugin_name: str):
         """强制重新导入插件（委托给插件管理器）"""
         try:
             # 使用插件管理器的重载功能
@@ -377,7 +380,8 @@ class PluginHotReloadManager:
             logger.error(f"❌ 强制重新导入插件 {plugin_name} 时发生错误: {e}", exc_info=True)
             return False
 
-    def _unload_plugin(self, plugin_name: str):
+    @staticmethod
+    def _unload_plugin(plugin_name: str):
         """卸载指定插件"""
         try:
             logger.info(f"🗑️ 开始卸载插件: {plugin_name}")
@@ -490,7 +494,8 @@ class PluginHotReloadManager:
             "debounce_delay": self.file_handlers[0].debounce_delay if self.file_handlers else 0,
         }
 
-    def clear_all_caches(self):
+    @staticmethod
+    def clear_all_caches():
         """清理所有Python模块缓存"""
         try:
             logger.info("🧹 开始清理所有Python模块缓存...")

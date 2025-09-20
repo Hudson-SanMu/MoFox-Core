@@ -49,7 +49,8 @@ class SimpleMessageBuffer:
         """设置插件配置"""
         self.plugin_config = plugin_config
 
-    def get_session_id(self, event_data: Dict[str, Any]) -> str:
+    @staticmethod
+    def get_session_id(event_data: Dict[str, Any]) -> str:
         """根据事件数据生成会话ID"""
         message_type = event_data.get("message_type", "unknown")
         user_id = event_data.get("user_id", "unknown")
@@ -62,7 +63,8 @@ class SimpleMessageBuffer:
         else:
             return f"{message_type}_{user_id}"
 
-    def extract_text_from_message(self, message: List[Dict[str, Any]]) -> Optional[str]:
+    @staticmethod
+    def extract_text_from_message(message: List[Dict[str, Any]]) -> Optional[str]:
         """从OneBot消息中提取纯文本，如果包含非文本内容则返回None"""
         text_parts = []
         has_non_text = False
@@ -177,7 +179,8 @@ class SimpleMessageBuffer:
             logger.debug(f"文本消息已添加到缓冲器 {session_id}: {text[:50]}...")
             return True
 
-    async def _cancel_session_timers(self, session: BufferedSession):
+    @staticmethod
+    async def _cancel_session_timers(session: BufferedSession):
         """取消会话的所有定时器"""
         for task_name in ["timer_task", "delay_task"]:
             task = getattr(session, task_name)

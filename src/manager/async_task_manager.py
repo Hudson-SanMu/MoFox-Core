@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 
 import asyncio
 from asyncio import Task, Event, Lock
@@ -9,7 +9,7 @@ from src.common.logger import get_logger
 logger = get_logger("async_task_manager")
 
 
-class AsyncTask:
+class AsyncTask(metaclass=ABCMeta):
     """异步任务基类"""
 
     def __init__(self, task_name: str | None = None, wait_before_start: int = 0, run_interval: int = 0):

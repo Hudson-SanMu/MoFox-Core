@@ -124,7 +124,8 @@ class ChatMood:
         # 发送初始情绪状态到ws端
         asyncio.create_task(self.send_emotion_update(self.mood_values))
 
-    def _parse_numerical_mood(self, response: str) -> dict[str, int] | None:
+    @staticmethod
+    def _parse_numerical_mood(response: str) -> dict[str, int] | None:
         try:
             # The LLM might output markdown with json inside
             if "```json" in response:

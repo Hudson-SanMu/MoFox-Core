@@ -31,6 +31,7 @@ class ComponentRegistry:
 
     def __init__(self):
         # 命名空间式组件名构成法 f"{component_type}.{component_name}"
+        self._plus_command_registry: Dict[str, Type[PlusCommand]] = {}
         self._components: Dict[str, ComponentInfo] = {}
         """组件注册表 命名空间式组件名 -> 组件信息"""
         self._components_by_type: Dict[ComponentType, Dict[str, ComponentInfo]] = {types: {} for types in ComponentType}
@@ -618,7 +619,7 @@ class ComponentRegistry:
     def get_plus_command_registry(self) -> Dict[str, Type[PlusCommand]]:
         """获取PlusCommand注册表"""
         if not hasattr(self, "_plus_command_registry"):
-            self._plus_command_registry: Dict[str, Type[PlusCommand]] = {}
+            pass
         return self._plus_command_registry.copy()
 
     def get_registered_plus_command_info(self, command_name: str) -> Optional[PlusCommandInfo]:
@@ -667,7 +668,8 @@ class ComponentRegistry:
         plugin_info = self.get_plugin_info(plugin_name)
         return plugin_info.components if plugin_info else []
 
-    def get_plugin_config(self, plugin_name: str) -> dict:
+    @staticmethod
+    def get_plugin_config(plugin_name: str) -> dict:
         """获取插件配置
 
         Args:

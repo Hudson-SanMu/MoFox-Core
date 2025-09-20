@@ -37,7 +37,8 @@ class MessageProcessor:
         # 只返回用户新增的内容，避免重复
         return new_content
 
-    def extract_new_content_from_reply(self, full_text: str) -> str:
+    @staticmethod
+    def extract_new_content_from_reply(full_text: str) -> str:
         """从包含引用的完整消息中提取用户新增的内容
 
         Args:
@@ -64,7 +65,8 @@ class MessageProcessor:
 
         return new_content
 
-    def check_whitelist(self, message: MessageRecv, whitelist: list) -> Optional[tuple]:
+    @staticmethod
+    def check_whitelist(message: MessageRecv, whitelist: list) -> Optional[tuple]:
         """检查用户白名单
 
         Args:
@@ -85,7 +87,8 @@ class MessageProcessor:
 
         return None
 
-    def check_whitelist_dict(self, user_id: str, platform: str, whitelist: list) -> bool:
+    @staticmethod
+    def check_whitelist_dict(user_id: str, platform: str, whitelist: list) -> bool:
         """检查用户是否在白名单中（字典格式）
 
         Args:

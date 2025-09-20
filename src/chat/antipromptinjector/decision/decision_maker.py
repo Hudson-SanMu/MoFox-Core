@@ -22,7 +22,8 @@ class ProcessingDecisionMaker:
         """
         self.config = config
 
-    def determine_auto_action(self, detection_result: DetectionResult) -> str:
+    @staticmethod
+    def determine_auto_action(detection_result: DetectionResult) -> str:
         """自动模式：根据检测结果确定处理动作
 
         Args:

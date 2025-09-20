@@ -1,10 +1,10 @@
-from typing import Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
+from typing import Optional, TYPE_CHECKING
 
 from . import BaseDataModel
 
 if TYPE_CHECKING:
-    from .database_data_model import DatabaseMessages
+    pass
 
 
 @dataclass

@@ -591,7 +591,8 @@ class DefaultReplyer:
             logger.error(f"工具信息获取失败: {e}")
             return ""
 
-    def _parse_reply_target(self, target_message: str) -> Tuple[str, str]:
+    @staticmethod
+    def _parse_reply_target(target_message: str) -> Tuple[str, str]:
         """解析回复目标消息 - 使用共享工具"""
         from src.chat.utils.prompt import Prompt
         if target_message is None:
@@ -599,7 +600,8 @@ class DefaultReplyer:
             return "未知用户", "(无消息内容)"
         return Prompt.parse_reply_target(target_message)
 
-    async def build_keywords_reaction_prompt(self, target: Optional[str]) -> str:
+    @staticmethod
+    async def build_keywords_reaction_prompt(target: Optional[str]) -> str:
         """构建关键词反应提示
 
         Args:
@@ -641,7 +643,8 @@ class DefaultReplyer:
 
         return keywords_reaction_prompt
 
-    async def _time_and_run_task(self, coroutine, name: str) -> Tuple[str, Any, float]:
+    @staticmethod
+    async def _time_and_run_task(coroutine, name: str) -> Tuple[str, Any, float]:
         """计时并运行异步任务的辅助函数
 
         Args:
@@ -730,9 +733,9 @@ class DefaultReplyer:
 
         return core_dialogue_prompt, all_dialogue_prompt
 
+    @staticmethod
     def build_mai_think_context(
-        self,
-        chat_id: str,
+            chat_id: str,
         memory_block: str,
         relation_info: str,
         time_block: str,

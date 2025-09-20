@@ -67,7 +67,8 @@ class PluginManager:
         except Exception as e:
             logger.error(f"同步插件 '{plugin_name}' 配置时发生未知错误: {e}")
 
-    def _copy_default_config_to_central(self, plugin_name: str, plugin_config_file: Path, central_config_dir: Path):
+    @staticmethod
+    def _copy_default_config_to_central(plugin_name: str, plugin_config_file: Path, central_config_dir: Path):
         """
         如果中央配置不存在，则将插件的默认 config.toml 复制到中央目录。
         """
@@ -96,7 +97,8 @@ class PluginManager:
                 shutil.copy2(central_file, target_plugin_file)
                 logger.info(f"已将中央配置 '{central_file.name}' 同步到插件 '{plugin_name}'")
 
-    def _is_file_content_identical(self, file1: Path, file2: Path) -> bool:
+    @staticmethod
+    def _is_file_content_identical(file1: Path, file2: Path) -> bool:
         """
         通过比较 MD5 哈希值检查两个文件的内容是否相同。
         """
@@ -403,7 +405,8 @@ class PluginManager:
 
     # == 兼容性检查 ==
 
-    def _check_plugin_version_compatibility(self, plugin_name: str, manifest_data: Dict[str, Any]) -> Tuple[bool, str]:
+    @staticmethod
+    def _check_plugin_version_compatibility(plugin_name: str, manifest_data: Dict[str, Any]) -> Tuple[bool, str]:
         """检查插件版本兼容性
 
         Args:
@@ -557,7 +560,8 @@ class PluginManager:
         else:
             logger.warning("😕 没有成功加载任何插件")
 
-    def _show_plugin_components(self, plugin_name: str) -> None:
+    @staticmethod
+    def _show_plugin_components(plugin_name: str) -> None:
         if plugin_info := component_registry.get_plugin_info(plugin_name):
             component_types = {}
             for comp in plugin_info.components:
@@ -673,7 +677,8 @@ class PluginManager:
         """
         return self.reload_plugin(plugin_name)
 
-    def clear_all_plugin_caches(self):
+    @staticmethod
+    def clear_all_plugin_caches():
         """清理所有插件相关的模块缓存（简化版）"""
         try:
             logger.info("🧹 清理模块缓存...")

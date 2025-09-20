@@ -111,7 +111,8 @@ class PermissionCommand(PlusCommand):
 
         await self.send_text(help_text)
 
-    def _parse_user_mention(self, mention: str) -> Optional[str]:
+    @staticmethod
+    def _parse_user_mention(mention: str) -> Optional[str]:
         """解析用户提及，提取QQ号
 
         支持的格式:

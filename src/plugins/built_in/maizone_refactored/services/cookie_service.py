@@ -50,7 +50,8 @@ class CookieService:
                 logger.error(f"无法读取或解析Cookie文件 {cookie_file_path}: {e}")
         return None
 
-    async def _get_cookies_from_adapter(self, stream_id: Optional[str]) -> Optional[Dict[str, str]]:
+    @staticmethod
+    async def _get_cookies_from_adapter(stream_id: Optional[str]) -> Optional[Dict[str, str]]:
         """通过Adapter API获取Cookie"""
         try:
             params = {"domain": "user.qzone.qq.com"}

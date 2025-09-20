@@ -27,7 +27,8 @@ class PlanExecutor:
         """
         self.action_manager = action_manager
 
-    async def execute(self, plan: Plan):
+    @staticmethod
+    async def execute(plan: Plan):
         """
         遍历并执行 Plan 对象中 `decided_actions` 列表里的所有动作。
 

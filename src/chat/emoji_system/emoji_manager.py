@@ -424,7 +424,8 @@ class EmojiManager:
     #     if not self._initialized:
     #         raise RuntimeError("EmojiManager not initialized")
 
-    async def record_usage(self, emoji_hash: str) -> None:
+    @staticmethod
+    async def record_usage(emoji_hash: str) -> None:
         """记录表情使用次数"""
         try:
             async with get_db_session() as session:
@@ -436,7 +437,6 @@ class EmojiManager:
                 else:
                     emoji_update.usage_count += 1
                     emoji_update.last_used_time = time.time()
-                    await session.commit()
         except Exception as e:
             logger.error(f"记录表情使用失败: {str(e)}")
 
@@ -523,7 +523,7 @@ class EmojiManager:
 
             # 7. 获取选中的表情包并更新使用记录
             selected_emoji = candidate_emojis[selected_index]
-            self.record_usage(selected_emoji.hash)
+            await self.record_usage(selected_emoji.emoji_hash)
             _time_end = time.time()
 
             logger.info(
@@ -680,7 +680,8 @@ class EmojiManager:
             self.emoji_objects = []  # 加载失败则清空列表
             self.emoji_num = 0
 
-    async def get_emoji_from_db(self, emoji_hash: Optional[str] = None) -> List["MaiEmoji"]:
+    @staticmethod
+    async def get_emoji_from_db(emoji_hash: Optional[str] = None) -> List["MaiEmoji"]:
         """获取指定哈希值的表情包并初始化为MaiEmoji类对象列表 (主要用于调试或特定查找)
 
         参数:
@@ -747,8 +748,8 @@ class EmojiManager:
             try:
                 emoji_record = await self.get_emoji_from_db(emoji_hash)
                 if emoji_record and emoji_record[0].emotion:
-                    logger.info(f"[缓存命中] 从数据库获取表情包描述: {emoji_record.emotion[:50]}...")
-                    return emoji_record.emotion
+                    logger.info(f"[缓存命中] 从数据库获取表情包描述: {emoji_record[0].emotion[:50]}...")
+                    return emoji_record[0].emotion
             except Exception as e:
                 logger.error(f"从数据库查询表情包描述时出错: {e}")
 

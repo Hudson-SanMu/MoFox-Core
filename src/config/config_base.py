@@ -50,7 +50,7 @@ class ConfigBase:
             except Exception as e:
                 raise RuntimeError(f"Failed to convert field '{field_name}' to target type: {e}") from e
 
-        return cls(**init_args)
+        return cls()
 
     @classmethod
     def _convert_field(cls, value: Any, field_type: Type[Any]) -> Any:

@@ -82,10 +82,10 @@ class VersionComparator:
         normalized = VersionComparator.normalize_version(version)
         try:
             parts = normalized.split(".")
-            return (int(parts[0]), int(parts[1]), int(parts[2]))
+            return int(parts[0]), int(parts[1]), int(parts[2])
         except (ValueError, IndexError):
             logger.warning(f"无法解析版本号: {version}，使用默认版本 0.0.0")
-            return (0, 0, 0)
+            return 0, 0, 0
 
     @staticmethod
     def compare_versions(version1: str, version2: str) -> int:

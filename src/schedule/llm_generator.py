@@ -125,7 +125,8 @@ class ScheduleLLMGenerator:
                 logger.info("继续重试...")
                 await asyncio.sleep(3)
 
-    def _validate_schedule_with_pydantic(self, schedule_data) -> bool:
+    @staticmethod
+    def _validate_schedule_with_pydantic(schedule_data) -> bool:
         try:
             ScheduleData(schedule=schedule_data)
             logger.info("日程数据Pydantic验证通过")
@@ -204,7 +205,8 @@ class MonthlyPlanLLMGenerator:
         logger.error(" 所有尝试都失败，无法生成月度计划")
         return []
 
-    def _parse_plans_response(self, response: str) -> List[str]:
+    @staticmethod
+    def _parse_plans_response(response: str) -> List[str]:
         try:
             response = response.strip()
             lines = [line.strip() for line in response.split("\n") if line.strip()]

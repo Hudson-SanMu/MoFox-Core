@@ -105,7 +105,8 @@ class SuperChatManager:
                 logger.error(f"清理过期SuperChat时出错: {e}", exc_info=True)
                 await asyncio.sleep(60)  # 出错时等待更长时间
 
-    def _calculate_expire_time(self, price: float) -> float:
+    @staticmethod
+    def _calculate_expire_time(price: float) -> float:
         """根据SuperChat金额计算过期时间"""
         current_time = time.time()
 

@@ -215,6 +215,10 @@ class PromptManager:
         result = prompt.format(**kwargs)
         return result
 
+    @property
+    def context(self):
+        return self._context
+
 
 # 全局单例
 global_prompt_manager = PromptManager()
@@ -256,7 +260,7 @@ class Prompt:
         self._processed_template = self._process_escaped_braces(template)
         
         # 自动注册
-        if should_register and not global_prompt_manager._context._current_context:
+        if should_register and not global_prompt_manager.context._current_context:
             global_prompt_manager.register(self)
     
     @staticmethod
@@ -459,8 +463,9 @@ class Prompt:
         context_data["chat_info"] = f"""群里的聊天内容：
 {self.parameters.chat_talking_prompt_short}"""
     
+    @staticmethod
     async def _build_s4u_chat_history_prompts(
-        self, message_list_before_now: List[Dict[str, Any]], target_user_id: str, sender: str
+            message_list_before_now: List[Dict[str, Any]], target_user_id: str, sender: str
     ) -> Tuple[str, str]:
         """构建S4U风格的分离对话prompt"""
         # 实现逻辑与原有SmartPromptBuilder相同
@@ -537,14 +542,10 @@ class Prompt:
                 )
             
             # 创建表情选择器
-            expression_selector = ExpressionSelector(self.parameters.chat_id)
+            expression_selector = ExpressionSelector()
             
             # 选择合适的表情
             selected_expressions = await expression_selector.select_suitable_expressions_llm(
-                chat_history=chat_history,
-                current_message=self.parameters.target,
-                emotional_tone="neutral",
-                topic_type="general"
             )
             
             # 构建表达习惯块
@@ -991,7 +992,7 @@ async def create_prompt_async(
 ) -> Prompt:
     """异步创建Prompt实例"""
     prompt = create_prompt(template, name, parameters, **kwargs)
-    if global_prompt_manager._context._current_context:
-        await global_prompt_manager._context.register_async(prompt)
+    if global_prompt_manager.context._current_context:
+        await global_prompt_manager.context.register_async(prompt)
     return prompt
 

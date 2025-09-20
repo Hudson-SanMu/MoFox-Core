@@ -134,7 +134,8 @@ class ImageManager:
         except Exception as e:
             logger.error(f"保存描述到数据库失败 (SQLAlchemy): {str(e)}")
 
-    async def get_emoji_tag(self, image_base64: str) -> str:
+    @staticmethod
+    async def get_emoji_tag(image_base64: str) -> str:
         from src.chat.emoji_system.emoji_manager import get_emoji_manager
 
         emoji_manager = get_emoji_manager()

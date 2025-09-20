@@ -156,7 +156,7 @@ class ChatAction:
         self.regression_count = 0
 
         message_time: float = message.message_info.time  # type: ignore
-        message_list_before_now = get_raw_msg_by_timestamp_with_chat_inclusive(
+        message_list_before_now = await get_raw_msg_by_timestamp_with_chat_inclusive(
             chat_id=self.chat_id,
             timestamp_start=self.last_change_time,
             timestamp_end=message_time,
@@ -220,7 +220,7 @@ class ChatAction:
 
     async def regress_action(self):
         message_time = time.time()
-        message_list_before_now = get_raw_msg_by_timestamp_with_chat_inclusive(
+        message_list_before_now = await get_raw_msg_by_timestamp_with_chat_inclusive(
             chat_id=self.chat_id,
             timestamp_start=self.last_change_time,
             timestamp_end=message_time,

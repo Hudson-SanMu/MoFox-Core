@@ -1,37 +1,35 @@
 # 再用这个就写一行注释来混提交的我直接全部🌿飞😡
 import asyncio
-import time
 import signal
 import sys
+import time
+
 from maim_message import MessageServer
-
-from src.common.remote import TelemetryHeartBeatTask
-from src.manager.async_task_manager import async_task_manager
-from src.chat.utils.statistic import OnlineTimeRecordTask, StatisticOutputTask
-from src.common.remote import TelemetryHeartBeatTask
-from src.chat.emoji_system.emoji_manager import get_emoji_manager
-from src.chat.message_receive.chat_stream import get_chat_manager
-from src.config.config import global_config
-from src.chat.message_receive.bot import chat_bot
-from src.common.logger import get_logger
-from src.individuality.individuality import get_individuality, Individuality
-from src.common.server import get_global_server, Server
-from src.mood.mood_manager import mood_manager
 from rich.traceback import install
-from src.schedule.schedule_manager import schedule_manager
-from src.schedule.monthly_plan_manager import monthly_plan_manager
-from src.plugin_system.core.event_manager import event_manager
-from src.plugin_system.base.component_types import EventType
-# from src.api.main import start_api_server
 
-# 导入新的插件管理器和热重载管理器
-from src.plugin_system.core.plugin_manager import plugin_manager
-from src.plugin_system.core.plugin_hot_reload import hot_reload_manager
-
+from src.chat.emoji_system.emoji_manager import get_emoji_manager
+from src.chat.memory_system.Hippocampus import hippocampus_manager
+from src.chat.message_receive.bot import chat_bot
+from src.chat.message_receive.chat_stream import get_chat_manager
+from src.chat.utils.statistic import OnlineTimeRecordTask, StatisticOutputTask
+from src.common.logger import get_logger
 # 导入消息API和traceback模块
 from src.common.message import get_global_api
+from src.common.remote import TelemetryHeartBeatTask
+from src.common.server import get_global_server, Server
+from src.config.config import global_config
+from src.individuality.individuality import get_individuality, Individuality
+from src.manager.async_task_manager import async_task_manager
+from src.mood.mood_manager import mood_manager
+from src.plugin_system.base.component_types import EventType
+from src.plugin_system.core.event_manager import event_manager
+from src.plugin_system.core.plugin_hot_reload import hot_reload_manager
+# 导入新的插件管理器和热重载管理器
+from src.plugin_system.core.plugin_manager import plugin_manager
+from src.schedule.monthly_plan_manager import monthly_plan_manager
+from src.schedule.schedule_manager import schedule_manager
 
-from src.chat.memory_system.Hippocampus import hippocampus_manager
+# from src.api.main import start_api_server
 
 if not global_config.memory.enable_memory:
     import src.chat.memory_system.Hippocampus as hippocampus_module
@@ -43,7 +41,8 @@ if not global_config.memory.enable_memory:
         async def initialize_async(self):
             pass
 
-        def get_hippocampus(self):
+        @staticmethod
+        def get_hippocampus():
             return None
 
         async def build_memory(self):
@@ -55,9 +54,9 @@ if not global_config.memory.enable_memory:
         async def consolidate_memory(self):
             pass
 
+        @staticmethod
         async def get_memory_from_text(
-            self,
-            text: str,
+                text: str,
             max_memory_num: int = 3,
             max_memory_length: int = 2,
             max_depth: int = 3,
@@ -65,20 +64,24 @@ if not global_config.memory.enable_memory:
         ) -> list:
             return []
 
+        @staticmethod
         async def get_memory_from_topic(
-            self, valid_keywords: list[str], max_memory_num: int = 3, max_memory_length: int = 2, max_depth: int = 3
+                valid_keywords: list[str], max_memory_num: int = 3, max_memory_length: int = 2, max_depth: int = 3
         ) -> list:
             return []
 
+        @staticmethod
         async def get_activate_from_text(
-            self, text: str, max_depth: int = 3, fast_retrieval: bool = False
+                text: str, max_depth: int = 3, fast_retrieval: bool = False
         ) -> tuple[float, list[str]]:
             return 0.0, []
 
-        def get_memory_from_keyword(self, keyword: str, max_depth: int = 2) -> list:
+        @staticmethod
+        def get_memory_from_keyword(keyword: str, max_depth: int = 2) -> list:
             return []
 
-        def get_all_node_names(self) -> list:
+        @staticmethod
+        def get_all_node_names() -> list:
             return []
 
     hippocampus_module.hippocampus_manager = MockHippocampusManager()
@@ -114,7 +117,8 @@ class MainSystem:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-    def _cleanup(self):
+    @staticmethod
+    def _cleanup():
         """清理资源"""
         try:
             # 停止消息重组器

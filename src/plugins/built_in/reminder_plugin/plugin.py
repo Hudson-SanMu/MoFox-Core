@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
 from typing import List, Tuple, Type, Optional
+
 from dateutil.parser import parse as parse_datetime
 
 from src.common.logger import get_logger
@@ -14,7 +15,7 @@ from src.plugin_system import (
     ActionActivationType,
 )
 from src.plugin_system.apis import send_api, llm_api, generator_api
-from src.plugin_system.base.component_types import ChatType, ComponentType
+from src.plugin_system.base.component_types import ComponentType
 
 logger = get_logger(__name__)
 

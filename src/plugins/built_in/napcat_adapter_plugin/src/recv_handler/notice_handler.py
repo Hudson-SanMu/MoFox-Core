@@ -197,9 +197,11 @@ class NoticeHandler:
 
         if system_notice:
             await self.put_notice(message_base)
+            return None
         else:
             logger.debug("发送到Maibot处理通知信息")
             await message_send_instance.message_send(message_base)
+            return None
 
     async def handle_poke_notify(
         self, raw_message: dict, group_id: int, user_id: int
@@ -464,7 +466,8 @@ class NoticeHandler:
         )
         return seg_data, operator_info
 
-    async def put_notice(self, message_base: MessageBase) -> None:
+    @staticmethod
+    async def put_notice(message_base: MessageBase) -> None:
         """
         将处理后的通知消息放入通知队列
         """
@@ -577,7 +580,8 @@ class NoticeHandler:
                     self.banned_list.remove(ban_record)
             await asyncio.sleep(5)
 
-    async def send_notice(self) -> None:
+    @staticmethod
+    async def send_notice() -> None:
         """
         发送通知消息到Napcat
         """

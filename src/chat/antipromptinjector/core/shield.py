@@ -29,11 +29,13 @@ class MessageShield:
         """初始化加盾器"""
         self.config = global_config.anti_prompt_injection
 
-    def get_safety_system_prompt(self) -> str:
+    @staticmethod
+    def get_safety_system_prompt() -> str:
         """获取安全系统提示词"""
         return SAFETY_SYSTEM_PROMPT
 
-    def is_shield_needed(self, confidence: float, matched_patterns: List[str]) -> bool:
+    @staticmethod
+    def is_shield_needed(confidence: float, matched_patterns: List[str]) -> bool:
         """判断是否需要加盾
 
         Args:
@@ -57,7 +59,8 @@ class MessageShield:
 
         return False
 
-    def create_safety_summary(self, confidence: float, matched_patterns: List[str]) -> str:
+    @staticmethod
+    def create_safety_summary(confidence: float, matched_patterns: List[str]) -> str:
         """创建安全处理摘要
 
         Args:
@@ -93,7 +96,8 @@ class MessageShield:
             # 低风险：添加警告前缀
             return f"{self.config.shield_prefix}[内容已检查]{self.config.shield_suffix} {original_message}"
 
-    def _partially_shield_content(self, message: str) -> str:
+    @staticmethod
+    def _partially_shield_content(message: str) -> str:
         """部分遮蔽消息内容"""
         # 遮蔽策略：替换关键词
         dangerous_keywords = [
@@ -231,4 +235,4 @@ def create_default_shield() -> MessageShield:
     """创建默认的消息加盾器"""
     from .config import default_config
 
-    return MessageShield(default_config)
+    return MessageShield()

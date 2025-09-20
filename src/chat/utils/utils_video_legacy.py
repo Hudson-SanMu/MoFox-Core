@@ -13,7 +13,7 @@ import base64
 import numpy as np
 from PIL import Image
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any
 import io
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,7 +31,7 @@ def _extract_frames_worker(
     max_image_size: int,
     frame_extraction_mode: str,
     frame_interval_seconds: Optional[float],
-) -> List[Tuple[str, float]]:
+) -> list[Any] | list[tuple[str, str]]:
     """线程池中提取视频帧的工作函数"""
     frames = []
     try:
@@ -568,7 +568,8 @@ class LegacyVideoAnalyzer:
             logger.error(error_msg)
             return error_msg
 
-    def is_supported_video(self, file_path: str) -> bool:
+    @staticmethod
+    def is_supported_video(file_path: str) -> bool:
         """检查是否为支持的视频格式"""
         supported_formats = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".m4v", ".3gp", ".webm"}
         return Path(file_path).suffix.lower() in supported_formats

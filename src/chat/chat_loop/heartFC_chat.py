@@ -94,7 +94,7 @@ class HeartFChatting:
         self.context.running = True
 
         self.context.relationship_builder = relationship_builder_manager.get_or_create_builder(self.context.stream_id)
-        self.context.expression_learner = expression_learner_manager.get_expression_learner(self.context.stream_id)
+        self.context.expression_learner = await expression_learner_manager.get_expression_learner(self.context.stream_id)
 
         # 启动主动思考监视器
         if global_config.chat.enable_proactive_thinking:
@@ -281,7 +281,8 @@ class HeartFChatting:
             logger.error(f"{self.context.log_prefix} 动态间隔计算出错: {e}，使用固定间隔")
             return max(300, abs(global_config.chat.proactive_thinking_interval))
 
-    def _format_duration(self, seconds: float) -> str:
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
         """
         格式化时长为可读字符串
 

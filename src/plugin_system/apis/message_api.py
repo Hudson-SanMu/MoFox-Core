@@ -8,7 +8,7 @@
     readable_text = message_api.build_readable_messages(messages)
 """
 
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Coroutine
 from src.config.config import global_config
 import time
 from src.chat.utils.chat_message_builder import (
@@ -36,7 +36,7 @@ from src.chat.utils.chat_message_builder import (
 
 def get_messages_by_time(
     start_time: float, end_time: float, limit: int = 0, limit_mode: str = "latest", filter_mai: bool = False
-) -> List[Dict[str, Any]]:
+) -> Coroutine[Any, Any, list[dict[str, Any]]]:
     """
     获取指定时间范围内的消息
 
@@ -155,7 +155,7 @@ def get_messages_by_time_in_chat_for_users(
     person_ids: List[str],
     limit: int = 0,
     limit_mode: str = "latest",
-) -> List[Dict[str, Any]]:
+) -> Coroutine[Any, Any, list[dict[str, Any]]]:
     """
     获取指定聊天中指定用户在指定时间范围内的消息
 
@@ -186,7 +186,7 @@ def get_messages_by_time_in_chat_for_users(
 
 def get_random_chat_messages(
     start_time: float, end_time: float, limit: int = 0, limit_mode: str = "latest", filter_mai: bool = False
-) -> List[Dict[str, Any]]:
+) -> Coroutine[Any, Any, list[dict[str, Any]]]:
     """
     随机选择一个聊天，返回该聊天在指定时间范围内的消息
 
@@ -214,7 +214,7 @@ def get_random_chat_messages(
 
 def get_messages_by_time_for_users(
     start_time: float, end_time: float, person_ids: List[str], limit: int = 0, limit_mode: str = "latest"
-) -> List[Dict[str, Any]]:
+) -> Coroutine[Any, Any, list[dict[str, Any]]]:
     """
     获取指定用户在所有聊天中指定时间范围内的消息
 
@@ -238,7 +238,8 @@ def get_messages_by_time_for_users(
     return get_raw_msg_by_timestamp_with_users(start_time, end_time, person_ids, limit, limit_mode)
 
 
-def get_messages_before_time(timestamp: float, limit: int = 0, filter_mai: bool = False) -> List[Dict[str, Any]]:
+def get_messages_before_time(timestamp: float, limit: int = 0, filter_mai: bool = False) -> Coroutine[
+    Any, Any, list[dict[str, Any]]]:
     """
     获取指定时间戳之前的消息
 
@@ -264,7 +265,7 @@ def get_messages_before_time(timestamp: float, limit: int = 0, filter_mai: bool 
 
 def get_messages_before_time_in_chat(
     chat_id: str, timestamp: float, limit: int = 0, filter_mai: bool = False
-) -> List[Dict[str, Any]]:
+) -> Coroutine[Any, Any, list[dict[str, Any]]]:
     """
     获取指定聊天中指定时间戳之前的消息
 
@@ -293,7 +294,8 @@ def get_messages_before_time_in_chat(
     return get_raw_msg_before_timestamp_with_chat(chat_id, timestamp, limit)
 
 
-def get_messages_before_time_for_users(timestamp: float, person_ids: List[str], limit: int = 0) -> List[Dict[str, Any]]:
+def get_messages_before_time_for_users(timestamp: float, person_ids: List[str], limit: int = 0) -> Coroutine[
+    Any, Any, list[dict[str, Any]]]:
     """
     获取指定用户在指定时间戳之前的消息
 
@@ -317,7 +319,7 @@ def get_messages_before_time_for_users(timestamp: float, person_ids: List[str], 
 
 def get_recent_messages(
     chat_id: str, hours: float = 24.0, limit: int = 100, limit_mode: str = "latest", filter_mai: bool = False
-) -> List[Dict[str, Any]]:
+) -> Coroutine[Any, Any, list[dict[str, Any]]]:
     """
     获取指定聊天中最近一段时间的消息
 
@@ -354,7 +356,8 @@ def get_recent_messages(
 # =============================================================================
 
 
-def count_new_messages(chat_id: str, start_time: float = 0.0, end_time: Optional[float] = None) -> int:
+def count_new_messages(chat_id: str, start_time: float = 0.0, end_time: Optional[float] = None) -> Coroutine[
+    Any, Any, int]:
     """
     计算指定聊天中从开始时间到结束时间的新消息数量
 
@@ -378,7 +381,8 @@ def count_new_messages(chat_id: str, start_time: float = 0.0, end_time: Optional
     return num_new_messages_since(chat_id, start_time, end_time)
 
 
-def count_new_messages_for_users(chat_id: str, start_time: float, end_time: float, person_ids: List[str]) -> int:
+def count_new_messages_for_users(chat_id: str, start_time: float, end_time: float, person_ids: List[str]) -> Coroutine[
+    Any, Any, int]:
     """
     计算指定聊天中指定用户从开始时间到结束时间的新消息数量
 
@@ -416,7 +420,7 @@ def build_readable_messages_to_str(
     read_mark: float = 0.0,
     truncate: bool = False,
     show_actions: bool = False,
-) -> str:
+) -> Coroutine[Any, Any, str]:
     """
     将消息列表构建成可读的字符串
 

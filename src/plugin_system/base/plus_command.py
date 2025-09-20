@@ -149,7 +149,7 @@ class PlusCommand(ABC):
         Returns:
             bool: 如果匹配返回True
         """
-        return not self.args.is_empty() or self._is_exact_command_call()
+        return not self.args.is_empty or self._is_exact_command_call()
 
     def _is_exact_command_call(self) -> bool:
         """检查是否是精确的命令调用（无参数）"""

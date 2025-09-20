@@ -167,7 +167,8 @@ class VideoAnalyzer:
         # 获取Rust模块系统信息
         self._log_system_info()
 
-    def _log_system_info(self):
+    @staticmethod
+    def _log_system_info():
         """记录系统信息"""
         if not RUST_VIDEO_AVAILABLE:
             logger.info("⚠️ Rust模块不可用，跳过系统信息获取")
@@ -196,13 +197,15 @@ class VideoAnalyzer:
         except Exception as e:
             logger.warning(f"获取系统信息失败: {e}")
 
-    def _calculate_video_hash(self, video_data: bytes) -> str:
+    @staticmethod
+    def _calculate_video_hash(video_data: bytes) -> str:
         """计算视频文件的hash值"""
         hash_obj = hashlib.sha256()
         hash_obj.update(video_data)
         return hash_obj.hexdigest()
 
-    def _check_video_exists(self, video_hash: str) -> Optional[Videos]:
+    @staticmethod
+    def _check_video_exists(video_hash: str) -> Optional[Videos]:
         """检查视频是否已经分析过"""
         try:
             with get_db_session() as session:
@@ -213,8 +216,9 @@ class VideoAnalyzer:
             logger.warning(f"检查视频是否存在时出错: {e}")
             return None
 
+    @staticmethod
     def _store_video_result(
-        self, video_hash: str, description: str, metadata: Optional[Dict] = None
+            video_hash: str, description: str, metadata: Optional[Dict] = None
     ) -> Optional[Videos]:
         """存储视频分析结果到数据库"""
         # 检查描述是否为错误信息，如果是则不保存
@@ -619,7 +623,7 @@ class VideoAnalyzer:
         if self.disabled:
             error_msg = "❌ 视频分析功能已禁用：没有可用的视频处理实现"
             logger.warning(error_msg)
-            return (False, error_msg)
+            return False, error_msg
 
         try:
             logger.info(f"开始分析视频: {os.path.basename(video_path)}")
@@ -628,7 +632,7 @@ class VideoAnalyzer:
             frames = await self.extract_frames(video_path)
             if not frames:
                 error_msg = "❌ 无法从视频中提取有效帧"
-                return (False, error_msg)
+                return False, error_msg
 
             # 根据模式选择分析方法
             if self.analysis_mode == "auto":
@@ -645,12 +649,12 @@ class VideoAnalyzer:
                 result = await self.analyze_frames_sequential(frames, user_question)
 
             logger.info("✅ 视频分析完成")
-            return (True, result)
+            return True, result
 
         except Exception as e:
             error_msg = f"❌ 视频分析失败: {str(e)}"
             logger.error(error_msg)
-            return (False, error_msg)
+            return False, error_msg
 
     async def analyze_video_from_bytes(
         self, video_bytes: bytes, filename: str = None, user_question: str = None, prompt: str = None
@@ -783,7 +787,8 @@ class VideoAnalyzer:
 
             return {"summary": error_msg}
 
-    def is_supported_video(self, file_path: str) -> bool:
+    @staticmethod
+    def is_supported_video(file_path: str) -> bool:
         """检查是否为支持的视频格式"""
         supported_formats = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".m4v", ".3gp", ".webm"}
         return Path(file_path).suffix.lower() in supported_formats
@@ -818,7 +823,8 @@ class VideoAnalyzer:
             logger.error(f"获取处理能力信息失败: {e}")
             return {"error": str(e), "available": False}
 
-    def _get_recommended_settings(self, cpu_features: Dict[str, bool]) -> Dict[str, any]:
+    @staticmethod
+    def _get_recommended_settings(cpu_features: Dict[str, bool]) -> Dict[str, any]:
         """根据CPU特性推荐最佳设置"""
         settings = {
             "use_simd": any(cpu_features.values()),

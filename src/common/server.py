@@ -1,10 +1,10 @@
+import os
+from typing import Optional
+
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware  # 新增导入
-from typing import Optional
-from uvicorn import Config, Server as UvicornServer
-from src.config.config import global_config
 from rich.traceback import install
-import os
+from uvicorn import Config, Server as UvicornServer
 
 install(extra_lines=3)
 

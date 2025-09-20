@@ -125,7 +125,8 @@ class EmbeddingStore:
         self.faiss_index = None
         self.idx2hash = None
 
-    def _get_embedding(self, s: str) -> List[float]:
+    @staticmethod
+    def _get_embedding(s: str) -> List[float]:
         """获取字符串的嵌入向量，使用完全同步的方式避免事件循环问题"""
         # 创建新的事件循环并在完成后立即关闭
         loop = asyncio.new_event_loop()
@@ -157,8 +158,9 @@ class EmbeddingStore:
             except Exception:
                 ...
 
+    @staticmethod
     def _get_embeddings_batch_threaded(
-        self, strs: List[str], chunk_size: int = 10, max_workers: int = 10, progress_callback=None
+            strs: List[str], chunk_size: int = 10, max_workers: int = 10, progress_callback=None
     ) -> List[Tuple[str, List[float]]]:
         """使用多线程批量获取嵌入向量
 
@@ -265,7 +267,8 @@ class EmbeddingStore:
 
         return ordered_results
 
-    def get_test_file_path(self):
+    @staticmethod
+    def get_test_file_path():
         return EMBEDDING_TEST_FILE
 
     def save_embedding_test_vectors(self):

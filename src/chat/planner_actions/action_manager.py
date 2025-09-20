@@ -27,9 +27,9 @@ class ActionManager:
 
     # === 执行Action方法 ===
 
+    @staticmethod
     def create_action(
-        self,
-        action_name: str,
+            action_name: str,
         action_data: dict,
         reasoning: str,
         cycle_timers: dict,

@@ -97,7 +97,8 @@ class PromptBuilder:
         self.prompt_built = ""
         self.activate_messages = ""
 
-    async def build_expression_habits(self, chat_stream: ChatStream, chat_history, target):
+    @staticmethod
+    async def build_expression_habits(chat_stream: ChatStream, chat_history, target):
         style_habits = []
 
         # 使用从处理器传来的选中表达方式
@@ -125,7 +126,8 @@ class PromptBuilder:
 
         return expression_habits_block
 
-    async def build_relation_info(self, chat_stream) -> str:
+    @staticmethod
+    async def build_relation_info(chat_stream) -> str:
         is_group_chat = bool(chat_stream.group_info)
         who_chat_in_group = []
         if is_group_chat:
@@ -157,7 +159,8 @@ class PromptBuilder:
                 )
         return relation_prompt
 
-    async def build_memory_block(self, text: str) -> str:
+    @staticmethod
+    async def build_memory_block(text: str) -> str:
         related_memory = await hippocampus_manager.get_memory_from_text(
             text=text, max_memory_num=2, max_memory_length=2, max_depth=3, fast_retrieval=False
         )
@@ -169,7 +172,8 @@ class PromptBuilder:
             return await global_prompt_manager.format_prompt("memory_prompt", memory_info=related_memory_info)
         return ""
 
-    def build_chat_history_prompts(self, chat_stream: ChatStream, message: MessageRecvS4U):
+    @staticmethod
+    def build_chat_history_prompts(chat_stream: ChatStream, message: MessageRecvS4U):
         message_list_before_now = get_raw_msg_before_timestamp_with_chat(
             chat_id=chat_stream.stream_id,
             timestamp=time.time(),
@@ -260,7 +264,8 @@ class PromptBuilder:
 
         return core_msg_str, background_dialogue_prompt, all_dialogue_prompt_str
 
-    def build_gift_info(self, message: MessageRecvS4U):
+    @staticmethod
+    def build_gift_info(message: MessageRecvS4U):
         if message.is_gift:
             return f"这是一条礼物信息，{message.gift_name} x{message.gift_count}，请注意这位用户"
         else:
@@ -269,7 +274,8 @@ class PromptBuilder:
 
         return ""
 
-    def build_sc_info(self, message: MessageRecvS4U):
+    @staticmethod
+    def build_sc_info(message: MessageRecvS4U):
         super_chat_manager = get_super_chat_manager()
         return super_chat_manager.build_superchat_summary_string(message.chat_stream.stream_id)
 

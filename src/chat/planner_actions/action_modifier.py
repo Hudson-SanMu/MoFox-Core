@@ -243,7 +243,8 @@ class ActionModifier:
 
         return deactivated_actions
 
-    def _generate_context_hash(self, chat_content: str) -> str:
+    @staticmethod
+    def _generate_context_hash(chat_content: str) -> str:
         """生成上下文的哈希值用于缓存"""
         context_content = f"{chat_content}"
         return hashlib.md5(context_content.encode("utf-8")).hexdigest()

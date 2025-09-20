@@ -1,17 +1,15 @@
-from typing import List, Optional, TYPE_CHECKING
 import time
-from src.chat.message_receive.chat_stream import ChatStream, get_chat_manager
-from src.person_info.relationship_builder_manager import RelationshipBuilder
-from src.chat.express.expression_learner import ExpressionLearner
-from src.chat.planner_actions.action_manager import ActionManager
+from typing import List, Optional, TYPE_CHECKING
+
 from src.chat.chat_loop.hfc_utils import CycleDetail
+from src.chat.express.expression_learner import ExpressionLearner
+from src.chat.message_receive.chat_stream import ChatStream, get_chat_manager
+from src.chat.planner_actions.action_manager import ActionManager
 from src.config.config import global_config
+from src.person_info.relationship_builder_manager import RelationshipBuilder
 
 if TYPE_CHECKING:
-    from .sleep_manager.wakeup_manager import WakeUpManager
-    from .energy_manager import EnergyManager
-    from .heartFC_chat import HeartFChatting
-    from .sleep_manager.sleep_manager import SleepManager
+    pass
 
 
 class HfcContext:

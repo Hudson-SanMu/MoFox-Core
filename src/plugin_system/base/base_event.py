@@ -1,5 +1,6 @@
 import asyncio
 from typing import List, Dict, Any, Optional
+
 from src.common.logger import get_logger
 
 logger = get_logger("base_event")
@@ -90,8 +91,6 @@ class BaseEvent:
         self.allowed_subscribers = allowed_subscribers  # 记录事件处理器名
         self.allowed_triggers = allowed_triggers  # 记录插件名
 
-        from src.plugin_system.base.base_events_handler import BaseEventHandler
-
         self.subscribers: List["BaseEventHandler"] = []  # 订阅该事件的事件处理器列表
 
         self.event_handle_lock = asyncio.Lock()
@@ -150,7 +149,8 @@ class BaseEvent:
 
             return HandlerResultsCollection(processed_results)
 
-    async def _execute_subscriber(self, subscriber, params: dict) -> HandlerResult:
+    @staticmethod
+    async def _execute_subscriber(subscriber, params: dict) -> HandlerResult:
         """执行单个订阅者处理器"""
         try:
             return await subscriber.execute(params)

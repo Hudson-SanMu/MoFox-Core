@@ -1,16 +1,18 @@
+import copy
+import datetime
 import hashlib
-import asyncio
-import orjson
 import time
-
-from json_repair import repair_json
 from typing import Any, Callable, Dict, Union, Optional
+
+import orjson
+from json_repair import repair_json
 from sqlalchemy import select
-from src.common.logger import get_logger
-from src.common.database.sqlalchemy_models import PersonInfo
+
 from src.common.database.sqlalchemy_database_api import get_db_session
-from src.llm_models.utils_model import LLMRequest
+from src.common.database.sqlalchemy_models import PersonInfo
+from src.common.logger import get_logger
 from src.config.config import global_config, model_config
+from src.llm_models.utils_model import LLMRequest
 
 logger = get_logger("person_info")
 
@@ -444,7 +446,8 @@ class PersonInfoManager:
             logger.error(f"检查用户 {person_id} 是否已知时出错 (SQLAlchemy): {e}")
             return False
 
-    async def get_person_id_by_person_name(self, person_name: str) -> str:
+    @staticmethod
+    async def get_person_id_by_person_name(person_name: str) -> str:
         """根据用户名获取用户ID"""
         try:
             # 在需要时获取会话
@@ -516,7 +519,8 @@ class PersonInfoManager:
 
         await _db_create_async(final_data)
 
-    async def _safe_create_person_info(self, person_id: str, data: Optional[dict] = None):
+    @staticmethod
+    async def _safe_create_person_info(person_id: str, data: Optional[dict] = None):
         """安全地创建用户信息，处理竞态条件"""
         if not person_id:
             logger.debug("创建失败，person_id不存在")

@@ -44,7 +44,7 @@ class UserInfo:
 
     def to_tuple(self) -> tuple[str, str]:
         """转换为元组格式"""
-        return (self.platform, self.user_id)
+        return self.platform, self.user_id
 
 
 class IPermissionManager(ABC):

@@ -8,12 +8,10 @@ from src.chat.planner_actions.action_manager import ActionManager
 from src.chat.planner_actions.plan_executor import PlanExecutor
 from src.chat.planner_actions.plan_filter import PlanFilter
 from src.chat.planner_actions.plan_generator import PlanGenerator
-from src.common.data_models.info_data_model import ActionPlannerInfo
 from src.common.logger import get_logger
 from src.plugin_system.base.component_types import ChatMode
 
 # 导入提示词模块以确保其被初始化
-from . import planner_prompts
 
 logger = get_logger("planner")
 

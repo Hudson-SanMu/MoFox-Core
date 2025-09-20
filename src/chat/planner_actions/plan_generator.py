@@ -2,7 +2,7 @@
 PlanGenerator: 负责搜集和汇总所有决策所需的信息，生成一个未经筛选的“原始计划” (Plan)。
 """
 import time
-from typing import Dict, Optional, Tuple
+from typing import Dict
 
 from src.chat.utils.chat_message_builder import get_raw_msg_before_timestamp_with_chat
 from src.chat.utils.utils import get_chat_type_and_target_info

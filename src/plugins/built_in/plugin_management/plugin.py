@@ -34,11 +34,11 @@ class ManagementCommand(PlusCommand):
     @require_permission("plugin.management.admin", "❌ 你没有插件管理的权限")
     async def execute(self, args: CommandArgs) -> Tuple[bool, str, bool]:
         """执行插件管理命令"""
-        if args.is_empty():
+        if args.is_empty:
             await self._show_help("all")
             return True, "显示帮助信息", True
 
-        subcommand = args.get_first().lower()
+        subcommand = args.get_first.lower()
         remaining_args = args.get_args()[1:]  # 获取除第一个参数外的所有参数
 
         if subcommand in ["plugin", "插件"]:
@@ -318,7 +318,8 @@ class ManagementCommand(PlusCommand):
         else:
             await self.send_text(f"❌ 插件目录添加失败: `{dir_path}`")
 
-    def _fetch_all_registered_components(self) -> List[ComponentInfo]:
+    @staticmethod
+    def _fetch_all_registered_components() -> List[ComponentInfo]:
         all_plugin_info = component_manage_api.get_all_plugin_info()
         if not all_plugin_info:
             return []

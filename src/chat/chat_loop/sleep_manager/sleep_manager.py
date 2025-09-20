@@ -5,12 +5,12 @@ from typing import Optional, TYPE_CHECKING
 
 from src.common.logger import get_logger
 from src.config.config import global_config
+from .notification_sender import NotificationSender
 from .sleep_state import SleepState, SleepStateSerializer
 from .time_checker import TimeChecker
-from .notification_sender import NotificationSender
 
 if TYPE_CHECKING:
-    from .wakeup_manager import WakeUpManager
+    pass
 
 logger = get_logger("sleep_manager")
 

@@ -145,9 +145,9 @@ class LLMUsageRecorder:
     LLM使用情况记录器（SQLAlchemy版本）
     """
 
+    @staticmethod
     def record_usage_to_database(
-        self,
-        model_info: ModelInfo,
+            model_info: ModelInfo,
         model_usage: UsageRecord,
         user_id: str,
         request_type: str,

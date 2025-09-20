@@ -297,15 +297,17 @@ class PlanFilter:
             )
         return parsed_actions
 
+    @staticmethod
     def _filter_no_actions(
-        self, action_list: List[ActionPlannerInfo]
+            action_list: List[ActionPlannerInfo]
     ) -> List[ActionPlannerInfo]:
         non_no_actions = [a for a in action_list if a.action_type not in ["no_action", "no_reply"]]
         if non_no_actions:
             return non_no_actions
         return action_list[:1] if action_list else []
 
-    async def _get_long_term_memory_context(self) -> str:
+    @staticmethod
+    async def _get_long_term_memory_context() -> str:
         try:
             now = datetime.now()
             keywords = ["今天", "日程", "计划"]
@@ -329,7 +331,8 @@ class PlanFilter:
             logger.error(f"获取长期记忆时出错: {e}")
             return "回忆时出现了一些问题。"
 
-    async def _build_action_options(self, current_available_actions: Dict[str, ActionInfo]) -> str:
+    @staticmethod
+    async def _build_action_options(current_available_actions: Dict[str, ActionInfo]) -> str:
         action_options_block = ""
         for action_name, action_info in current_available_actions.items():
             param_text = ""
@@ -347,7 +350,8 @@ class PlanFilter:
             )
         return action_options_block
 
-    def _find_message_by_id(self, message_id: str, message_id_list: list) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    def _find_message_by_id(message_id: str, message_id_list: list) -> Optional[Dict[str, Any]]:
         if message_id.isdigit():
             message_id = f"m{message_id}"
         for item in message_id_list:
@@ -355,7 +359,8 @@ class PlanFilter:
                 return item.get("message")
         return None
 
-    def _get_latest_message(self, message_id_list: list) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    def _get_latest_message(message_id_list: list) -> Optional[Dict[str, Any]]:
         if not message_id_list:
             return None
         return message_id_list[-1].get("message")
