@@ -2,7 +2,7 @@ import base64
 import time
 from abc import abstractmethod, ABCMeta
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 
 import urllib3
 from maim_message import Seg, UserInfo, BaseMessageInfo, MessageBase
@@ -14,7 +14,10 @@ from src.chat.utils.utils_voice import get_voice_text
 from src.common.logger import get_logger
 from src.config.config import global_config
 
+from src.chat.message_receive.chat_stream import ChatStream
+
 install(extra_lines=3)
+
 
 logger = get_logger("chat_message")
 
