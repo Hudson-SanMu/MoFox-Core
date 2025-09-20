@@ -77,7 +77,7 @@ class EmojiAction(BaseAction):
 
             # 3. 根据历史记录筛选表情
             try:
-                recent_emojis_desc = await get_recent_emojis(self.chat_id, limit=10)
+                recent_emojis_desc = get_recent_emojis(self.chat_id, limit=10)
                 if recent_emojis_desc:
                     filtered_emojis = [emoji for emoji in all_emojis_obj if emoji.description not in recent_emojis_desc]
                     if filtered_emojis:
@@ -260,7 +260,7 @@ class EmojiAction(BaseAction):
 
             # 发送成功后，记录到历史
             try:
-                await add_emoji_to_history(self.chat_id, emoji_description)
+                add_emoji_to_history(self.chat_id, emoji_description)
             except Exception as e:
                 logger.error(f"{self.log_prefix} 添加表情到历史记录时出错: {e}")
             
