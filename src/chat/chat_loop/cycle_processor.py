@@ -86,7 +86,8 @@ class CycleProcessor:
             platform,
             action_message.get("chat_info_user_id", ""),
         )
-        person_name = await person_info_manager.get_value(person_id, "person_name")
+        person_info = await person_info_manager.get_values(person_id, ["person_name"])
+        person_name = person_info.get("person_name")
         action_prompt_display = f"你对{person_name}进行了回复：{reply_text}"
 
         # 存储动作信息到数据库

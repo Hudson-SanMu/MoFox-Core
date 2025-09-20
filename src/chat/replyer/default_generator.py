@@ -660,7 +660,7 @@ class DefaultReplyer:
         duration = end_time - start_time
         return name, result, duration
 
-    def build_s4u_chat_history_prompts(
+    async def build_s4u_chat_history_prompts(
         self, message_list_before_now: List[Dict[str, Any]], target_user_id: str, sender: str
     ) -> Tuple[str, str]:
         """
@@ -692,7 +692,7 @@ class DefaultReplyer:
         all_dialogue_prompt = ""
         if message_list_before_now:
             latest_25_msgs = message_list_before_now[-int(global_config.chat.max_context_size) :]
-            all_dialogue_prompt_str = build_readable_messages(
+            all_dialogue_prompt_str = await build_readable_messages(
                 latest_25_msgs,
                 replace_bot_name=True,
                 timestamp_mode="normal",
@@ -716,7 +716,7 @@ class DefaultReplyer:
             else:
                 core_dialogue_list = core_dialogue_list[-int(global_config.chat.max_context_size * 2) :]  # 限制消息数量
 
-                core_dialogue_prompt_str = build_readable_messages(
+                core_dialogue_prompt_str = await build_readable_messages(
                     core_dialogue_list,
                     replace_bot_name=True,
                     merge_messages=False,
