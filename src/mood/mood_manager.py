@@ -105,7 +105,7 @@ class ChatMood:
             limit=int(global_config.chat.max_context_size / 3),
             limit_mode="last",
         )
-        chat_talking_prompt = build_readable_messages(
+        chat_talking_prompt = await build_readable_messages(
             message_list_before_now,
             replace_bot_name=True,
             merge_messages=False,
@@ -154,7 +154,7 @@ class ChatMood:
             limit=15,
             limit_mode="last",
         )
-        chat_talking_prompt = build_readable_messages(
+        chat_talking_prompt = await build_readable_messages(
             message_list_before_now,
             replace_bot_name=True,
             merge_messages=False,

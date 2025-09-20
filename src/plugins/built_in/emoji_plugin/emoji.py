@@ -125,7 +125,7 @@ class EmojiAction(BaseAction):
                     recent_messages = message_api.get_recent_messages(chat_id=self.chat_id, limit=5)
                     messages_text = ""
                     if recent_messages:
-                        messages_text = message_api.build_readable_messages(
+                        messages_text = await message_api.build_readable_messages(
                             messages=recent_messages,
                             timestamp_mode="normal_no_YMD",
                             truncate=False,
@@ -184,7 +184,7 @@ class EmojiAction(BaseAction):
                 recent_messages = message_api.get_recent_messages(chat_id=self.chat_id, limit=5)
                 messages_text = ""
                 if recent_messages:
-                    messages_text = message_api.build_readable_messages(
+                    messages_text = await message_api.build_readable_messages(
                         messages=recent_messages,
                         timestamp_mode="normal_no_YMD",
                         truncate=False,

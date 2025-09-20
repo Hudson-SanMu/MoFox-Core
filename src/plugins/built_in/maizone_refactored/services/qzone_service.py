@@ -240,7 +240,7 @@ class QZoneService:
                     all_messages = all_messages[-100:]
 
                 # build_readable_messages_with_id 返回一个元组 (formatted_string, message_id_list)
-                formatted_string, _ = build_readable_messages_with_id(all_messages)
+                formatted_string, _ = await build_readable_messages_with_id(all_messages)
                 return formatted_string
 
         logger.debug(f"Stream ID '{stream_id}' 未在任何互通组中找到。")

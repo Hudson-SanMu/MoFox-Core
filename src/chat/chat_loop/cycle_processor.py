@@ -192,7 +192,7 @@ class CycleProcessor:
                 await self.action_modifier.modify_actions()
                 available_actions = self.context.action_manager.get_using_actions()
             except Exception as e:
-                logger.error(f"{self.context.log_prefix} 动作修改失败: {e}")
+                logger.error(f"{self.log_prefix} 动作修改失败: {e}")
                 available_actions = {}
 
             # 规划动作

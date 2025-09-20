@@ -133,7 +133,7 @@ class PlanFilter:
                 )
 
                 prompt_template = await global_prompt_manager.get_prompt_async("proactive_planner_prompt")
-                actions_before_now = get_actions_by_timestamp_with_chat(
+                actions_before_now = await get_actions_by_timestamp_with_chat(
                     chat_id=plan.chat_id,
                     timestamp_start=time.time() - 3600,
                     timestamp_end=time.time(),

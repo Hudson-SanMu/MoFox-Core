@@ -120,6 +120,10 @@ class ProactiveThinker:
                 action_result = actions[0] if actions else {}
                 action_type = action_result.get("action_type")
 
+                if action_type is None:
+                    logger.info(f"{self.context.log_prefix} 主动思考决策: 规划器未返回有效动作")
+                    return
+
                 if action_type == "proactive_reply":
                     await self._generate_proactive_content_and_send(action_result, trigger_event)
                 elif action_type not in ["do_nothing", "no_action"]:
@@ -212,12 +216,12 @@ class ProactiveThinker:
                             logger.warning(f"{self.context.log_prefix} 主题为空，跳过网络搜索。")
                     except Exception as e:
                         logger.error(f"{self.context.log_prefix} 主动思考时网络搜索失败: {e}")
-                message_list = get_raw_msg_before_timestamp_with_chat(
+                message_list = await get_raw_msg_before_timestamp_with_chat(
                     chat_id=self.context.stream_id,
                     timestamp=time.time(),
                     limit=int(global_config.chat.max_context_size * 0.3),
                 )
-                chat_context_block, _ = build_readable_messages_with_id(messages=message_list)
+                chat_context_block, _ = await build_readable_messages_with_id(messages=message_list)
 
             from src.llm_models.utils_model import LLMRequest
             from src.config.config import model_config

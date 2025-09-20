@@ -173,7 +173,7 @@ class PromptBuilder:
         return ""
 
     @staticmethod
-    def build_chat_history_prompts(chat_stream: ChatStream, message: MessageRecvS4U):
+    async def build_chat_history_prompts(chat_stream: ChatStream, message: MessageRecvS4U):
         message_list_before_now = get_raw_msg_before_timestamp_with_chat(
             chat_id=chat_stream.stream_id,
             timestamp=time.time(),
@@ -207,7 +207,7 @@ class PromptBuilder:
         background_dialogue_prompt = ""
         if background_dialogue_list:
             context_msgs = background_dialogue_list[-s4u_config.max_context_message_length :]
-            background_dialogue_prompt_str = build_readable_messages(
+            background_dialogue_prompt_str = await build_readable_messages(
                 context_msgs,
                 timestamp_mode="normal_no_YMD",
                 show_pic=False,
@@ -256,7 +256,7 @@ class PromptBuilder:
             timestamp=time.time(),
             limit=20,
         )
-        all_dialogue_prompt_str = build_readable_messages(
+        all_dialogue_prompt_str = await build_readable_messages(
             all_dialogue_prompt,
             timestamp_mode="normal_no_YMD",
             show_pic=False,
@@ -306,7 +306,7 @@ class PromptBuilder:
             self.build_expression_habits(chat_stream, message_txt, sender_name),
         )
 
-        core_dialogue_prompt, background_dialogue_prompt, all_dialogue_prompt = self.build_chat_history_prompts(
+        core_dialogue_prompt, background_dialogue_prompt, all_dialogue_prompt = await self.build_chat_history_prompts(
             chat_stream, message
         )
 

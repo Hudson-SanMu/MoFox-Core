@@ -486,7 +486,7 @@ class Prompt:
         all_dialogue_prompt = ""
         if message_list_before_now:
             latest_25_msgs = message_list_before_now[-int(global_config.chat.max_context_size) :]
-            all_dialogue_prompt_str = build_readable_messages(
+            all_dialogue_prompt_str = await build_readable_messages(
                 latest_25_msgs,
                 replace_bot_name=True,
                 timestamp_mode="normal",
@@ -505,7 +505,7 @@ class Prompt:
             else:
                 core_dialogue_list = core_dialogue_list[-int(global_config.chat.max_context_size * 2) :]
                 
-                core_dialogue_prompt_str = build_readable_messages(
+                core_dialogue_prompt_str = await build_readable_messages(
                     core_dialogue_list,
                     replace_bot_name=True,
                     merge_messages=False,
@@ -534,7 +534,7 @@ class Prompt:
             chat_history = ""
             if self.parameters.message_list_before_now_long:
                 recent_messages = self.parameters.message_list_before_now_long[-10:]
-                chat_history = build_readable_messages(
+                chat_history = await build_readable_messages(
                     recent_messages,
                     replace_bot_name=True,
                     timestamp_mode="normal",
@@ -574,7 +574,7 @@ class Prompt:
             chat_history = ""
             if self.parameters.message_list_before_now_long:
                 recent_messages = self.parameters.message_list_before_now_long[-20:]
-                chat_history = build_readable_messages(
+                chat_history = await build_readable_messages(
                     recent_messages,
                     replace_bot_name=True,
                     timestamp_mode="normal",
@@ -632,7 +632,7 @@ class Prompt:
             chat_history = ""
             if self.parameters.message_list_before_now_long:
                 recent_messages = self.parameters.message_list_before_now_long[-15:]
-                chat_history = build_readable_messages(
+                chat_history = await build_readable_messages(
                     recent_messages,
                     replace_bot_name=True,
                     timestamp_mode="normal",
