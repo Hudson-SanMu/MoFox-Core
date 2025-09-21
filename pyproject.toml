@@ -74,6 +74,7 @@ dependencies = [
     "websockets>=15.0.1",
     "aiomysql>=0.2.0",
     "aiosqlite>=0.21.0",
+    "inkfox>=0.1.0",
 ]
 
 [[tool.uv.index]]

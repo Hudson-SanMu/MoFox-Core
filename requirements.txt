@@ -70,3 +70,4 @@ lunar_python
 fuzzywuzzy
 python-multipart
 aiofiles
+inkfox
