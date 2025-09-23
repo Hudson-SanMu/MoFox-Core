@@ -639,14 +639,9 @@ async def initialize_database():
             }
         )
     else:
-        # SQLite配置 - 异步引擎使用默认连接池
+        # SQLite配置 - aiosqlite不支持连接池参数
         engine_kwargs.update(
             {
-                "pool_size": 20,  # 增加池大小
-                "max_overflow": 30,  # 增加溢出连接数
-                "pool_timeout": 60,  # 增加超时时间
-                "pool_recycle": 3600,  # 1小时回收连接
-                "pool_pre_ping": True,  # 连接前ping检查
                 "connect_args": {
                     "check_same_thread": False,
                     "timeout": 30,
