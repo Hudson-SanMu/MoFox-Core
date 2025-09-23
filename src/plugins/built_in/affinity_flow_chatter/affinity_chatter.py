@@ -17,6 +17,10 @@ from src.common.logger import get_logger
 
 logger = get_logger("affinity_chatter")
 
+# 定义颜色
+SOFT_GREEN = "\033[38;5;118m"  # 一个更柔和的绿色
+RESET_COLOR = "\033[0m"
+
 
 class AffinityChatter(BaseChatter):
     """亲和力聊天处理器"""
@@ -59,6 +63,10 @@ class AffinityChatter(BaseChatter):
         """
         try:
             unread_messages = context.get_unread_messages()
+
+            # 像hfc一样，打印收到的消息
+            for msg in unread_messages:
+                logger.info(f"{SOFT_GREEN}[所见] {msg.user_info.user_nickname}:{msg.processed_plain_text}{RESET_COLOR}")
 
             # 使用增强版规划器处理消息
             actions, target_message = await self.planner.plan(context=context)

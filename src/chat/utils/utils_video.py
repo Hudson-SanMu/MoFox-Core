@@ -59,10 +59,59 @@ class VideoAnalyzer:
 
         # 人格与提示模板
         try:
-            persona = global_config.personality
-            self.personality_core = getattr(persona, "personality_core", "是一个积极向上的女大学生")
-            self.personality_side = getattr(persona, "personality_side", "用一句话或几句话描述人格的侧面特点")
-        except Exception:  # pragma: no cover
+            import cv2
+
+            opencv_available = True
+        except ImportError:
+            pass
+
+        if not RUST_VIDEO_AVAILABLE and not opencv_available:
+            logger.error("❌ 没有可用的视频处理实现，视频分析器将被禁用")
+            self.disabled = True
+            return
+        elif not RUST_VIDEO_AVAILABLE:
+            logger.warning("⚠️ Rust视频处理模块不可用，将使用Python降级实现")
+        elif not opencv_available:
+            logger.warning("⚠️ OpenCV不可用，仅支持Rust关键帧模式")
+
+        self.disabled = False
+
+        # 使用专用的视频分析配置
+        try:
+            self.video_llm = LLMRequest(
+                model_set=model_config.model_task_config.video_analysis, request_type="video_analysis"
+            )
+            logger.debug("✅ 使用video_analysis模型配置")
+        except (AttributeError, KeyError) as e:
+            # 如果video_analysis不存在，使用vlm配置
+            self.video_llm = LLMRequest(model_set=model_config.model_task_config.vlm, request_type="vlm")
+            logger.warning(f"video_analysis配置不可用({e})，回退使用vlm配置")
+
+        # 从配置文件读取参数，如果配置不存在则使用默认值
+        config = global_config.video_analysis
+
+        # 使用 getattr 统一获取配置参数，如果配置不存在则使用默认值
+        self.max_frames = getattr(config, "max_frames", 6)
+        self.frame_quality = getattr(config, "frame_quality", 85)
+        self.max_image_size = getattr(config, "max_image_size", 600)
+        self.enable_frame_timing = getattr(config, "enable_frame_timing", True)
+
+        # Rust模块相关配置
+        self.rust_keyframe_threshold = getattr(config, "rust_keyframe_threshold", 2.0)
+        self.rust_use_simd = getattr(config, "rust_use_simd", True)
+        self.rust_block_size = getattr(config, "rust_block_size", 8192)
+        self.rust_threads = getattr(config, "rust_threads", 0)
+        self.ffmpeg_path = getattr(config, "ffmpeg_path", "ffmpeg")
+
+        # 从personality配置中获取人格信息
+        try:
+            personality_config = global_config.personality
+            self.personality_core = getattr(personality_config, "personality_core", "是一个积极向上的女大学生")
+            self.personality_side = getattr(
+                personality_config, "personality_side", "用一句话或几句话描述人格的侧面特点"
+            )
+        except AttributeError:
+            # 如果没有personality配置，使用默认值
             self.personality_core = "是一个积极向上的女大学生"
             self.personality_side = "用一句话或几句话描述人格的侧面特点"
 
@@ -72,12 +121,76 @@ class VideoAnalyzer:
             """请以第一人称视角阅读这些按时间顺序提取的关键帧。\n核心：{personality_core}\n人格：{personality_side}\n请详细描述视频(主题/人物与场景/动作与时间线/视觉风格/情绪氛围/特殊元素)。""",
         )
 
+        # 新增的线程池配置
+        self.use_multiprocessing = getattr(config, "use_multiprocessing", True)
+        self.max_workers = getattr(config, "max_workers", 2)
+        self.frame_extraction_mode = getattr(config, "frame_extraction_mode", "fixed_number")
+        self.frame_interval_seconds = getattr(config, "frame_interval_seconds", 2.0)
+
+        # 将配置文件中的模式映射到内部使用的模式名称
+        config_mode = getattr(config, "analysis_mode", "auto")
+        if config_mode == "batch_frames":
+            self.analysis_mode = "batch"
+        elif config_mode == "frame_by_frame":
+            self.analysis_mode = "sequential"
+        elif config_mode == "auto":
+            self.analysis_mode = "auto"
+        else:
+            logger.warning(f"无效的分析模式: {config_mode}，使用默认的auto模式")
+            self.analysis_mode = "auto"
+
+        self.frame_analysis_delay = 0.3  # API调用间隔（秒）
+        self.frame_interval = 1.0  # 抽帧时间间隔（秒）
+        self.batch_size = 3  # 批处理时每批处理的帧数
+        self.timeout = 60.0  # 分析超时时间（秒）
+
+        if config:
+            logger.debug("✅ 从配置文件读取视频分析参数")
+        else:
+            logger.warning("配置文件中缺少video_analysis配置，使用默认值")
+
+        # 系统提示词
+        self.system_prompt = "你是一个专业的视频内容分析助手。请仔细观察用户提供的视频关键帧，详细描述视频内容。"
+
+        logger.debug(f"✅ 视频分析器初始化完成，分析模式: {self.analysis_mode}, 线程池: {self.use_multiprocessing}")
+
+        # 获取Rust模块系统信息
+        self._log_system_info()
+
+    def _log_system_info(self):
+        """记录系统信息"""
+        if not RUST_VIDEO_AVAILABLE:
+            logger.info("⚠️ Rust模块不可用，跳过系统信息获取")
+            return
+
         try:
-            self.video_llm = LLMRequest(
-                model_set=model_config.model_task_config.video_analysis, request_type="video_analysis"
-            )
-        except Exception:
-            self.video_llm = LLMRequest(model_set=model_config.model_task_config.vlm, request_type="vlm")
+            system_info = rust_video.get_system_info()
+            logger.debug(f"🔧 系统信息: 线程数={system_info.get('threads', '未知')}")
+
+            # 记录CPU特性
+            features = []
+            if system_info.get("avx2_supported"):
+                features.append("AVX2")
+            if system_info.get("sse2_supported"):
+                features.append("SSE2")
+            if system_info.get("simd_supported"):
+                features.append("SIMD")
+
+            if features:
+                logger.debug(f"🚀 CPU特性: {', '.join(features)}")
+            else:
+                logger.debug("⚠️ 未检测到SIMD支持")
+
+            logger.debug(f"📦 Rust模块版本: {system_info.get('version', '未知')}")
+
+        except Exception as e:
+            logger.warning(f"获取系统信息失败: {e}")
+
+    def _calculate_video_hash(self, video_data: bytes) -> str:
+        """计算视频文件的hash值"""
+        hash_obj = hashlib.sha256()
+        hash_obj.update(video_data)
+        return hash_obj.hexdigest()
 
         self._log_system()
 

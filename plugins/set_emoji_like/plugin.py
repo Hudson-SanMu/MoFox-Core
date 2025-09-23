@@ -45,7 +45,7 @@ class SetEmojiLikeAction(BaseAction):
 
     # === 基本信息（必须填写）===
     action_name = "set_emoji_like"
-    action_description = "为一个已存在的消息添加点赞或表情回应（也叫‘贴表情’）"
+    action_description = "为某条已经存在的消息添加‘贴表情’回应（类似点赞），而不是发送新消息。可以在觉得某条消息非常有趣、值得赞同或者需要特殊情感回应时主动使用。"
     activation_type = ActionActivationType.ALWAYS  # 消息接收时激活(?)
     chat_type_allow = ChatType.GROUP
     parallel_action = True

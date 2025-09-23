@@ -27,13 +27,26 @@ from src.schedule.schedule_manager import schedule_manager
 
 logger = get_logger("plan_filter")
 
+SAKURA_PINK = "\033[38;5;175m"
+SKY_BLUE = "\033[38;5;117m"
+RESET_COLOR = "\033[0m"
+
 
 class ChatterPlanFilter:
     """
     根据 Plan 中的模式和信息，筛选并决定最终的动作。
     """
 
-    def __init__(self):
+    def __init__(self, chat_id: str, available_actions: List[str]):
+        """
+        初始化动作计划筛选器。
+
+        Args:
+            chat_id (str): 当前聊天的唯一标识符。
+            available_actions (List[str]): 当前可用的动作列表。
+        """
+        self.chat_id = chat_id
+        self.available_actions = available_actions
         self.planner_llm = LLMRequest(model_set=model_config.model_task_config.planner, request_type="planner")
         self.last_obs_time_mark = 0.0
 
@@ -110,12 +123,16 @@ class ChatterPlanFilter:
                             final_actions.extend(await self._parse_single_action(item, used_message_id_list, plan))
                         
                         if thinking and thinking != "未提供思考过程":
-                            logger.info(f"思考: {thinking}")
+                            logger.info(f"\n{SAKURA_PINK}思考: {thinking}{RESET_COLOR}\n")
                         plan.decided_actions = self._filter_no_actions(final_actions)
 
         except Exception as e:
             logger.error(f"筛选 Plan 时出错: {e}\n{traceback.format_exc()}")
             plan.decided_actions = [ActionPlannerInfo(action_type="no_action", reasoning=f"筛选时出错: {e}")]
+
+        # 在返回最终计划前，打印将要执行的动作
+        action_types = [action.action_type for action in plan.decided_actions]
+        logger.info(f"选择动作: [{SKY_BLUE}{', '.join(action_types) if action_types else '无'}{RESET_COLOR}]")
 
         return plan
 
@@ -279,12 +296,24 @@ class ChatterPlanFilter:
             # 从message_manager获取真实的已读/未读消息
             from src.chat.message_manager.message_manager import message_manager
             from src.chat.utils.utils import assign_message_ids
+            from src.chat.utils.chat_message_builder import get_raw_msg_before_timestamp_with_chat
 
             # 获取聊天流的上下文
             stream_context = message_manager.stream_contexts.get(plan.chat_id)
 
             # 获取真正的已读和未读消息
             read_messages = stream_context.history_messages  # 已读消息存储在history_messages中
+            if not read_messages:
+                from src.common.data_models.database_data_model import DatabaseMessages
+                # 如果内存中没有已读消息（比如刚启动），则从数据库加载最近的上下文
+                fallback_messages_dicts = get_raw_msg_before_timestamp_with_chat(
+                    chat_id=plan.chat_id,
+                    timestamp=time.time(),
+                    limit=global_config.chat.max_context_size,
+                )
+                # 将字典转换为DatabaseMessages对象
+                read_messages = [DatabaseMessages(**msg_dict) for msg_dict in fallback_messages_dicts]
+
             unread_messages = stream_context.get_unread_messages()  # 获取未读消息
 
             # 构建已读历史消息块
@@ -316,14 +345,12 @@ class ChatterPlanFilter:
                     synthetic_id = mapped.get("id")
                     original_msg_id = msg.get("message_id") or msg.get("id")
                     msg_time = time.strftime("%H:%M:%S", time.localtime(msg.get("time", time.time())))
+                    user_nickname = msg.get("user_nickname", "未知用户")
                     msg_content = msg.get("processed_plain_text", "")
 
-                    # 添加兴趣度信息
-                    interest_score = interest_scores.get(original_msg_id, 0.0)
-                    interest_text = f" [兴趣度: {interest_score:.3f}]" if interest_score > 0 else ""
-
-                    # 在未读行中显示合成id，方便 planner 返回时使用
-                    unread_lines.append(f"{msg_time} {synthetic_id}: {msg_content}{interest_text}")
+                    # 不再显示兴趣度，但保留合成ID供模型内部使用
+                    # 同时，为了让模型更好地理解上下文，我们显示用户名
+                    unread_lines.append(f"<{synthetic_id}> {msg_time} {user_nickname}: {msg_content}")
 
                 unread_history_block = "\n".join(unread_lines)
             else:
@@ -389,75 +416,70 @@ class ChatterPlanFilter:
             actions_obj = action_json.get("actions", {})
             
             # 处理actions字段可能是字典或列表的情况
+            actions_to_process = []
             if isinstance(actions_obj, dict):
-                action = actions_obj.get("action_type", "no_action")
-                reasoning = actions_obj.get("reason", "未提供原因")
-                # 合并actions_obj中的其他字段作为action_data
-                action_data = {k: v for k, v in actions_obj.items() if k not in ["action_type", "reason"]}
-            elif isinstance(actions_obj, list) and actions_obj:
-                # 如果是列表，取第一个元素
-                first_action = actions_obj[0]
-                if isinstance(first_action, dict):
-                    action = first_action.get("action_type", "no_action")
-                    reasoning = first_action.get("reason", "未提供原因")
-                    action_data = {k: v for k, v in first_action.items() if k not in ["action_type", "reason"]}
-                else:
+                actions_to_process.append(actions_obj)
+            elif isinstance(actions_obj, list):
+                actions_to_process.extend(actions_obj)
+
+            if not actions_to_process:
+                 actions_to_process.append({"action_type": "no_action", "reason": "actions格式错误"})
+
+            for single_action_obj in actions_to_process:
+                if not isinstance(single_action_obj, dict):
+                    continue
+
+                action = single_action_obj.get("action_type", "no_action")
+                reasoning = single_action_obj.get("reason", "未提供原因")
+                action_data = {k: v for k, v in single_action_obj.items() if k not in ["action_type", "reason"]}
+
+                # 保留原始的thinking字段（如果有）
+                thinking = action_json.get("thinking")
+                if thinking:
+                    action_data["thinking"] = thinking
+
+                target_message_obj = None
+                if action not in ["no_action", "no_reply", "do_nothing", "proactive_reply"]:
+                    if target_message_id := action_data.get("target_message_id"):
+                        target_message_dict = self._find_message_by_id(target_message_id, message_id_list)
+                    else:
+                        # 如果LLM没有指定target_message_id，我们就默认选择最新的一条消息
+                        target_message_dict = self._get_latest_message(message_id_list)
+
+                    if target_message_dict:
+                        # 直接使用字典作为action_message，避免DatabaseMessages对象创建失败
+                        target_message_obj = target_message_dict
+                        # 替换action_data中的临时ID为真实ID
+                        if "target_message_id" in action_data:
+                            real_message_id = target_message_dict.get("message_id") or target_message_dict.get("id")
+                            if real_message_id:
+                                action_data["target_message_id"] = real_message_id
+                    else:
+                        # 如果找不到目标消息，对于reply动作来说这是必需的，应该记录警告
+                        if action == "reply":
+                            logger.warning(
+                                f"reply动作找不到目标消息，target_message_id: {action_data.get('target_message_id')}"
+                            )
+                            # 将reply动作改为no_action，避免后续执行时出错
+                            action = "no_action"
+                            reasoning = f"找不到目标消息进行回复。原始理由: {reasoning}"
+
+                if (
+                    action not in ["no_action", "no_reply", "reply", "do_nothing", "proactive_reply"]
+                    and action not in self.available_actions
+                ):
+                    reasoning = f"LLM 返回了当前不可用的动作 '{action}'。原始理由: {reasoning}"
                     action = "no_action"
-                    reasoning = "actions格式错误"
-                    action_data = {}
-            else:
-                action = "no_action"
-                reasoning = "actions格式错误"
-                action_data = {}
-            
-            # 保留原始的thinking字段（如果有）
-            thinking = action_json.get("thinking")
-            if thinking:
-                action_data["thinking"] = thinking
 
-            target_message_obj = None
-            if action not in ["no_action", "no_reply", "do_nothing", "proactive_reply"]:
-                if target_message_id := action_data.get("target_message_id"):
-                    target_message_dict = self._find_message_by_id(target_message_id, message_id_list)
-                else:
-                    # 如果LLM没有指定target_message_id，我们就默认选择最新的一条消息
-                    target_message_dict = self._get_latest_message(message_id_list)
-
-                if target_message_dict:
-                    # 直接使用字典作为action_message，避免DatabaseMessages对象创建失败
-                    target_message_obj = target_message_dict
-                    # 替换action_data中的临时ID为真实ID
-                    if "target_message_id" in action_data:
-                        real_message_id = target_message_dict.get("message_id") or target_message_dict.get("id")
-                        if real_message_id:
-                            action_data["target_message_id"] = real_message_id
-                else:
-                    # 如果找不到目标消息，对于reply动作来说这是必需的，应该记录警告
-                    if action == "reply":
-                        logger.warning(
-                            f"reply动作找不到目标消息，target_message_id: {action_data.get('target_message_id')}"
-                        )
-                        # 将reply动作改为no_action，避免后续执行时出错
-                        action = "no_action"
-                        reasoning = f"找不到目标消息进行回复。原始理由: {reasoning}"
-
-            available_action_names = list(plan.available_actions.keys())
-            if (
-                action not in ["no_action", "no_reply", "reply", "do_nothing", "proactive_reply"]
-                and action not in available_action_names
-            ):
-                reasoning = f"LLM 返回了当前不可用的动作 '{action}'。原始理由: {reasoning}"
-                action = "no_action"
-
-            parsed_actions.append(
-                ActionPlannerInfo(
-                    action_type=action,
-                    reasoning=reasoning,
-                    action_data=action_data,
-                    action_message=target_message_obj,
-                    available_actions=plan.available_actions,
+                parsed_actions.append(
+                    ActionPlannerInfo(
+                        action_type=action,
+                        reasoning=reasoning,
+                        action_data=action_data,
+                        action_message=target_message_obj,
+                        available_actions=plan.available_actions,
+                    )
                 )
-            )
         except Exception as e:
             logger.error(f"解析单个action时出错: {e}")
             parsed_actions.append(

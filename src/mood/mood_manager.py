@@ -140,9 +140,9 @@ class ChatMood:
             prompt=prompt, temperature=0.7
         )
         if global_config.debug.show_prompt:
-            logger.info(f"{self.log_prefix} prompt: {prompt}")
-            logger.info(f"{self.log_prefix} response: {response}")
-            logger.info(f"{self.log_prefix} reasoning_content: {reasoning_content}")
+            logger.debug(f"{self.log_prefix} prompt: {prompt}")
+            logger.debug(f"{self.log_prefix} response: {response}")
+            logger.debug(f"{self.log_prefix} reasoning_content: {reasoning_content}")
 
         logger.info(f"{self.log_prefix} 情绪状态更新为: {response}")
 
@@ -190,9 +190,9 @@ class ChatMood:
         )
 
         if global_config.debug.show_prompt:
-            logger.info(f"{self.log_prefix} prompt: {prompt}")
-            logger.info(f"{self.log_prefix} response: {response}")
-            logger.info(f"{self.log_prefix} reasoning_content: {reasoning_content}")
+            logger.debug(f"{self.log_prefix} prompt: {prompt}")
+            logger.debug(f"{self.log_prefix} response: {response}")
+            logger.debug(f"{self.log_prefix} reasoning_content: {reasoning_content}")
 
         logger.info(f"{self.log_prefix} 情绪状态转变为: {response}")
 

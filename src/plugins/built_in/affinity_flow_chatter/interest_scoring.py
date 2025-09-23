@@ -15,6 +15,10 @@ from src.config.config import global_config
 
 logger = get_logger("chatter_interest_scoring")
 
+# 定义颜色
+SOFT_BLUE = "\033[38;5;67m"
+RESET_COLOR = "\033[0m"
+
 
 class ChatterInterestScoringSystem:
     """兴趣度评分系统"""
@@ -80,8 +84,8 @@ class ChatterInterestScoringSystem:
             "mentioned": f"提及: {mentioned_score:.3f}",
         }
 
-        logger.info(
-            f"消息得分: {total_score:.3f} (匹配: {interest_match_score:.2f}, 关系: {relationship_score:.2f}, 提及: {mentioned_score:.2f})"
+        logger.debug(
+            f"消息得分详情: {total_score:.3f} (匹配: {interest_match_score:.2f}, 关系: {relationship_score:.2f}, 提及: {mentioned_score:.2f})"
         )
 
         return InterestScore(
@@ -248,7 +252,9 @@ class ChatterInterestScoringSystem:
         # 做出决策
         should_reply = score.total_score >= effective_threshold
         decision = "回复" if should_reply else "不回复"
-        logger.info(f"决策: {decision} (分数: {score.total_score:.3f})")
+        logger.info(
+            f"{SOFT_BLUE}决策: {decision} (兴趣度: {score.total_score:.3f} / 阈值: {effective_threshold:.3f}){RESET_COLOR}"
+        )
 
         return should_reply, score.total_score
 
@@ -264,7 +270,7 @@ class ChatterInterestScoringSystem:
 
         # 限制最大计数
         self.no_reply_count = min(self.no_reply_count, self.max_no_reply_count)
-        logger.info(f"{action} | 不回复次数: {old_count} -> {self.no_reply_count}")
+        logger.info(f"动作: {action}, 连续不回复次数: {old_count} -> {self.no_reply_count}")
 
     def update_user_relationship(self, user_id: str, relationship_change: float):
         """更新用户关系"""

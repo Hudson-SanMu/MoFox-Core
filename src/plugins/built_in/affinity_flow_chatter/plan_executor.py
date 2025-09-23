@@ -65,6 +65,10 @@ class ChatterPlanExecutor:
         if not plan.decided_actions:
             logger.info("没有需要执行的动作。")
             return {"executed_count": 0, "results": []}
+        
+        # 像hfc一样，提前打印将要执行的动作
+        action_types = [action.action_type for action in plan.decided_actions]
+        logger.info(f"选择动作: {', '.join(action_types) if action_types else '无'}")
 
         execution_results = []
         reply_actions = []

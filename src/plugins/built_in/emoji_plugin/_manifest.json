@@ -26,8 +26,8 @@
     "components": [
       {
         "type": "action",
-        "name": "emoji", 
-        "description": "发送表情包辅助表达情绪"
+        "name": "emoji",
+        "description": "作为一条全新的消息，发送一个符合当前情景的表情包来生动地表达情绪。"
       }
     ]
   }

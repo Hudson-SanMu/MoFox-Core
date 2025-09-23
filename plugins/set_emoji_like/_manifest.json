@@ -25,7 +25,7 @@
       {
         "type": "action",
         "name": "set_emoji_like",
-        "description": "为消息设置表情回应"
+        "description": "为某条已经存在的消息添加‘贴表情’回应（类似点赞），而不是发送新消息。当用户明确要求‘贴表情’时使用。"
       }
     ],
     "features": [

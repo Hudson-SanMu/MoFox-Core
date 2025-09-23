@@ -50,7 +50,6 @@ class ChatterActionPlanner:
         self.chat_id = chat_id
         self.action_manager = action_manager
         self.generator = ChatterPlanGenerator(chat_id)
-        self.filter = ChatterPlanFilter()
         self.executor = ChatterPlanExecutor(action_manager)
 
         # 初始化兴趣度评分系统
@@ -96,9 +95,17 @@ class ChatterActionPlanner:
     async def _enhanced_plan_flow(self, context: "StreamContext") -> Tuple[List[Dict], Optional[Dict]]:
         """执行增强版规划流程"""
         try:
+            # 在规划前，先进行动作修改
+            from src.chat.planner_actions.action_modifier import ActionModifier
+            action_modifier = ActionModifier(self.action_manager, self.chat_id)
+            await action_modifier.modify_actions()
+            
             # 1. 生成初始 Plan
             initial_plan = await self.generator.generate(context.chat_mode)
 
+            # 确保Plan中包含所有当前可用的动作
+            initial_plan.available_actions = self.action_manager.get_using_actions()
+            
             unread_messages = context.get_unread_messages() if context else []
             # 2. 兴趣度评分 - 只对未读消息进行评分
             if unread_messages:
@@ -142,7 +149,9 @@ class ChatterActionPlanner:
                 filtered_plan.decided_actions = [no_action]
             else:
                 # 4. 筛选 Plan
-                filtered_plan = await self.filter.filter(reply_not_available, initial_plan)
+                available_actions = list(initial_plan.available_actions.keys())
+                plan_filter = ChatterPlanFilter(self.chat_id, available_actions)
+                filtered_plan = await plan_filter.filter(reply_not_available, initial_plan)
 
             # 检查filtered_plan是否有reply动作，以便记录reply action
             has_reply_action = False

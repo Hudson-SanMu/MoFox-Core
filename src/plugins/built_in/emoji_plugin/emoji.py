@@ -33,7 +33,7 @@ class EmojiAction(BaseAction):
 
     # 动作基本信息
     action_name = "emoji"
-    action_description = "发送表情包辅助表达情绪"
+    action_description = "作为一条全新的消息，发送一个符合当前情景的表情包来生动地表达情绪。"
 
     # LLM判断提示词
     llm_judge_prompt = """

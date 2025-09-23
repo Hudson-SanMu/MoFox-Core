@@ -464,7 +464,7 @@ class BotInterestManager:
                     low_similarity_count += 1
                     result.add_match(tag.tag_name, enhanced_score, [tag.tag_name])
 
-        logger.info(
+        logger.debug(
             f"匹配统计: {match_count}/{len(active_tags)} 个标签命中 | "
             f"高(>{high_threshold}): {high_similarity_count}, "
             f"中(>{medium_threshold}): {medium_similarity_count}, "
@@ -492,9 +492,9 @@ class BotInterestManager:
         if result.matched_tags:
             top_tag_name = max(result.match_scores.items(), key=lambda x: x[1])[0]
             result.top_tag = top_tag_name
-            logger.info(f"最佳匹配: '{top_tag_name}' (分数: {result.match_scores[top_tag_name]:.3f})")
+            logger.debug(f"最佳匹配: '{top_tag_name}' (分数: {result.match_scores[top_tag_name]:.3f})")
 
-        logger.info(
+        logger.debug(
             f"最终结果: 总分={result.overall_score:.3f}, 置信度={result.confidence:.3f}, 匹配标签数={len(result.matched_tags)}"
         )
         return result
