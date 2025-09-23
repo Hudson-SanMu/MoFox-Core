@@ -78,6 +78,7 @@ class PromptParameters:
     
     # 可用动作信息
     available_actions: Optional[Dict[str, Any]] = None
+    read_mark: float = 0.0
     
     def validate(self) -> List[str]:
         """参数验证"""
@@ -449,7 +450,8 @@ class Prompt:
         core_dialogue, background_dialogue = await self._build_s4u_chat_history_prompts(
             self.parameters.message_list_before_now_long,
             self.parameters.target_user_info.get("user_id") if self.parameters.target_user_info else "",
-            self.parameters.sender
+            self.parameters.sender,
+            read_mark=self.parameters.read_mark,
         )
         
         context_data["core_dialogue_prompt"] = core_dialogue
@@ -465,7 +467,7 @@ class Prompt:
     
     @staticmethod
     async def _build_s4u_chat_history_prompts(
-            message_list_before_now: List[Dict[str, Any]], target_user_id: str, sender: str
+            message_list_before_now: List[Dict[str, Any]], target_user_id: str, sender: str, read_mark: float = 0.0
     ) -> Tuple[str, str]:
         """构建S4U风格的分离对话prompt"""
         # 实现逻辑与原有SmartPromptBuilder相同
@@ -491,6 +493,7 @@ class Prompt:
                 replace_bot_name=True,
                 timestamp_mode="normal",
                 truncate=True,
+                read_mark=read_mark,
             )
             all_dialogue_prompt = f"所有用户的发言：\n{all_dialogue_prompt_str}"
         
@@ -510,7 +513,7 @@ class Prompt:
                     replace_bot_name=True,
                     merge_messages=False,
                     timestamp_mode="normal_no_YMD",
-                    read_mark=0.0,
+                    read_mark=read_mark,
                     truncate=True,
                     show_actions=True,
                 )
@@ -764,6 +767,7 @@ class Prompt:
             "keywords_reaction_prompt": self.parameters.keywords_reaction_prompt or context_data.get("keywords_reaction_prompt", ""),
             "moderation_prompt": self.parameters.moderation_prompt_block or context_data.get("moderation_prompt", ""),
             "safety_guidelines_block": self.parameters.safety_guidelines_block or context_data.get("safety_guidelines_block", ""),
+            "chat_context_type": "群聊" if self.parameters.is_group_chat else "私聊",
         }
     
     def _prepare_normal_params(self, context_data: Dict[str, Any]) -> Dict[str, Any]:

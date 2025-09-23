@@ -82,12 +82,12 @@ def init_prompt():
 - {schedule_block}
 
 ## 历史记录
-### 当前群聊中的所有人的聊天记录：
+### {chat_context_type}中的所有人的聊天记录：
 {background_dialogue_prompt}
 
 {cross_context_block}
 
-### 当前群聊中正在与你对话的聊天记录
+### {chat_context_type}中正在与你对话的聊天记录
 {core_dialogue_prompt}
 
 ## 表达方式
@@ -109,12 +109,11 @@ def init_prompt():
 
 ## 任务
 
-*你正在一个QQ群里聊天，你需要理解整个群的聊天动态和话题走向，并做出自然的回应。*
+*你正在一个{chat_context_type}里聊天，你需要理解整个{chat_context_type}的聊天动态和话题走向，并做出自然的回应。*
 
 ### 核心任务
-- 你现在的主要任务是和 {sender_name} 聊天。同时，也有其他用户会参与聊天，你可以参考他们的回复内容，但是你现在想回复{sender_name}的发言。
-
--  {reply_target_block} ，你需要生成一段紧密相关且能推动对话的回复。
+- 你现在的主要任务是和 {sender_name} 聊天。
+- {reply_target_block} ，你需要生成一段紧密相关且能推动对话的回复。
 
 ## 规则
 {safety_guidelines_block}
@@ -236,6 +235,7 @@ class DefaultReplyer:
         from_plugin: bool = True,
         stream_id: Optional[str] = None,
         reply_message: Optional[Dict[str, Any]] = None,
+        read_mark: float = 0.0,
     ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         # sourcery skip: merge-nested-ifs
         """
@@ -272,6 +272,7 @@ class DefaultReplyer:
                     choosen_actions=choosen_actions,
                     enable_tool=enable_tool,
                     reply_message=reply_message,
+                    read_mark=read_mark,
                 )
 
             if not prompt:
@@ -723,10 +724,8 @@ class DefaultReplyer:
                     truncate=True,
                     show_actions=True,
                 )
-                core_dialogue_prompt = f"""--------------------------------
-这是你和{sender}的对话，你们正在交流中：
+                core_dialogue_prompt = f"""
 {core_dialogue_prompt_str}
---------------------------------
 """
 
         return core_dialogue_prompt, all_dialogue_prompt
@@ -815,6 +814,7 @@ class DefaultReplyer:
         choosen_actions: Optional[List[Dict[str, Any]]] = None,
         enable_tool: bool = True,
         reply_message: Optional[Dict[str, Any]] = None,
+        read_mark: float = 0.0,
     ) -> str:
         """
         构建回复器上下文
@@ -904,7 +904,7 @@ class DefaultReplyer:
             target = "(无消息内容)"
 
         person_info_manager = get_person_info_manager()
-        person_id = await person_info_manager.get_person_id_by_person_name(sender)
+        person_id = person_info_manager.get_person_id(platform, reply_message.get("user_id")) if reply_message else None
         platform = chat_stream.platform
 
         target = replace_user_references_sync(target, chat_stream.platform, replace_bot_name=True)
@@ -936,7 +936,7 @@ class DefaultReplyer:
             replace_bot_name=True,
             merge_messages=False,
             timestamp_mode="relative",
-            read_mark=0.0,
+            read_mark=read_mark,
             show_actions=True,
         )
         # 获取目标用户信息，用于s4u模式
@@ -1117,6 +1117,7 @@ class DefaultReplyer:
             reply_target_block=reply_target_block,
             mood_prompt=mood_prompt,
             action_descriptions=action_descriptions,
+            read_mark=read_mark,
         )
 
         # 使用新的统一Prompt系统 - 使用正确的模板名称
@@ -1203,7 +1204,7 @@ class DefaultReplyer:
             replace_bot_name=True,
             merge_messages=False,
             timestamp_mode="relative",
-            read_mark=0.0,
+            read_mark=read_mark,
             show_actions=True,
         )
 

@@ -267,6 +267,7 @@ class CycleProcessor:
                             enable_tool=global_config.tool.enable_tool,
                             request_type="chat.replyer",
                             from_plugin=False,
+                            read_mark=action_info.get("action_message", {}).get("time", 0.0),
                         )
                         if not success or not response_set:
                             logger.info(

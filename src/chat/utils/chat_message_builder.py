@@ -516,6 +516,7 @@ async def _build_readable_messages_internal(
     pic_counter: int = 1,
     show_pic: bool = True,
     message_id_list: Optional[List[Dict[str, Any]]] = None,
+    read_mark: float = 0.0,
 ) -> Tuple[str, List[Tuple[float, str, str]], Dict[str, str], int]:
     """
     内部辅助函数，构建可读消息字符串和原始消息详情列表。
@@ -721,11 +722,10 @@ async def _build_readable_messages_internal(
                     "is_action": is_action,
                 }
                 continue
-
             # 如果是同一个人发送的连续消息且时间间隔小于等于60秒
             if name == current_merge["name"] and (timestamp - current_merge["end_time"] <= 60):
                 current_merge["content"].append(content)
-                current_merge["end_time"] = timestamp  # 更新最后消息时间
+                current_merge["end_time"] = timestamp
             else:
                 # 保存上一个合并块
                 merged_messages.append(current_merge)
@@ -753,8 +753,14 @@ async def _build_readable_messages_internal(
 
     # 4 & 5: 格式化为字符串
     output_lines = []
+    read_mark_inserted = False
 
     for _i, merged in enumerate(merged_messages):
+        # 检查是否需要插入已读标记
+        if read_mark > 0 and not read_mark_inserted and merged["start_time"] >= read_mark:
+            output_lines.append("\n--- 以上消息是你已经看过，请关注以下未读的新消息---\n")
+            read_mark_inserted = True
+
         # 使用指定的 timestamp_mode 格式化时间
         readable_time = translate_timestamp_to_human_readable(merged["start_time"], mode=timestamp_mode)
 
