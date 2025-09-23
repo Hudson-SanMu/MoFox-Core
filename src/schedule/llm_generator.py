@@ -94,11 +94,10 @@ class ScheduleLLMGenerator:
 
 请你扮演我，以我的身份和口吻，为我生成一份完整的24小时日程表。
 """
-        attempt = 0
-        while True:
-            attempt += 1
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
             try:
-                logger.info(f"正在生成日程 (第 {attempt} 次尝试)")
+                logger.info(f"正在生成日程 (第 {attempt}/{max_retries} 次尝试)")
                 prompt = base_prompt
                 if attempt > 1:
                     failure_hint = f"""
@@ -118,12 +117,16 @@ class ScheduleLLMGenerator:
                     return schedule_data
                 else:
                     logger.warning(f"第 {attempt} 次生成的日程验证失败，继续重试...")
-                    await asyncio.sleep(2)
 
             except Exception as e:
                 logger.error(f"第 {attempt} 次生成日程失败: {e}")
-                logger.info("继续重试...")
-                await asyncio.sleep(3)
+
+            if attempt < max_retries:
+                logger.info("2秒后继续重试...")
+                await asyncio.sleep(2)
+
+        logger.error("所有尝试都失败，无法生成日程，将会在下次启动时自动重试")
+        return None
 
     @staticmethod
     def _validate_schedule_with_pydantic(schedule_data) -> bool:
