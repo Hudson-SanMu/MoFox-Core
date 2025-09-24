@@ -20,7 +20,6 @@
   作为模块的统一入口（Facade），为上层业务逻辑提供了简洁的接口来发起文本、图像、语音等不同类型的LLM请求。
 """
 import re
-import inspect
 import asyncio
 import time
 import random
@@ -91,13 +90,9 @@ async def execute_concurrently(
     Raises:
         RuntimeError: 如果所有并发请求都失败。
     """
-    if not inspect.iscoroutinefunction(coro_callable):
-        err_msg = f"并发执行的函数 '{coro_callable.__name__}' 必须是协程函数 (async def)"
-        logger.error(err_msg)
-        raise TypeError(err_msg)
-        
     logger.info(f"启用并发请求模式，并发数: {concurrency_count}")
     tasks = [coro_callable(*args, **kwargs) for _ in range(concurrency_count)]
+
     results = await asyncio.gather(*tasks, return_exceptions=True)
     successful_results = [res for res in results if not isinstance(res, Exception)]
 
@@ -1249,7 +1244,7 @@ class LLMRequest:
                 cannot_retry_msg=f"任务-'{task_name}' 模型-'{model_name}': 连接异常，超过最大重试次数，请检查网络连接状态或URL是否正确",
             )
         elif isinstance(e, ReqAbortException):
-            logger.warning(f"任务-'{task_name}' 模型-'{model_name}': 请求被中断，详细信息-{str(e)}")
+            logger.warning(f"任务-'{task_name}' 模型-'{model_name}': 请求被中断，详细信息-{e}")
             return -1, None  # 不再重试请求该模型
         elif isinstance(e, RespNotOkException):
             return self._handle_resp_not_ok(
@@ -1263,7 +1258,7 @@ class LLMRequest:
             )
         elif isinstance(e, RespParseException):
             # 响应解析错误
-            logger.error(f"任务-'{task_name}' 模型-'{model_name}': 响应解析错误，错误信息-{str(e)}")
+            logger.error(f"任务-'{task_name}' 模型-'{model_name}': 响应解析错误，错误信息-{e}")
             logger.debug(f"附加内容: {str(e.ext_info)}")
             return -1, None  # 不再重试请求该模型
         else:
@@ -1281,10 +1276,27 @@ class LLMRequest:
         # 响应错误
         if e.status_code in [400, 401, 402, 403, 404]:
             model_name = model_info.name
-            return 0, None  # 立即重试
+            if (
+                e.status_code == 403
+                and model_name.startswith("Pro/deepseek-ai")
+                and api_provider.base_url == "https://api.siliconflow.cn/v1/"
+            ):
+                old_model_name = model_name
+                new_model_name = model_name[4:]
+                model_info.name = new_model_name
+                logger.warning(f"检测到403错误，模型从 {old_model_name} 降级为 {new_model_name}")
+                # 更新任务配置中的模型列表
+                for i, m_name in enumerate(self.model_for_task.model_list):
+                    if m_name == old_model_name:
+                        self.model_for_task.model_list[i] = new_model_name
+                        logger.warning(
+                            f"将任务 {self.task_name} 的模型列表中的 {old_model_name} 临时降级至 {new_model_name}"
+                        )
+                        break
+                return 0, None  # 立即重试
             # 客户端错误
             logger.warning(
-                f"任务-'{task_name}' 模型-'{model_name}': 请求失败，错误代码-{e.status_code}，错误信息-{str(e)}"
+                f"任务-'{task_name}' 模型-'{model_name}': 请求失败，错误代码-{e.status_code}，错误信息-{e.message}"
             )
             return -1, None  # 不再重试请求该模型
         elif e.status_code == 413:
@@ -1320,7 +1332,7 @@ class LLMRequest:
         else:
             # 未知错误
             logger.warning(
-                f"任务-'{task_name}' 模型-'{model_name}': 未知错误，错误代码-{e.status_code}，错误信息-{str(e)}"
+                f"任务-'{task_name}' 模型-'{model_name}': 未知错误，错误代码-{e.status_code}，错误信息-{e.message}"
             )
             return -1, None
 
