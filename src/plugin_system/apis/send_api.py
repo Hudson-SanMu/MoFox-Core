@@ -80,7 +80,7 @@ def message_dict_to_message_recv(message_dict: Dict[str, Any]) -> Optional[Messa
 
     message_info = {
         "platform": message_dict.get("chat_info_platform", ""),
-        "message_id": message_dict.get("message_id") or message_dict.get("chat_info_message_id"),
+        "message_id": message_dict.get("message_id") or message_dict.get("chat_info_message_id") or message_dict.get("id"),
         "time": message_dict.get("time"),
         "group_info": group_info,
         "user_info": user_info,
