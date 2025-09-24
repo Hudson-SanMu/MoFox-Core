@@ -12,14 +12,11 @@ from src.plugin_system import (
 from src.common.logger import get_logger
 from .qq_emoji_list import qq_face
 from src.plugin_system.base.component_types import ChatType
-from src.plugin_system.apis import llm_api
-from src.config.config import model_config, global_config
-from src.chat.utils.chat_message_builder import build_readable_messages
 
 logger = get_logger("set_emoji_like_plugin")
 
 
-async def get_emoji_id(emoji_input: str) -> str | None:
+def get_emoji_id(emoji_input: str) -> str | None:
     """根据输入获取表情ID"""
     # 如果输入本身就是数字ID，直接返回
     if emoji_input.isdigit() or (isinstance(emoji_input, str) and emoji_input.startswith("😊")):
@@ -101,19 +98,11 @@ class SetEmojiLikeAction(BaseAction):
         set_like = self.action_data.get("set", True)
 
         if not emoji_input:
-            logger.info("未提供表情，将由LLM决定")
-            try:
-                emoji_input = await self.ask_llm_for_emoji()
-                if not emoji_input:
-                    logger.error("LLM未能选择表情")
-                    return False, "LLM未能选择表情"
-            except Exception as e:
-                logger.error(f"请求LLM选择表情时出错: {e}")
-                return False, f"请求LLM选择表情时出错: {e}"
-
+            logger.error("未提供表情")
+            return False, "未提供表情"
         logger.info(f"设置表情回应: {emoji_input}, 是否设置: {set_like}")
 
-        emoji_id = await get_emoji_id(emoji_input)
+        emoji_id = get_emoji_id(emoji_input)
         if not emoji_id:
             logger.error(f"找不到表情: '{emoji_input}'。请从可用列表中选择。")
             await self.store_action_info(
@@ -164,71 +153,6 @@ class SetEmojiLikeAction(BaseAction):
             )
             return False, f"设置表情回应失败: {e}"
 
-    async def ask_llm_for_emoji(self) -> str | None:
-        """构建Prompt并请求LLM选择一个表情"""
-        from src.mood.mood_manager import mood_manager
-        from src.individuality.individuality import get_individuality
-        from src.chat.message_manager.message_manager import message_manager
-
-        # 1. 获取上下文信息
-        stream_context = message_manager.stream_contexts.get(self.chat_stream.stream_id)
-        if not stream_context:
-            logger.error(f"无法为 stream_id '{self.chat_stream.stream_id}' 找到 StreamContext")
-            return None
-            
-        history_messages = stream_context.get_latest_messages(20)
-        chat_context = build_readable_messages(
-            [msg.flatten() for msg in history_messages],
-            replace_bot_name=True,
-            timestamp_mode="normal_no_YMD",
-            truncate=True,
-        )
-
-        target_message_content = self.action_message.get("processed_plain_text", "")
-        mood = mood_manager.get_mood_by_chat_id(self.chat_stream.stream_id).mood_state
-        identity = await get_individuality().get_personality_block()
-
-        # 2. 构建Prompt
-        emoji_options_str = ", ".join(self.emoji_options)
-        bot_name = global_config.bot.nickname or "爱莉希雅"
-        prompt = f"""
-# 指令：选择一个最合适的表情来回应消息
-
-## 场景描述
-你的名字是“{bot_name}”。
-{identity}
-你现在的心情是：{mood}
-
-## 聊天上下文
-下面是最近的聊天记录：
-{chat_context}
-
-## 你的任务
-你需要针对下面的这条消息，选择一个最合适的表情来“贴”在上面，以表达你的心情和回应。
-目标消息："{target_message_content}"
-
-## 表情选项
-请从以下表情中，选择一个最能代表你此刻心情的表情。你只能选择一个，并直接返回它的【名称】。
-{emoji_options_str}
-
-## 输出要求
-直接输出你选择的表情【名称】，不要添加任何多余的文字、解释或标点符号。
-
-你选择的表情名称是：
-"""
-
-        # 3. 调用LLM
-        success, response, _, _ = await llm_api.generate_with_model(
-            prompt, model_config.model_task_config.tool_executor
-        )
-
-        if success and response:
-            # 清理LLM返回的可能存在的额外字符
-            cleaned_response = re.sub(r"[\[\]\'\"]", "", response).strip()
-            logger.info(f"LLM选择了表情: '{cleaned_response}'")
-            return cleaned_response
-        
-        return None
 
 # ===== 插件注册 =====
 @register_plugin
