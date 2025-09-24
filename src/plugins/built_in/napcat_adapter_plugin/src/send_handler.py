@@ -71,7 +71,6 @@ class SendHandler:
         action: Optional[str] = None
         id_name: Optional[str] = None
         processed_message: list = []
-        logger.info(message_info,message_segment)
         try:
             if user_info:
                 processed_message = await self.handle_seg_recursive(message_segment, user_info)
@@ -97,7 +96,7 @@ class SendHandler:
             logger.error("无法识别的消息类型")
             return None
         logger.info("尝试发送到napcat")
-        logger.info(f"准备发送到napcat的消息体: action='{action}', {id_name}='{target_id}', message='{processed_message}'")
+        logger.debug(f"准备发送到napcat的消息体: action='{action}', {id_name}='{target_id}', message='{processed_message}'")
         response = await self.send_message_to_napcat(
             action,
             {
@@ -298,7 +297,7 @@ class SendHandler:
 
     async def handle_reply_message(self, id: str, user_info: UserInfo) -> dict | list:
         """处理回复消息"""
-        logger.info(f"开始处理回复消息，消息ID: {id}")
+        logger.debug(f"开始处理回复消息，消息ID: {id}")
         reply_seg = {"type": "reply", "data": {"id": id}}
 
         # 检查是否启用引用艾特功能
@@ -308,7 +307,7 @@ class SendHandler:
 
         try:
             msg_info_response = await self.send_message_to_napcat("get_msg", {"message_id": id})
-            logger.info(f"获取消息 {id} 的详情响应: {msg_info_response}")
+            logger.debug(f"获取消息 {id} 的详情响应: {msg_info_response}")
 
             replied_user_id = None
             if msg_info_response and msg_info_response.get("status") == "ok":
