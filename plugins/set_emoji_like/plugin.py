@@ -125,31 +125,25 @@ class SetEmojiLikeAction(BaseAction):
 
         try:
             # 使用适配器API发送贴表情命令
-            response = await send_api.adapter_command_to_stream(
-                action="set_msg_emoji_like",
-                params={"message_id": message_id, "emoji_id": emoji_id, "set": set_like},
-                stream_id=self.chat_stream.stream_id if self.chat_stream else None,
-                timeout=30.0,
-                storage_message=False,
+            success = await self.send_command(
+                command_name="set_emoji_like", args={"message_id": message_id, "emoji_id": emoji_id, "set": set_like}, storage_message=False
             )
-
-            if response["status"] == "ok":
-                logger.info(f"设置表情回应成功: {response}")
+            if success:
+                logger.info("设置表情回应成功")
                 await self.store_action_info(
                     action_build_into_prompt=True,
                     action_prompt_display=f"执行了set_emoji_like动作,{emoji_input},设置表情回应: {emoji_id}, 是否设置: {set_like}",
                     action_done=True,
                 )
-                return True, f"成功设置表情回应: {response.get('message', '成功')}"
+                return True, "成功设置表情回应"
             else:
-                error_msg = response.get("message", "未知错误")
-                logger.error(f"设置表情回应失败: {error_msg}")
+                logger.error("设置表情回应失败")
                 await self.store_action_info(
                     action_build_into_prompt=True,
-                    action_prompt_display=f"执行了set_emoji_like动作：{self.action_name},失败: {error_msg}",
+                    action_prompt_display=f"执行了set_emoji_like动作：{self.action_name},失败",
                     action_done=False,
                 )
-                return False, f"设置表情回应失败: {error_msg}"
+                return False, "设置表情回应失败"
 
         except Exception as e:
             logger.error(f"设置表情回应失败: {e}")
