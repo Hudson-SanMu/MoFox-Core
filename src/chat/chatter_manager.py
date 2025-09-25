@@ -107,6 +107,16 @@ class ChatterManager:
             result = await self.instances[stream_id].execute(context)
             self.stats["successful_executions"] += 1
 
+            # 从 mood_manager 获取最新的 chat_stream 并同步回 StreamContext
+            try:
+                from src.mood.mood_manager import mood_manager
+                mood = mood_manager.get_mood_by_chat_id(stream_id)
+                if mood and mood.chat_stream:
+                    context.chat_stream = mood.chat_stream
+                    logger.debug(f"已将最新的 chat_stream 同步回流 {stream_id} 的 StreamContext")
+            except Exception as sync_e:
+                logger.error(f"同步 chat_stream 回 StreamContext 失败: {sync_e}")
+
             # 记录处理结果
             success = result.get("success", False)
             actions_count = result.get("actions_count", 0)

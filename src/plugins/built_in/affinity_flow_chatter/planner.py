@@ -136,6 +136,14 @@ class ChatterActionPlanner:
                         chat_mood = mood_manager.get_mood_by_chat_id(self.chat_id)
                         await chat_mood.update_mood_by_message(latest_message, score)
                         logger.debug(f"已更新聊天 {self.chat_id} 的情绪状态，兴趣度: {score:.3f}")
+                    elif latest_message:
+                        # 即使不更新情绪状态，也要更新ChatStream的兴趣度数据
+                        chat_mood = mood_manager.get_mood_by_chat_id(self.chat_id)
+                        if hasattr(chat_mood, 'chat_stream') and chat_mood.chat_stream:
+                            chat_mood.chat_stream.add_message_interest(score)
+                            # 在这里同步更新 focus_energy
+                            chat_mood.chat_stream.update_focus_energy()
+                            logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度和Focus Energy，分数: {score:.3f}")
 
             # base_threshold = self.interest_scoring.reply_threshold
             # 检查兴趣度是否达到非回复动作阈值
