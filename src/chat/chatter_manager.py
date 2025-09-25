@@ -79,7 +79,9 @@ class ChatterManager:
             del self.instances[stream_id]
             logger.info(f"清理不活跃聊天流实例: {stream_id}")
 
-    async def process_stream_context(self, stream_id: str, context: StreamContext) -> dict:
+    async def process_stream_context(
+        self, stream_id: str, context: StreamContext, unread_messages: Optional[List[Any]] = None
+    ) -> dict:
         """处理流上下文"""
         chat_type = context.chat_type
         logger.debug(f"处理流 {stream_id}，聊天类型: {chat_type.value}")
@@ -104,9 +106,14 @@ class ChatterManager:
 
         self.stats["streams_processed"] += 1
         try:
-            result = await self.instances[stream_id].execute(context)
+            # 如果提供了 unread_messages，则传递给 execute 方法
+            if unread_messages:
+                result = await self.instances[stream_id].execute(context, unread_messages)
+            else:
+                result = await self.instances[stream_id].execute(context)
+                
             self.stats["successful_executions"] += 1
-
+ 
             # 记录处理结果
             success = result.get("success", False)
             actions_count = result.get("actions_count", 0)
