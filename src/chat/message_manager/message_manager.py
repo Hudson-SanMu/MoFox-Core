@@ -313,8 +313,10 @@ class MessageManager:
         stream_count = 0
 
         for context in active_streams:
-            if hasattr(context, 'chat_stream') and context.chat_stream:
-                focus_energy = context.chat_stream.focus_energy
+            from src.plugin_system.apis.chat_api import get_chat_manager
+            chat_stream = get_chat_manager().get_stream(context.stream_id)            
+            if chat_stream:
+                focus_energy = chat_stream.focus_energy
                 total_focus_energy += focus_energy
                 max_focus_energy = max(max_focus_energy, focus_energy)
                 stream_count += 1
@@ -363,16 +365,18 @@ class MessageManager:
         """计算单个聊天流的分发周期 - 基于阈值感知的focus_energy"""
         if not global_config.chat.dynamic_distribution_enabled:
             return self.check_interval  # 使用固定间隔
-
+        
+        from src.plugin_system.apis.chat_api import get_chat_manager
+        chat_stream = get_chat_manager().get_stream(context.stream_id)      
         # 获取该流的focus_energy（新的阈值感知版本）
         focus_energy = 0.5  # 默认值
         avg_message_interest = 0.5  # 默认平均兴趣度
 
-        if hasattr(context, 'chat_stream') and context.chat_stream:
-            focus_energy = context.chat_stream.focus_energy
+        if chat_stream:
+            focus_energy = chat_stream.focus_energy
             # 获取平均消息兴趣度用于更精确的计算
-            if context.chat_stream.message_count > 0:
-                avg_message_interest = context.chat_stream.message_interest_total / context.chat_stream.message_count
+            if chat_stream.message_count > 0:
+                avg_message_interest = chat_stream.message_interest_total / chat_stream.message_count
 
         # 获取AFC阈值用于参考，添加None值检查
         reply_threshold = getattr(global_config.affinity_flow, 'reply_action_interest_threshold', 0.4)
@@ -491,7 +495,9 @@ class MessageManager:
 
                     # 如果没有处理任务，创建一个
                     if not context.processing_task or context.processing_task.done():
-                        focus_energy = context.chat_stream.focus_energy if hasattr(context, 'chat_stream') and context.chat_stream else 0.5
+                        from src.plugin_system.apis.chat_api import get_chat_manager
+                        chat_stream = get_chat_manager().get_stream(context.stream_id)      
+                        focus_energy = chat_stream.focus_energy if chat_stream else 0.5
 
                         # 根据优先级记录日志
                         if focus_energy >= 0.7:
@@ -532,9 +538,11 @@ class MessageManager:
                 continue
 
             # 获取focus_energy，如果不存在则使用默认值
+            from src.plugin_system.apis.chat_api import get_chat_manager
+            chat_stream = get_chat_manager().get_stream(context.stream_id)      
             focus_energy = 0.5
-            if hasattr(context, 'chat_stream') and context.chat_stream:
-                focus_energy = context.chat_stream.focus_energy
+            if chat_stream:
+                focus_energy = chat_stream.focus_energy
 
             # 计算流优先级分数
             priority_score = self._calculate_stream_priority(context, focus_energy)
@@ -573,6 +581,8 @@ class MessageManager:
 
     def _calculate_stream_priority(self, context: StreamContext, focus_energy: float) -> float:
         """计算聊天流的优先级分数"""
+        from src.plugin_system.apis.chat_api import get_chat_manager
+        chat_stream = get_chat_manager().get_stream(context.stream_id)      
         # 基础优先级：focus_energy
         base_priority = focus_energy
 
@@ -586,8 +596,8 @@ class MessageManager:
         time_penalty = max(0, 1.0 - time_since_active / 3600.0)  # 1小时内无惩罚
 
         # 连续无回复惩罚
-        if hasattr(context, 'chat_stream') and context.chat_stream:
-            consecutive_no_reply = context.chat_stream.consecutive_no_reply
+        if chat_stream:
+            consecutive_no_reply = chat_stream.consecutive_no_reply
             no_reply_penalty = max(0, 1.0 - consecutive_no_reply * 0.05)  # 每次无回复降低5%
         else:
             no_reply_penalty = 1.0

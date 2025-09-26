@@ -149,12 +149,7 @@ class ChatMood:
         self.mood_state = response
 
         self.last_change_time = message_time
-
-        # 更新ChatStream的兴趣度数据
-        if hasattr(self, 'chat_stream') and self.chat_stream:
-            self.chat_stream.add_message_interest(interested_rate)
-            logger.debug(f"{self.log_prefix} 已更新ChatStream兴趣度，当前focus_energy: {self.chat_stream.focus_energy:.3f}")
-
+        
     async def regress_mood(self):
         message_time = time.time()
         message_list_before_now = await get_raw_msg_by_timestamp_with_chat_inclusive(

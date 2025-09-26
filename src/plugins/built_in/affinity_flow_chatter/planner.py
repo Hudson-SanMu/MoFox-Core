@@ -125,17 +125,17 @@ class ChatterActionPlanner:
                         logger.info(f"兴趣度不足 ({latest_score.total_score:.2f})，移除回复")
                         reply_not_available = True
 
+                    # 更新ChatStream的兴趣度数据
+                    from src.plugin_system.apis.chat_api import get_chat_manager
+                    chat_stream = get_chat_manager().get_stream(self.chat_id)
+                    chat_stream.add_message_interest(score)
+                    logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度，分数: {score:.3f}")
+
                     # 更新情绪状态和ChatStream兴趣度数据
                     if latest_message and score > 0:
                         chat_mood = mood_manager.get_mood_by_chat_id(self.chat_id)
                         await chat_mood.update_mood_by_message(latest_message, score)
                         logger.debug(f"已更新聊天 {self.chat_id} 的情绪状态，兴趣度: {score:.3f}")
-                    elif latest_message:
-                        # 即使不更新情绪状态，也要更新ChatStream的兴趣度数据
-                        chat_mood = mood_manager.get_mood_by_chat_id(self.chat_id)
-                        if hasattr(chat_mood, 'chat_stream') and chat_mood.chat_stream:
-                            chat_mood.chat_stream.add_message_interest(score)
-                            logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度，分数: {score:.3f}")
 
             # base_threshold = self.interest_scoring.reply_threshold
             # 检查兴趣度是否达到非回复动作阈值
