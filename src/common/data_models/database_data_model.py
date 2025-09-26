@@ -95,6 +95,10 @@ class DatabaseMessages(BaseDataModel):
         chat_info_platform: str = "",
         chat_info_create_time: float = 0.0,
         chat_info_last_active_time: float = 0.0,
+        # 新增字段
+        interest_degree: float = 0.0,
+        actions: Optional[list] = None,
+        should_reply: bool = False,
         **kwargs: Any,
     ):
         self.message_id = message_id
@@ -102,6 +106,11 @@ class DatabaseMessages(BaseDataModel):
         self.chat_id = chat_id
         self.reply_to = reply_to
         self.interest_value = interest_value
+
+        # 新增字段
+        self.interest_degree = interest_degree
+        self.actions = actions
+        self.should_reply = should_reply
 
         self.key_words = key_words
         self.key_words_lite = key_words_lite
@@ -191,6 +200,10 @@ class DatabaseMessages(BaseDataModel):
             "is_notify": self.is_notify,
             "selected_expressions": self.selected_expressions,
             "is_read": self.is_read,
+            # 新增字段
+            "interest_degree": self.interest_degree,
+            "actions": self.actions,
+            "should_reply": self.should_reply,
             "user_id": self.user_info.user_id,
             "user_nickname": self.user_info.user_nickname,
             "user_cardname": self.user_info.user_cardname,
@@ -206,6 +219,60 @@ class DatabaseMessages(BaseDataModel):
             "chat_info_user_id": self.chat_info.user_info.user_id,
             "chat_info_user_nickname": self.chat_info.user_info.user_nickname,
             "chat_info_user_cardname": self.chat_info.user_info.user_cardname,
+        }
+
+    def update_message_info(self, interest_degree: float = None, actions: list = None, should_reply: bool = None):
+        """
+        更新消息信息
+
+        Args:
+            interest_degree: 兴趣度值
+            actions: 执行的动作列表
+            should_reply: 是否应该回复
+        """
+        if interest_degree is not None:
+            self.interest_degree = interest_degree
+        if actions is not None:
+            self.actions = actions
+        if should_reply is not None:
+            self.should_reply = should_reply
+
+    def add_action(self, action: str):
+        """
+        添加执行的动作到消息中
+
+        Args:
+            action: 要添加的动作名称
+        """
+        if self.actions is None:
+            self.actions = []
+        if action not in self.actions:  # 避免重复添加
+            self.actions.append(action)
+
+    def get_actions(self) -> list:
+        """
+        获取执行的动作列表
+
+        Returns:
+            动作列表，如果没有动作则返回空列表
+        """
+        return self.actions or []
+
+    def get_message_summary(self) -> Dict[str, Any]:
+        """
+        获取消息摘要信息
+
+        Returns:
+            包含关键字段的消息摘要
+        """
+        return {
+            "message_id": self.message_id,
+            "time": self.time,
+            "interest_degree": self.interest_degree,
+            "actions": self.actions,
+            "should_reply": self.should_reply,
+            "user_nickname": self.user_info.user_nickname,
+            "display_message": self.display_message,
         }
 
 

@@ -25,43 +25,6 @@ install(extra_lines=3)
 logger = get_logger("chat_stream")
 
 
-class ChatMessageContext:
-    """聊天消息上下文，存储消息的上下文信息"""
-
-    def __init__(self, message: "MessageRecv"):
-        self.message = message
-
-    def get_template_name(self) -> Optional[str]:
-        """获取模板名称"""
-        if self.message.message_info.template_info and not self.message.message_info.template_info.template_default:
-            return self.message.message_info.template_info.template_name  # type: ignore
-        return None
-
-    def get_last_message(self) -> "MessageRecv":
-        """获取最后一条消息"""
-        return self.message
-
-    def check_types(self, types: list) -> bool:
-        # sourcery skip: invert-any-all, use-any, use-next
-        """检查消息类型"""
-        if not self.message.message_info.format_info.accept_format:  # type: ignore
-            return False
-        for t in types:
-            if t not in self.message.message_info.format_info.accept_format:  # type: ignore
-                return False
-        return True
-
-    def get_priority_mode(self) -> str:
-        """获取优先级模式"""
-        return self.message.priority_mode
-
-    def get_priority_info(self) -> Optional[dict]:
-        """获取优先级信息"""
-        if hasattr(self.message, "priority_info") and self.message.priority_info:
-            return self.message.priority_info
-        return None
-
-
 class ChatStream:
     """聊天流对象，存储一个完整的聊天上下文"""
 
@@ -79,24 +42,23 @@ class ChatStream:
         self.group_info = group_info
         self.create_time = data.get("create_time", time.time()) if data else time.time()
         self.last_active_time = data.get("last_active_time", self.create_time) if data else self.create_time
-        self.energy_value = data.get("energy_value", 5.0) if data else 5.0
         self.sleep_pressure = data.get("sleep_pressure", 0.0) if data else 0.0
         self.saved = False
-        self.context: ChatMessageContext = None  # type: ignore # 用于存储该聊天的上下文信息
 
-        # 动态兴趣度系统 - 重构后的focus_energy
-        self.base_interest_energy = data.get("base_interest_energy", 0.5) if data else 0.5
-        self.message_interest_total = data.get("message_interest_total", 0.0) if data else 0.0
-        self.message_count = data.get("message_count", 0) if data else 0
-        self.action_count = data.get("action_count", 0) if data else 0
-        self.reply_count = data.get("reply_count", 0) if data else 0
-        self.last_interaction_time = data.get("last_interaction_time", time.time()) if data else time.time()
-        self.consecutive_no_reply = data.get("consecutive_no_reply", 0) if data else 0
+        # 使用StreamContext替代ChatMessageContext
+        from src.common.data_models.message_manager_data_model import StreamContext
+        from src.plugin_system.base.component_types import ChatType, ChatMode
+        self.stream_context: StreamContext = StreamContext(
+            stream_id=stream_id,
+            chat_type=ChatType.GROUP if group_info else ChatType.PRIVATE,
+            chat_mode=ChatMode.NORMAL
+        )
 
-        # 计算动态focus_energy
-        self.focus_energy = self._calculate_dynamic_focus_energy()
+        # 基础参数
+        self.base_interest_energy = 0.5  # 默认基础兴趣度
+        self._focus_energy = 0.5  # 内部存储的focus_energy值
         self.no_reply_consecutive = 0
-        self.breaking_accumulated_interest = 0.0
+
 
     def to_dict(self) -> dict:
         """转换为字典格式"""
@@ -107,18 +69,13 @@ class ChatStream:
             "group_info": self.group_info.to_dict() if self.group_info else None,
             "create_time": self.create_time,
             "last_active_time": self.last_active_time,
-            "energy_value": self.energy_value,
             "sleep_pressure": self.sleep_pressure,
             "focus_energy": self.focus_energy,
-            "breaking_accumulated_interest": self.breaking_accumulated_interest,
-            # 新增动态兴趣度系统字段
+            # 基础兴趣度
             "base_interest_energy": self.base_interest_energy,
-            "message_interest_total": self.message_interest_total,
-            "message_count": self.message_count,
-            "action_count": self.action_count,
-            "reply_count": self.reply_count,
-            "last_interaction_time": self.last_interaction_time,
-            "consecutive_no_reply": self.consecutive_no_reply,
+            # 新增stream_context信息
+            "stream_context_chat_type": self.stream_context.chat_type.value,
+            "stream_context_chat_mode": self.stream_context.chat_mode.value,
         }
 
     @classmethod
@@ -127,13 +84,23 @@ class ChatStream:
         user_info = UserInfo.from_dict(data.get("user_info", {})) if data.get("user_info") else None
         group_info = GroupInfo.from_dict(data.get("group_info", {})) if data.get("group_info") else None
 
-        return cls(
+        instance = cls(
             stream_id=data["stream_id"],
             platform=data["platform"],
             user_info=user_info,  # type: ignore
             group_info=group_info,
             data=data,
         )
+
+        # 恢复stream_context信息
+        if "stream_context_chat_type" in data:
+            from src.plugin_system.base.component_types import ChatType, ChatMode
+            instance.stream_context.chat_type = ChatType(data["stream_context_chat_type"])
+        if "stream_context_chat_mode" in data:
+            from src.plugin_system.base.component_types import ChatType, ChatMode
+            instance.stream_context.chat_mode = ChatMode(data["stream_context_chat_mode"])
+
+        return instance
 
     def update_active_time(self):
         """更新最后活跃时间"""
@@ -142,32 +109,91 @@ class ChatStream:
 
     def set_context(self, message: "MessageRecv"):
         """设置聊天消息上下文"""
-        self.context = ChatMessageContext(message)
+        # 将MessageRecv转换为DatabaseMessages并设置到stream_context
+        from src.common.data_models.database_data_model import DatabaseMessages
+
+        # 简化转换，实际可能需要更完整的转换逻辑
+        db_message = DatabaseMessages(
+            message_id=getattr(message, 'message_id', ''),
+            time=getattr(message, 'time', time.time()),
+            chat_id=getattr(message, 'chat_id', ''),
+            user_id=str(getattr(message.message_info, 'user_info', {}).user_id) if hasattr(message, 'message_info') and hasattr(message.message_info, 'user_info') else '',
+            user_nickname=getattr(message.message_info, 'user_info', {}).user_nickname if hasattr(message, 'message_info') and hasattr(message.message_info, 'user_info') else '',
+            user_platform=getattr(message.message_info, 'user_info', {}).platform if hasattr(message, 'message_info') and hasattr(message.message_info, 'user_info') else '',
+            priority_mode=getattr(message, 'priority_mode', None),
+            priority_info=str(getattr(message, 'priority_info', None)) if hasattr(message, 'priority_info') and message.priority_info else None,
+        )
+
+        self.stream_context.set_current_message(db_message)
+        self.stream_context.priority_mode = getattr(message, 'priority_mode', None)
+        self.stream_context.priority_info = getattr(message, 'priority_info', None)
+
+    @property
+    def focus_energy(self) -> float:
+        """动态计算的聊天流总体兴趣度，访问时自动更新"""
+        self._focus_energy = self._calculate_dynamic_focus_energy()
+        return self._focus_energy
+
+    @focus_energy.setter
+    def focus_energy(self, value: float):
+        """设置focus_energy值（主要用于初始化或特殊场景）"""
+        self._focus_energy = max(0.0, min(1.0, value))
 
     def _calculate_dynamic_focus_energy(self) -> float:
-        """动态计算聊天流的总体兴趣度"""
+        """动态计算聊天流的总体兴趣度，使用StreamContext历史消息"""
         try:
-            # 基础分：平均消息兴趣度
-            avg_message_interest = self.message_interest_total / max(self.message_count, 1)
+            # 从StreamContext获取历史消息计算统计数据
+            history_messages = self.stream_context.get_history_messages(limit=global_config.chat.max_context_size)
+            unread_messages = self.stream_context.get_unread_messages()
+            all_messages = history_messages + unread_messages
 
-            # 动作参与度：动作执行率
-            action_rate = self.action_count / max(self.message_count, 1)
+            # 计算基于历史消息的统计数据
+            if all_messages:
+                # 基础分：平均消息兴趣度
+                message_interests = [msg.interest_degree for msg in all_messages if hasattr(msg, 'interest_degree')]
+                avg_message_interest = sum(message_interests) / len(message_interests) if message_interests else 0.3
 
-            # 回复活跃度：回复率
-            reply_rate = self.reply_count / max(self.message_count, 1)
+                # 动作参与度：有动作的消息比例
+                messages_with_actions = [msg for msg in all_messages if hasattr(msg, 'actions') and msg.actions]
+                action_rate = len(messages_with_actions) / len(all_messages)
+
+                # 回复活跃度：应该回复且已回复的消息比例
+                should_reply_messages = [msg for msg in all_messages if hasattr(msg, 'should_reply') and msg.should_reply]
+                replied_messages = [msg for msg in should_reply_messages if hasattr(msg, 'actions') and 'reply' in (msg.actions or [])]
+                reply_rate = len(replied_messages) / len(should_reply_messages) if should_reply_messages else 0.0
+
+                # 获取最后交互时间
+                if all_messages:
+                    self.last_interaction_time = max(msg.time for msg in all_messages)
+
+                # 连续无回复计算：从最近的未回复消息计数
+                consecutive_no_reply = 0
+                for msg in reversed(all_messages):
+                    if hasattr(msg, 'should_reply') and msg.should_reply:
+                        if not (hasattr(msg, 'actions') and 'reply' in (msg.actions or [])):
+                            consecutive_no_reply += 1
+                        else:
+                            break
+            else:
+                # 没有历史消息时的默认值
+                avg_message_interest = 0.3
+                action_rate = 0.0
+                reply_rate = 0.0
+                consecutive_no_reply = 0
+                self.last_interaction_time = time.time()
 
             # 获取用户关系分（对于私聊，群聊无效）
             relationship_factor = self._get_user_relationship_score()
 
             # 时间衰减因子：最近活跃度
             current_time = time.time()
-            if not self.last_interaction_time:
+            if not hasattr(self, 'last_interaction_time') or not self.last_interaction_time:
                 self.last_interaction_time = current_time
             time_since_interaction = current_time - self.last_interaction_time
             time_decay = max(0.3, 1.0 - min(time_since_interaction / (7 * 24 * 3600), 0.7))  # 7天衰减
 
             # 连续无回复惩罚
-            no_reply_penalty = max(0.1, 1.0 - self.consecutive_no_reply * 0.1)
+            no_reply_penalty = max(0.1, 1.0 - consecutive_no_reply * 0.1)
 
             # 获取AFC系统阈值，添加None值检查
             reply_threshold = getattr(global_config.affinity_flow, 'reply_action_interest_threshold', 0.4)
@@ -250,45 +276,8 @@ class ChatStream:
         # 默认基础分
         return 0.3
 
-    def add_message_interest(self, interest_score: float):
-        """添加消息兴趣值并更新focus_energy"""
-        self.message_interest_total += interest_score
-        self.message_count += 1
-        self.last_interaction_time = time.time()
-        self.focus_energy = self._calculate_dynamic_focus_energy()
 
-    def update_focus_energy(self):
-        """手动触发更新focus_energy"""
-        self.focus_energy = self._calculate_dynamic_focus_energy()
 
-    def record_action(self, is_reply: bool = False):
-        """记录动作执行"""
-        self.action_count += 1
-        if is_reply:
-            self.reply_count += 1
-            self.consecutive_no_reply = max(0, self.consecutive_no_reply - 1)
-        self.last_interaction_time = time.time()
-        self.focus_energy = self._calculate_dynamic_focus_energy()
-
-    def record_no_reply(self):
-        """记录无回复动作"""
-        self.consecutive_no_reply += 1
-        self.last_interaction_time = time.time()
-        self.focus_energy = self._calculate_dynamic_focus_energy()
-
-    def get_adjusted_focus_energy(self) -> float:
-        """获取应用了afc调整的focus_energy"""
-        try:
-            from src.chat.message_manager.message_manager import message_manager
-            if self.stream_id in message_manager.stream_contexts:
-                context = message_manager.stream_contexts[self.stream_id]
-                afc_adjustment = context.get_afc_threshold_adjustment()
-                # 对动态计算的focus_energy应用AFC调整
-                adjusted_energy = max(0.0, self.focus_energy - afc_adjustment)
-                return adjusted_energy
-        except Exception:
-            pass
-        return self.focus_energy
 
 
 class ChatManager:

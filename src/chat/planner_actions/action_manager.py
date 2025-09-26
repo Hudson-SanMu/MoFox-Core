@@ -1,7 +1,6 @@
 import asyncio
 import traceback
 import time
-import random
 from typing import Dict, Optional, Type, Any, Tuple
 
 
@@ -210,8 +209,10 @@ class ChatterActionManager:
                     target_message,
                 )
 
-                # 如果动作执行成功且不是no_action，重置打断计数
+                # 记录执行的动作到目标消息
                 if success:
+                    await self._record_action_to_message(chat_stream, action_name, target_message, action_data)
+                    # 重置打断计数
                     await self._reset_interruption_count_after_action(chat_stream.stream_id)
 
                 return {
@@ -252,6 +253,9 @@ class ChatterActionManager:
                     [],  # actions
                 )
 
+                # 记录回复动作到目标消息
+                await self._record_action_to_message(chat_stream, "reply", target_message, action_data)
+
                 # 回复成功，重置打断计数
                 await self._reset_interruption_count_after_action(chat_stream.stream_id)
 
@@ -267,6 +271,45 @@ class ChatterActionManager:
                 "loop_info": None,
                 "error": str(e),
             }
+
+    async def _record_action_to_message(self, chat_stream, action_name, target_message, action_data):
+        """
+        记录执行的动作到目标消息中
+
+        Args:
+            chat_stream: ChatStream实例
+            action_name: 动作名称
+            target_message: 目标消息
+            action_data: 动作数据
+        """
+        try:
+            from src.chat.message_manager.message_manager import message_manager
+
+            # 获取目标消息ID
+            target_message_id = None
+            if target_message and isinstance(target_message, dict):
+                target_message_id = target_message.get("message_id")
+            elif action_data and isinstance(action_data, dict):
+                target_message_id = action_data.get("target_message_id")
+
+            if not target_message_id:
+                logger.debug(f"无法获取目标消息ID，动作: {action_name}")
+                return
+
+            # 通过message_manager更新消息的动作记录并刷新focus_energy
+            if chat_stream.stream_id in message_manager.stream_contexts:
+                message_manager.add_action_and_refresh_energy(
+                    stream_id=chat_stream.stream_id,
+                    message_id=target_message_id,
+                    action=action_name
+                )
+                logger.debug(f"已记录动作 {action_name} 到消息 {target_message_id} 并更新focus_energy")
+            else:
+                logger.debug(f"未找到stream_context: {chat_stream.stream_id}")
+
+        except Exception as e:
+            logger.error(f"记录动作到消息失败: {e}")
+            # 不抛出异常，避免影响主要功能
 
     async def _reset_interruption_count_after_action(self, stream_id: str):
         """在动作执行成功后重置打断计数"""

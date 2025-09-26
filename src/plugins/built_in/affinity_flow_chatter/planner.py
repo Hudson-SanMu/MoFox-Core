@@ -128,7 +128,6 @@ class ChatterActionPlanner:
                     # 更新ChatStream的兴趣度数据
                     from src.plugin_system.apis.chat_api import get_chat_manager
                     chat_stream = get_chat_manager().get_stream(self.chat_id)
-                    chat_stream.add_message_interest(score)
                     logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度，分数: {score:.3f}")
 
                     # 更新情绪状态和ChatStream兴趣度数据
@@ -144,6 +143,39 @@ class ChatterActionPlanner:
                             # 在这里同步更新 focus_energy
                             chat_mood.chat_stream.update_focus_energy()
                             logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度和Focus Energy，分数: {score:.3f}")
+
+                # 为所有未读消息记录兴趣度信息
+                for message in unread_messages:
+                    # 查找对应的兴趣度评分
+                    message_score = next((s for s in interest_scores if s.message_id == message.message_id), None)
+                    if message_score:
+                        message.interest_degree = message_score.total_score
+                        message.should_reply = self.interest_scoring.should_reply(message_score, message)[0]
+                        logger.debug(f"已记录消息 {message.message_id} - 兴趣度: {message_score.total_score:.3f}, 应回复: {message.should_reply}")
+
+                        # 更新StreamContext中的消息信息并刷新focus_energy
+                        if context:
+                            from src.chat.message_manager.message_manager import message_manager
+                            message_manager.update_message_and_refresh_energy(
+                                stream_id=self.chat_id,
+                                message_id=message.message_id,
+                                interest_degree=message_score.total_score,
+                                should_reply=message.should_reply
+                            )
+                    else:
+                        # 如果没有找到评分，设置默认值
+                        message.interest_degree = 0.0
+                        message.should_reply = False
+
+                        # 更新StreamContext中的消息信息并刷新focus_energy
+                        if context:
+                            from src.chat.message_manager.message_manager import message_manager
+                            message_manager.update_message_and_refresh_energy(
+                                stream_id=self.chat_id,
+                                message_id=message.message_id,
+                                interest_degree=0.0,
+                                should_reply=False
+                            )
 
             # base_threshold = self.interest_scoring.reply_threshold
             # 检查兴趣度是否达到非回复动作阈值
@@ -177,10 +209,13 @@ class ChatterActionPlanner:
             # 5. 使用 PlanExecutor 执行 Plan
             execution_result = await self.executor.execute(filtered_plan)
 
-            # 6. 根据执行结果更新统计信息
+            # 6. 动作记录现在由ChatterActionManager统一处理
+            # 动作记录逻辑已移至ChatterActionManager.execute_action方法中
+
+            # 7. 根据执行结果更新统计信息
             self._update_stats_from_execution_result(execution_result)
 
-            # 7. 检查关系更新
+            # 8. 检查关系更新
             await self.relationship_tracker.check_and_update_relationships()
 
             # 8. 返回结果

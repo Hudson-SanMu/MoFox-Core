@@ -88,6 +88,18 @@ class MessageManager:
 
         logger.debug(f"添加消息到聊天流 {stream_id}: {message.message_id}")
 
+    def update_message_and_refresh_energy(self, stream_id: str, message_id: str, interest_degree: float = None, actions: list = None, should_reply: bool = None):
+        """更新消息信息"""
+        if stream_id in self.stream_contexts:
+            context = self.stream_contexts[stream_id]
+            context.update_message_info(message_id, interest_degree, actions, should_reply)
+
+    def add_action_and_refresh_energy(self, stream_id: str, message_id: str, action: str):
+        """添加动作到消息"""
+        if stream_id in self.stream_contexts:
+            context = self.stream_contexts[stream_id]
+            context.add_action_to_message(message_id, action)
+
     async def _manager_loop(self):
         """管理器主循环 - 独立聊天流分发周期版本"""
         while self.is_running:
@@ -294,70 +306,6 @@ class MessageManager:
                 )
             else:
                 logger.debug(f"聊天流 {stream_id} 未触发打断，打断概率: {interruption_probability:.2f}")
-
-    def _calculate_dynamic_distribution_interval(self) -> float:
-        """根据所有活跃聊天流的focus_energy动态计算分发周期"""
-        if not global_config.chat.dynamic_distribution_enabled:
-            return self.check_interval  # 使用固定间隔
-
-        if not self.stream_contexts:
-            return self.check_interval  # 默认间隔
-
-        # 计算活跃流的平均focus_energy
-        active_streams = [ctx for ctx in self.stream_contexts.values() if ctx.is_active]
-        if not active_streams:
-            return self.check_interval
-
-        total_focus_energy = 0.0
-        max_focus_energy = 0.0
-        stream_count = 0
-
-        for context in active_streams:
-            if hasattr(context, 'chat_stream') and context.chat_stream:
-                focus_energy = context.chat_stream.focus_energy
-                total_focus_energy += focus_energy
-                max_focus_energy = max(max_focus_energy, focus_energy)
-                stream_count += 1
-
-        if stream_count == 0:
-            return self.check_interval
-
-        avg_focus_energy = total_focus_energy / stream_count
-
-        # 使用配置参数
-        base_interval = global_config.chat.dynamic_distribution_base_interval
-        min_interval = global_config.chat.dynamic_distribution_min_interval
-        max_interval = global_config.chat.dynamic_distribution_max_interval
-        jitter_factor = global_config.chat.dynamic_distribution_jitter_factor
-
-        # 根据平均兴趣度调整间隔
-        # 高兴趣度 -> 更频繁检查 (间隔更短)
-        # 低兴趣度 -> 较少检查 (间隔更长)
-        if avg_focus_energy >= 0.7:
-            # 高兴趣度：1-5秒
-            interval = base_interval * (1.0 - (avg_focus_energy - 0.7) * 2.0)
-        elif avg_focus_energy >= 0.4:
-            # 中等兴趣度：5-15秒
-            interval = base_interval * (1.0 + (avg_focus_energy - 0.4) * 3.33)
-        else:
-            # 低兴趣度：15-30秒
-            interval = base_interval * (3.0 + (0.4 - avg_focus_energy) * 5.0)
-
-        # 添加随机扰动避免同步
-        import random
-        jitter = random.uniform(1.0 - jitter_factor, 1.0 + jitter_factor)
-        final_interval = interval * jitter
-
-        # 限制在合理范围内
-        final_interval = max(min_interval, min(max_interval, final_interval))
-
-        logger.debug(
-            f"动态分发周期: {final_interval:.2f}s | "
-            f"平均兴趣度: {avg_focus_energy:.3f} | "
-            f"活跃流数: {stream_count}"
-        )
-
-        return final_interval
 
     def _calculate_stream_distribution_interval(self, context: StreamContext) -> float:
         """计算单个聊天流的分发周期 - 基于阈值感知的focus_energy"""

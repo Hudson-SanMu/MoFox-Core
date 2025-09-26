@@ -47,6 +47,11 @@ class StreamContext(BaseDataModel):
     next_check_time: float = field(default_factory=time.time)  # 下次检查时间
     distribution_interval: float = 5.0  # 当前分发周期（秒）
 
+    # 新增字段以替代ChatMessageContext功能
+    current_message: Optional["DatabaseMessages"] = None
+    priority_mode: Optional[str] = None
+    priority_info: Optional[dict] = None
+
     def add_message(self, message: "DatabaseMessages"):
         """添加消息到上下文"""
         message.is_read = False
@@ -54,6 +59,48 @@ class StreamContext(BaseDataModel):
 
         # 自动检测和更新chat type
         self._detect_chat_type(message)
+
+    def update_message_info(self, message_id: str, interest_degree: float = None, actions: list = None, should_reply: bool = None):
+        """
+        更新消息信息
+
+        Args:
+            message_id: 消息ID
+            interest_degree: 兴趣度值
+            actions: 执行的动作列表
+            should_reply: 是否应该回复
+        """
+        # 在未读消息中查找并更新
+        for message in self.unread_messages:
+            if message.message_id == message_id:
+                message.update_message_info(interest_degree, actions, should_reply)
+                break
+
+        # 在历史消息中查找并更新
+        for message in self.history_messages:
+            if message.message_id == message_id:
+                message.update_message_info(interest_degree, actions, should_reply)
+                break
+
+    def add_action_to_message(self, message_id: str, action: str):
+        """
+        向指定消息添加执行的动作
+
+        Args:
+            message_id: 消息ID
+            action: 要添加的动作名称
+        """
+        # 在未读消息中查找并更新
+        for message in self.unread_messages:
+            if message.message_id == message_id:
+                message.add_action(action)
+                break
+
+        # 在历史消息中查找并更新
+        for message in self.history_messages:
+            if message.message_id == message_id:
+                message.add_action(action)
+                break
 
     def _detect_chat_type(self, message: "DatabaseMessages"):
         """根据消息内容自动检测聊天类型"""
@@ -149,6 +196,61 @@ class StreamContext(BaseDataModel):
     def get_afc_threshold_adjustment(self) -> float:
         """获取当前的afc阈值调整量"""
         return self.afc_threshold_adjustment
+
+    def set_current_message(self, message: "DatabaseMessages"):
+        """设置当前消息"""
+        self.current_message = message
+
+    def get_template_name(self) -> Optional[str]:
+        """获取模板名称"""
+        if self.current_message and hasattr(self.current_message, 'additional_config') and self.current_message.additional_config:
+            try:
+                import json
+                config = json.loads(self.current_message.additional_config)
+                if config.get('template_info') and not config.get('template_default', True):
+                    return config.get('template_name')
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        return None
+
+    def get_last_message(self) -> Optional["DatabaseMessages"]:
+        """获取最后一条消息"""
+        if self.current_message:
+            return self.current_message
+        if self.unread_messages:
+            return self.unread_messages[-1]
+        if self.history_messages:
+            return self.history_messages[-1]
+        return None
+
+    def check_types(self, types: list) -> bool:
+        """检查消息类型"""
+        if not self.current_message:
+            return False
+
+        # 检查消息是否支持指定的类型
+        # 这里简化处理，实际应该根据消息的格式信息检查
+        if hasattr(self.current_message, 'additional_config') and self.current_message.additional_config:
+            try:
+                import json
+                config = json.loads(self.current_message.additional_config)
+                if 'format_info' in config and 'accept_format' in config['format_info']:
+                    accept_format = config['format_info']['accept_format']
+                    for t in types:
+                        if t not in accept_format:
+                            return False
+                    return True
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        return False
+
+    def get_priority_mode(self) -> Optional[str]:
+        """获取优先级模式"""
+        return self.priority_mode
+
+    def get_priority_info(self) -> Optional[dict]:
+        """获取优先级信息"""
+        return self.priority_info
 
 
 @dataclass
