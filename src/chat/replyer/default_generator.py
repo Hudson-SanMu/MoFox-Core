@@ -202,7 +202,10 @@ class DefaultReplyer:
     ):
         self.express_model = LLMRequest(model_set=model_config.model_task_config.replyer, request_type=request_type)
         self.chat_stream = chat_stream
-        self.is_group_chat, self.chat_target_info = get_chat_type_and_target_info(self.chat_stream.stream_id)
+        self.is_group_chat: Optional[bool] = None
+        self.chat_target_info: Optional[Dict[str, Any]] = None
+        self._initialized = False
+
         self.heart_fc_sender = HeartFCSender()
         self.memory_activator = MemoryActivator()
         # 使用纯向量瞬时记忆系统V2，支持自定义保留时间
@@ -803,9 +806,12 @@ class DefaultReplyer:
             action_descriptions += "根据聊天情况，你决定在回复的同时做以下这些动作：\n"
             action_descriptions += choosen_action_descriptions
 
-        return action_descriptions
-        
-        
+    async def _async_init(self):
+        if self._initialized:
+            return
+        self.is_group_chat, self.chat_target_info = await get_chat_type_and_target_info(self.chat_stream.stream_id)
+        self._initialized = True
+
     async def build_prompt_reply_context(
         self,
         extra_info: str = "",
@@ -833,22 +839,11 @@ class DefaultReplyer:
         """
         if available_actions is None:
             available_actions = {}
+        await self._async_init()
         chat_stream = self.chat_stream
         chat_id = chat_stream.stream_id
-        is_group_chat = bool(chat_stream.group_info)
-        platform = chat_stream.platform
-        
-        if reply_message:
-            user_id = reply_message.get("user_id","")
-            person = Person(platform=platform, user_id=user_id)
-            person_name = person.person_name or user_id
-            sender = person_name
-            target = reply_message.get('processed_plain_text')
-        else:
-            person_name = "用户"
-            sender = "用户"
-            target = "消息"
-        
+        person_info_manager = get_person_info_manager()
+        is_group_chat = self.is_group_chat
 
         if global_config.mood.enable_mood:
             chat_mood = mood_manager.get_mood_by_chat_id(chat_id)
@@ -1164,9 +1159,10 @@ class DefaultReplyer:
         reply_to: str,
         reply_message: Optional[Dict[str, Any]] = None,
     ) -> str:  # sourcery skip: merge-else-if-into-elif, remove-redundant-if
+        await self._async_init()
         chat_stream = self.chat_stream
         chat_id = chat_stream.stream_id
-        is_group_chat = bool(chat_stream.group_info)
+        is_group_chat = self.is_group_chat
 
         if reply_message:
             sender = reply_message.get("sender")

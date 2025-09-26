@@ -24,7 +24,7 @@ class SubHeartflow:
         self.subheartflow_id = subheartflow_id
         self.chat_id = subheartflow_id
 
-        self.is_group_chat, self.chat_target_info = get_chat_type_and_target_info(self.chat_id)
+        self.is_group_chat, self.chat_target_info = (None, None)
         self.log_prefix = get_chat_manager().get_stream_name(self.subheartflow_id) or self.subheartflow_id
 
         # focus模式退出冷却时间管理
@@ -38,4 +38,5 @@ class SubHeartflow:
 
     async def initialize(self):
         """异步初始化方法，创建兴趣流并确定聊天类型"""
+        self.is_group_chat, self.chat_target_info = await get_chat_type_and_target_info(self.chat_id)
         await self.heart_fc_instance.start()

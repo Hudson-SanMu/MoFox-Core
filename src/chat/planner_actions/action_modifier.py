@@ -72,7 +72,7 @@ class ActionModifier:
         from src.chat.utils.utils import get_chat_type_and_target_info
 
         # 获取聊天类型
-        is_group_chat, _ = get_chat_type_and_target_info(self.chat_id)
+        is_group_chat, _ = await get_chat_type_and_target_info(self.chat_id)
         all_registered_actions = component_registry.get_components_by_type(ComponentType.ACTION)
 
         chat_type_removals = []

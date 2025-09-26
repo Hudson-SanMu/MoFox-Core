@@ -51,7 +51,7 @@ class PlanGenerator:
         Returns:
             Plan: 一个填充了初始上下文信息的 Plan 对象。
         """
-        _is_group_chat, chat_target_info_dict = get_chat_type_and_target_info(self.chat_id)
+        _is_group_chat, chat_target_info_dict = await get_chat_type_and_target_info(self.chat_id)
         
         target_info = None
         if chat_target_info_dict:
