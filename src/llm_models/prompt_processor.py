@@ -154,10 +154,17 @@ class PromptProcessor:
                 - 清理后的内容（移除了<think>标签及其内容）。
                 - 提取出的思考过程文本（如果没有则为空字符串）。
         """
-        # 使用正则表达式查找<think>标签
-        match = re.search(r"(?:<think>)?(.*?)</think>", content, re.DOTALL)
-        # 从内容中移除<think>标签及其包裹的所有内容
-        clean_content = re.sub(r"(?:<think>)?.*?</think>", "", content, flags=re.DOTALL, count=1).strip()
-        # 如果找到匹配项，则提取思考过程
-        reasoning = match.group(1).strip() if match else ""
+        # 使用正则表达式精确查找 <think>...</think> 标签及其内容
+        think_pattern = re.compile(r"<think>(.*?)</think>\s*", re.DOTALL)
+        match = think_pattern.search(content)
+
+        if match:
+            # 提取思考过程
+            reasoning = match.group(1).strip()
+            # 从原始内容中移除匹配到的整个部分（包括标签和后面的空白）
+            clean_content = think_pattern.sub("", content, count=1).strip()
+        else:
+            reasoning = ""
+            clean_content = content.strip()
+            
         return clean_content, reasoning
