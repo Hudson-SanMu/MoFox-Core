@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Tuple
 from src.common.logger import get_logger
 from .payload_content.tool_option import ToolOption, ToolOptionBuilder, ToolParamType
 
-logger = get_logger("llm_utils")
+logger = get_logger("model_utils")
 
 def normalize_image_format(image_format: str) -> str:
     """

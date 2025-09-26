@@ -13,7 +13,7 @@ from src.config.config import model_config
 from src.config.api_ada_configs import ModelInfo, APIProvider, TaskConfig
 from .model_client.base_client import BaseClient, client_registry
 
-logger = get_logger("model_selector")
+logger = get_logger("model_utils")
 
 
 class ModelSelector:
