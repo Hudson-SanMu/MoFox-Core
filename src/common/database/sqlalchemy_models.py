@@ -176,7 +176,6 @@ class Messages(Base):
     is_notify = Column(Boolean, nullable=False, default=False)
 
     # 兴趣度系统字段
-    interest_degree = Column(Float, nullable=True, default=0.0)
     actions = Column(Text, nullable=True)  # JSON格式存储动作列表
     should_reply = Column(Boolean, nullable=True, default=False)
 
@@ -185,7 +184,6 @@ class Messages(Base):
         Index("idx_messages_chat_id", "chat_id"),
         Index("idx_messages_time", "time"),
         Index("idx_messages_user_id", "user_id"),
-        Index("idx_messages_interest_degree", "interest_degree"),
         Index("idx_messages_should_reply", "should_reply"),
     )
 

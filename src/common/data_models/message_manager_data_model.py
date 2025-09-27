@@ -61,27 +61,27 @@ class StreamContext(BaseDataModel):
         self._detect_chat_type(message)
 
     def update_message_info(
-        self, message_id: str, interest_degree: float = None, actions: list = None, should_reply: bool = None
+        self, message_id: str, interest_value: float = None, actions: list = None, should_reply: bool = None
     ):
         """
         更新消息信息
 
         Args:
             message_id: 消息ID
-            interest_degree: 兴趣度值
+            interest_value: 兴趣度值
             actions: 执行的动作列表
             should_reply: 是否应该回复
         """
         # 在未读消息中查找并更新
         for message in self.unread_messages:
             if message.message_id == message_id:
-                message.update_message_info(interest_degree, actions, should_reply)
+                message.update_message_info(interest_value, actions, should_reply)
                 break
 
         # 在历史消息中查找并更新
         for message in self.history_messages:
             if message.message_id == message_id:
-                message.update_message_info(interest_degree, actions, should_reply)
+                message.update_message_info(interest_value, actions, should_reply)
                 break
 
     def add_action_to_message(self, message_id: str, action: str):

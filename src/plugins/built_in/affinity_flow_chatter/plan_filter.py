@@ -368,40 +368,29 @@ class ChatterPlanFilter:
         interest_scores = {}
 
         try:
-            from src.plugins.built_in.affinity_flow_chatter.interest_scoring import (
-                chatter_interest_scoring_system as interest_scoring_system,
-            )
-            from src.common.data_models.database_data_model import DatabaseMessages
+            from src.chat.interest_system import interest_manager
 
-            # 转换消息格式
-            db_messages = []
+            # 使用新的兴趣度管理系统计算评分
             for msg_dict in messages:
                 try:
-                    db_msg = DatabaseMessages(
-                        message_id=msg_dict.get("message_id", ""),
-                        time=msg_dict.get("time", time.time()),
-                        chat_id=msg_dict.get("chat_id", ""),
-                        processed_plain_text=msg_dict.get("processed_plain_text", ""),
-                        user_id=msg_dict.get("user_id", ""),
-                        user_nickname=msg_dict.get("user_nickname", ""),
-                        user_platform=msg_dict.get("platform", "qq"),
-                        chat_info_group_id=msg_dict.get("group_id", ""),
-                        chat_info_group_name=msg_dict.get("group_name", ""),
-                        chat_info_group_platform=msg_dict.get("platform", "qq"),
+                    # 构建计算上下文
+                    calc_context = {
+                        "stream_id": msg_dict.get("chat_id", ""),
+                        "user_id": msg_dict.get("user_id"),
+                    }
+
+                    # 计算消息兴趣度
+                    interest_score = interest_manager.calculate_message_interest(
+                        message=msg_dict,
+                        context=calc_context
                     )
-                    db_messages.append(db_msg)
+
+                    # 构建兴趣度字典
+                    interest_scores[msg_dict.get("message_id", "")] = interest_score
+
                 except Exception as e:
-                    logger.warning(f"转换消息格式失败: {e}")
+                    logger.warning(f"计算消息兴趣度失败: {e}")
                     continue
-
-            # 计算兴趣度评分
-            if db_messages:
-                bot_nickname = global_config.bot.nickname or "麦麦"
-                scores = await interest_scoring_system.calculate_interest_scores(db_messages, bot_nickname)
-
-                # 构建兴趣度字典
-                for score in scores:
-                    interest_scores[score.message_id] = score.total_score
 
         except Exception as e:
             logger.warning(f"获取兴趣度评分失败: {e}")

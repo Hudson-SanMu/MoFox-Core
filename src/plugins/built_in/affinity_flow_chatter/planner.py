@@ -4,13 +4,13 @@
 """
 
 from dataclasses import asdict
+import time
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from src.plugins.built_in.affinity_flow_chatter.plan_executor import ChatterPlanExecutor
 from src.plugins.built_in.affinity_flow_chatter.plan_filter import ChatterPlanFilter
 from src.plugins.built_in.affinity_flow_chatter.plan_generator import ChatterPlanGenerator
-from src.plugins.built_in.affinity_flow_chatter.interest_scoring import ChatterInterestScoringSystem
-from src.plugins.built_in.affinity_flow_chatter.relationship_tracker import ChatterRelationshipTracker
+from src.chat.interest_system import interest_manager
 from src.mood.mood_manager import mood_manager
 
 
@@ -52,14 +52,7 @@ class ChatterActionPlanner:
         self.generator = ChatterPlanGenerator(chat_id)
         self.executor = ChatterPlanExecutor(action_manager)
 
-        # 初始化兴趣度评分系统
-        self.interest_scoring = ChatterInterestScoringSystem()
-
-        # 创建新的关系追踪器
-        self.relationship_tracker = ChatterRelationshipTracker(self.interest_scoring)
-
-        # 设置执行器的关系追踪器
-        self.executor.set_relationship_tracker(self.relationship_tracker)
+        # 使用新的统一兴趣度管理系统
 
         # 规划器统计
         self.planner_stats = {
@@ -107,51 +100,39 @@ class ChatterActionPlanner:
             initial_plan.available_actions = self.action_manager.get_using_actions()
             
             unread_messages = context.get_unread_messages() if context else []
-            # 2. 兴趣度评分 - 只对未读消息进行评分
+            # 2. 使用新的兴趣度管理系统进行评分
+            score = 0.0
+            should_reply = False
+            reply_not_available = False
+
             if unread_messages:
-                bot_nickname = global_config.bot.nickname
-                interest_scores = await self.interest_scoring.calculate_interest_scores(unread_messages, bot_nickname)
+                # 获取用户ID
+                user_id = None
+                if unread_messages[0].user_id:
+                    user_id = unread_messages[0].user_id
 
-                # 3. 根据兴趣度调整可用动作
-                if interest_scores:
-                    latest_score = max(interest_scores, key=lambda s: s.total_score)
-                    latest_message = next(
-                        (msg for msg in unread_messages if msg.message_id == latest_score.message_id), None
-                    )
-                    should_reply, score = self.interest_scoring.should_reply(latest_score, latest_message)
+                # 构建计算上下文
+                calc_context = {
+                    "stream_id": self.chat_id,
+                    "user_id": user_id,
+                }
 
-                    reply_not_available = False
-                    if not should_reply and "reply" in initial_plan.available_actions:
-                        logger.info(f"兴趣度不足 ({latest_score.total_score:.2f})，移除回复")
-                        reply_not_available = True
-
-                    # 更新ChatStream的兴趣度数据
-                    from src.plugin_system.apis.chat_api import get_chat_manager
-                    chat_stream = get_chat_manager().get_stream(self.chat_id)
-                    logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度，分数: {score:.3f}")
-
-                    # 更新情绪状态和ChatStream兴趣度数据
-                    if latest_message and score > 0:
-                        chat_mood = mood_manager.get_mood_by_chat_id(self.chat_id)
-                        await chat_mood.update_mood_by_message(latest_message, score)
-                        logger.debug(f"已更新聊天 {self.chat_id} 的情绪状态，兴趣度: {score:.3f}")
-                    elif latest_message:
-                        # 即使不更新情绪状态，也要更新ChatStream的兴趣度数据
-                        chat_mood = mood_manager.get_mood_by_chat_id(self.chat_id)
-                        if hasattr(chat_mood, 'chat_stream') and chat_mood.chat_stream:
-                            chat_mood.chat_stream.add_message_interest(score)
-                            # 在这里同步更新 focus_energy
-                            chat_mood.chat_stream.update_focus_energy()
-                            logger.debug(f"已更新聊天 {self.chat_id} 的ChatStream兴趣度和Focus Energy，分数: {score:.3f}")
-
-                # 为所有未读消息记录兴趣度信息
+                # 为每条消息计算兴趣度
                 for message in unread_messages:
-                    # 查找对应的兴趣度评分
-                    message_score = next((s for s in interest_scores if s.message_id == message.message_id), None)
-                    if message_score:
-                        message.interest_degree = message_score.total_score
-                        message.should_reply = self.interest_scoring.should_reply(message_score, message)[0]
-                        logger.debug(f"已记录消息 {message.message_id} - 兴趣度: {message_score.total_score:.3f}, 应回复: {message.should_reply}")
+                    try:
+                        # 使用新的兴趣度管理器计算
+                        message_interest = interest_manager.calculate_message_interest(
+                            message=message.__dict__,
+                            context=calc_context
+                        )
+
+                        # 更新消息的兴趣度
+                        message.interest_value = message_interest
+
+                        # 简单的回复决策逻辑：兴趣度超过阈值则回复
+                        message.should_reply = message_interest > global_config.affinity_flow.non_reply_action_interest_threshold
+
+                        logger.debug(f"消息 {message.message_id} 兴趣度: {message_interest:.3f}, 应回复: {message.should_reply}")
 
                         # 更新StreamContext中的消息信息并刷新focus_energy
                         if context:
@@ -159,25 +140,35 @@ class ChatterActionPlanner:
                             message_manager.update_message_and_refresh_energy(
                                 stream_id=self.chat_id,
                                 message_id=message.message_id,
-                                interest_degree=message_score.total_score,
+                                interest_value=message_interest,
                                 should_reply=message.should_reply
                             )
-                    else:
-                        # 如果没有找到评分，设置默认值
-                        message.interest_degree = 0.0
+
+                        # 更新数据库中的消息记录
+                        try:
+                            from src.chat.message_receive.storage import MessageStorage
+                            MessageStorage.update_message_interest_value(message.message_id, message_interest)
+                            logger.debug(f"已更新数据库中消息 {message.message_id} 的兴趣度为: {message_interest:.3f}")
+                        except Exception as e:
+                            logger.warning(f"更新数据库消息兴趣度失败: {e}")
+
+                        # 更新话题兴趣度
+                        interest_manager.update_topic_interest(message.__dict__, message_interest)
+
+                        # 记录最高分
+                        if message_interest > score:
+                            score = message_interest
+                            if message.should_reply:
+                                should_reply = True
+                            else:
+                                reply_not_available = True
+
+                    except Exception as e:
+                        logger.warning(f"计算消息 {message.message_id} 兴趣度失败: {e}")
+                        # 设置默认值
+                        message.interest_value = 0.0
                         message.should_reply = False
 
-                        # 更新StreamContext中的消息信息并刷新focus_energy
-                        if context:
-                            from src.chat.message_manager.message_manager import message_manager
-                            message_manager.update_message_and_refresh_energy(
-                                stream_id=self.chat_id,
-                                message_id=message.message_id,
-                                interest_degree=0.0,
-                                should_reply=False
-                            )
-
-            # base_threshold = self.interest_scoring.reply_threshold
             # 检查兴趣度是否达到非回复动作阈值
             non_reply_action_interest_threshold = global_config.affinity_flow.non_reply_action_interest_threshold
             if score < non_reply_action_interest_threshold:
@@ -199,26 +190,16 @@ class ChatterActionPlanner:
                 plan_filter = ChatterPlanFilter(self.chat_id, available_actions)
                 filtered_plan = await plan_filter.filter(reply_not_available, initial_plan)
 
-            # 检查filtered_plan是否有reply动作，以便记录reply action
-            has_reply_action = False
-            for decision in filtered_plan.decided_actions:
-                if decision.action_type == "reply":
-                    has_reply_action = True
-            self.interest_scoring.record_reply_action(has_reply_action)
+            # 检查filtered_plan是否有reply动作，用于统计
+            has_reply_action = any(decision.action_type == "reply" for decision in filtered_plan.decided_actions)
 
             # 5. 使用 PlanExecutor 执行 Plan
             execution_result = await self.executor.execute(filtered_plan)
 
-            # 6. 动作记录现在由ChatterActionManager统一处理
-            # 动作记录逻辑已移至ChatterActionManager.execute_action方法中
-
-            # 7. 根据执行结果更新统计信息
+            # 6. 根据执行结果更新统计信息
             self._update_stats_from_execution_result(execution_result)
 
-            # 8. 检查关系更新
-            await self.relationship_tracker.check_and_update_relationships()
-
-            # 8. 返回结果
+            # 7. 返回结果
             return self._build_return_result(filtered_plan)
 
         except Exception as e:
@@ -267,36 +248,9 @@ class ChatterActionPlanner:
 
         return final_actions_dict, final_target_message_dict
 
-    def get_user_relationship(self, user_id: str) -> float:
-        """获取用户关系分"""
-        return self.interest_scoring.get_user_relationship(user_id)
-
-    def update_interest_keywords(self, new_keywords: Dict[str, List[str]]):
-        """更新兴趣关键词（已弃用，仅保留用于兼容性）"""
-        logger.info("传统关键词匹配已移除，此方法仅保留用于兼容性")
-        # 此方法已弃用，因为现在完全使用embedding匹配
-
     def get_planner_stats(self) -> Dict[str, any]:
         """获取规划器统计"""
         return self.planner_stats.copy()
-
-    def get_interest_scoring_stats(self) -> Dict[str, any]:
-        """获取兴趣度评分统计"""
-        return {
-            "no_reply_count": self.interest_scoring.no_reply_count,
-            "max_no_reply_count": self.interest_scoring.max_no_reply_count,
-            "reply_threshold": self.interest_scoring.reply_threshold,
-            "mention_threshold": self.interest_scoring.mention_threshold,
-            "user_relationships": len(self.interest_scoring.user_relationships),
-        }
-
-    def get_relationship_stats(self) -> Dict[str, any]:
-        """获取用户关系统计"""
-        return {
-            "tracking_users": len(self.relationship_tracker.tracking_users),
-            "relationship_history": len(self.relationship_tracker.relationship_history),
-            "max_tracking_users": self.relationship_tracker.max_tracking_users,
-        }
 
     def get_current_mood_state(self) -> str:
         """获取当前聊天的情绪状态"""

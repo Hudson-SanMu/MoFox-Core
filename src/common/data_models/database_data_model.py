@@ -96,7 +96,6 @@ class DatabaseMessages(BaseDataModel):
         chat_info_create_time: float = 0.0,
         chat_info_last_active_time: float = 0.0,
         # 新增字段
-        interest_degree: float = 0.0,
         actions: Optional[list] = None,
         should_reply: bool = False,
         **kwargs: Any,
@@ -108,7 +107,6 @@ class DatabaseMessages(BaseDataModel):
         self.interest_value = interest_value
 
         # 新增字段
-        self.interest_degree = interest_degree
         self.actions = actions
         self.should_reply = should_reply
 
@@ -201,7 +199,6 @@ class DatabaseMessages(BaseDataModel):
             "selected_expressions": self.selected_expressions,
             "is_read": self.is_read,
             # 新增字段
-            "interest_degree": self.interest_degree,
             "actions": self.actions,
             "should_reply": self.should_reply,
             "user_id": self.user_info.user_id,
@@ -221,17 +218,17 @@ class DatabaseMessages(BaseDataModel):
             "chat_info_user_cardname": self.chat_info.user_info.user_cardname,
         }
 
-    def update_message_info(self, interest_degree: float = None, actions: list = None, should_reply: bool = None):
+    def update_message_info(self, interest_value: float = None, actions: list = None, should_reply: bool = None):
         """
         更新消息信息
 
         Args:
-            interest_degree: 兴趣度值
+            interest_value: 兴趣度值
             actions: 执行的动作列表
             should_reply: 是否应该回复
         """
-        if interest_degree is not None:
-            self.interest_degree = interest_degree
+        if interest_value is not None:
+            self.interest_value = interest_value
         if actions is not None:
             self.actions = actions
         if should_reply is not None:
@@ -268,7 +265,7 @@ class DatabaseMessages(BaseDataModel):
         return {
             "message_id": self.message_id,
             "time": self.time,
-            "interest_degree": self.interest_degree,
+            "interest_value": self.interest_value,
             "actions": self.actions,
             "should_reply": self.should_reply,
             "user_nickname": self.user_info.user_nickname,
