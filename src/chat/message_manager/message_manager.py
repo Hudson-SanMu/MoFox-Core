@@ -78,6 +78,17 @@ class MessageManager:
 
     def add_message(self, stream_id: str, message: DatabaseMessages):
         """添加消息到指定聊天流"""
+        # 检查流上下文是否存在，不存在则创建
+        context = self.context_manager.get_stream_context(stream_id)
+        if not context:
+            # 创建新的流上下文
+            from src.common.data_models.message_manager_data_model import StreamContext
+            new_context = StreamContext(stream_id=stream_id)
+            success = self.context_manager.add_stream_context(stream_id, new_context)
+            if not success:
+                logger.error(f"无法为流 {stream_id} 创建上下文")
+                return
+
         # 使用 context_manager 添加消息
         success = self.context_manager.add_message_to_context(stream_id, message)
 

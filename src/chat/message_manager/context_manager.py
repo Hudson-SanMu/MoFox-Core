@@ -14,7 +14,7 @@ from src.common.logger import get_logger
 from src.config.config import global_config
 from src.chat.interest_system import interest_manager
 from src.chat.energy_system import energy_manager
-from . import distribution_manager
+from .distribution_manager import distribution_manager
 
 logger = get_logger("context_manager")
 
@@ -549,6 +549,13 @@ class StreamContextManager:
     def _message_to_dict(self, message: Any) -> Dict[str, Any]:
         """将消息对象转换为字典"""
         try:
+            # 获取user_id，优先从user_info.user_id获取，其次从user_id属性获取
+            user_id = ""
+            if hasattr(message, 'user_info') and hasattr(message.user_info, 'user_id'):
+                user_id = getattr(message.user_info, 'user_id', "")
+            else:
+                user_id = getattr(message, 'user_id', "")
+
             return {
                 "message_id": getattr(message, "message_id", ""),
                 "processed_plain_text": getattr(message, "processed_plain_text", ""),
@@ -557,7 +564,7 @@ class StreamContextManager:
                 "is_mentioned": getattr(message, "is_mentioned", False),
                 "is_command": getattr(message, "is_command", False),
                 "key_words": getattr(message, "key_words", "[]"),
-                "user_id": getattr(message, "user_id", ""),
+                "user_id": user_id,
                 "time": getattr(message, "time", time.time()),
             }
         except Exception as e:
@@ -857,6 +864,23 @@ class StreamContextManager:
                 validation_stats["validation_failures"] += 1
                 return False, f"验证器执行失败: {e}"
         return True, None
+
+    async def start(self) -> None:
+        """启动上下文管理器"""
+        if self.is_running:
+            logger.warning("上下文管理器已经在运行")
+            return
+
+        await self.start_auto_cleanup()
+        logger.info("上下文管理器已启动")
+
+    async def stop(self) -> None:
+        """停止上下文管理器"""
+        if not self.is_running:
+            return
+
+        await self.stop_auto_cleanup()
+        logger.info("上下文管理器已停止")
 
     async def start_auto_cleanup(self, interval: Optional[float] = None) -> None:
         """启动自动清理

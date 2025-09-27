@@ -106,10 +106,13 @@ class ChatterActionPlanner:
             reply_not_available = False
 
             if unread_messages:
-                # 获取用户ID
+                # 获取用户ID，优先从user_info.user_id获取，其次从user_id属性获取
                 user_id = None
-                if unread_messages[0].user_id:
-                    user_id = unread_messages[0].user_id
+                first_message = unread_messages[0]
+                if hasattr(first_message, 'user_info') and hasattr(first_message.user_info, 'user_id'):
+                    user_id = getattr(first_message.user_info, 'user_id', None)
+                elif hasattr(first_message, 'user_id'):
+                    user_id = getattr(first_message, 'user_id', None)
 
                 # 构建计算上下文
                 calc_context = {
