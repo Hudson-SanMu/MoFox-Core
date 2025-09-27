@@ -187,8 +187,7 @@ class QZoneService:
 
     # --- Internal Helper Methods ---
 
-    @staticmethod
-    async def _get_intercom_context(stream_id: str) -> Optional[str]:
+    async def _get_intercom_context(self, stream_id: str) -> Optional[str]:
         """
         根据 stream_id 查找其所属的互通组，并构建该组的聊天上下文。
 
@@ -399,8 +398,7 @@ class QZoneService:
             logger.error(f"加载本地图片失败: {e}")
             return []
 
-    @staticmethod
-    def _generate_gtk(skey: str) -> str:
+    def _generate_gtk(self, skey: str) -> str:
         hash_val = 5381
         for char in skey:
             hash_val += (hash_val << 5) + ord(char)
@@ -437,8 +435,7 @@ class QZoneService:
             logger.error(f"更新或加载Cookie时发生异常: {e}")
             return None
 
-    @staticmethod
-    async def _fetch_cookies_http(host: str, port: str, napcat_token: str) -> Optional[Dict]:
+    async def _fetch_cookies_http(self, host: str, port: str, napcat_token: str) -> Optional[Dict]:
         """通过HTTP服务器获取Cookie"""
         url = f"http://{host}:{port}/get_cookies"
         max_retries = 5

@@ -119,12 +119,10 @@ class ContentService:
             logger.error(f"生成说说内容时发生异常: {e}")
             return ""
 
-    async def generate_comment(self, content: str, target_name: str, rt_con: str = "", images=None) -> str:
+    async def generate_comment(self, content: str, target_name: str, rt_con: str = "", images: list = []) -> str:
         """
         针对一条具体的说说内容生成评论。
         """
-        if images is None:
-            images = []
         for i in range(3):  # 重试3次
             try:
                 chat_manager = get_chat_manager()
@@ -182,8 +180,7 @@ class ContentService:
                     return ""
         return ""
 
-    @staticmethod
-    async def generate_comment_reply(story_content: str, comment_content: str, commenter_name: str) -> str:
+    async def generate_comment_reply(self, story_content: str, comment_content: str, commenter_name: str) -> str:
         """
         针对自己说说的评论，生成回复。
         """

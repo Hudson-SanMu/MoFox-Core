@@ -129,8 +129,7 @@ class SchedulerService:
                 logger.error(f"定时任务循环中发生未知错误: {e}\n{traceback.format_exc()}")
                 await asyncio.sleep(300)  # 发生错误后，等待一段时间再重试
 
-    @staticmethod
-    async def _is_processed(hour_str: str, activity: str) -> bool:
+    async def _is_processed(self, hour_str: str, activity: str) -> bool:
         """
         检查指定的任务（某个小时的某个活动）是否已经被成功处理过。
 
@@ -153,8 +152,7 @@ class SchedulerService:
             logger.error(f"检查日程处理状态时发生数据库错误: {e}")
             return False  # 数据库异常时，默认为未处理，允许重试
 
-    @staticmethod
-    async def _mark_as_processed(hour_str: str, activity: str, success: bool, content: str):
+    async def _mark_as_processed(self, hour_str: str, activity: str, success: bool, content: str):
         """
         将任务的处理状态和结果写入数据库。
 
@@ -187,7 +185,7 @@ class SchedulerService:
                         send_success=success,
                     )
                     session.add(new_record)
-                await session.commit()
+                session.commit()
                 logger.info(f"已更新日程处理状态: {hour_str} - {activity} - 成功: {success}")
         except Exception as e:
             logger.error(f"更新日程处理状态时发生数据库错误: {e}")

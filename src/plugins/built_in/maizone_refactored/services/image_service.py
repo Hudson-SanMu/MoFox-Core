@@ -59,8 +59,7 @@ class ImageService:
             logger.error(f"处理AI配图时发生异常: {e}")
             return False
 
-    @staticmethod
-    async def _call_siliconflow_api(api_key: str, story: str, image_dir: str, batch_size: int) -> bool:
+    async def _call_siliconflow_api(self, api_key: str, story: str, image_dir: str, batch_size: int) -> bool:
         """
         调用硅基流动（SiliconFlow）的API来生成图片。
 
