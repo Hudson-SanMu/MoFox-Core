@@ -435,22 +435,32 @@ class BaseAction(ABC):
                 logger.warning(f"{log_prefix} 未找到Action组件信息: {action_name}")
                 return False, f"未找到Action组件信息: {action_name}"
 
+            # 确保获取的是Action组件
+            if component_info.component_type != ComponentType.ACTION:
+                logger.error(f"{log_prefix} 尝试调用的组件 '{action_name}' 不是一个Action，而是一个 '{component_info.component_type.value}'")
+                return False, f"组件 '{action_name}' 不是一个有效的Action"
+
             plugin_config = component_registry.get_plugin_config(component_info.plugin_name)
             # 3. 实例化被调用的Action
-            action_instance = action_class(
-                action_data=called_action_data,
-                reasoning=f"Called by {self.action_name}",
-                cycle_timers=self.cycle_timers,
-                thinking_id=self.thinking_id,
-                chat_stream=self.chat_stream,
-                log_prefix=log_prefix,
-                plugin_config=plugin_config,
-                action_message=self.action_message,
-            )
+            action_params = {
+                "action_data": called_action_data,
+                "reasoning": f"Called by {self.action_name}",
+                "cycle_timers": self.cycle_timers,
+                "thinking_id": self.thinking_id,
+                "chat_stream": self.chat_stream,
+                "log_prefix": log_prefix,
+                "plugin_config": plugin_config,
+                "action_message": self.action_message,
+            }
+            action_instance = action_class(**action_params)
 
             # 4. 执行Action
             logger.debug(f"{log_prefix} 开始执行...")
-            result = await action_instance.execute()
+            execute_result = await action_instance.execute()
+            # 确保返回类型符合 (bool, str) 格式
+            is_success = execute_result[0] if isinstance(execute_result, tuple) and len(execute_result) > 0 else False
+            message = execute_result[1] if isinstance(execute_result, tuple) and len(execute_result) > 1 else ""
+            result = (is_success, str(message))
             logger.info(f"{log_prefix} 执行完成，结果: {result}")
             return result
 
