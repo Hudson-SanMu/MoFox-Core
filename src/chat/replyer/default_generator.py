@@ -488,20 +488,114 @@ class DefaultReplyer:
             try:
                 # 使用新的增强记忆系统
                 from src.chat.memory_system.enhanced_memory_integration import recall_memories, remember_message
-               
+
+                stream = self.chat_stream
+                user_info_obj = getattr(stream, "user_info", None)
+                group_info_obj = getattr(stream, "group_info", None)
+
+                memory_user_id = str(stream.stream_id)
+                memory_user_display = None
+                memory_aliases = []
+                user_info_dict = {}
+
+                if user_info_obj is not None:
+                    raw_user_id = getattr(user_info_obj, "user_id", None)
+                    if raw_user_id:
+                        memory_user_id = str(raw_user_id)
+
+                    if hasattr(user_info_obj, "to_dict"):
+                        try:
+                            user_info_dict = user_info_obj.to_dict()  # type: ignore[attr-defined]
+                        except Exception:
+                            user_info_dict = {}
+
+                    candidate_keys = [
+                        "user_cardname",
+                        "user_nickname",
+                        "nickname",
+                        "remark",
+                        "display_name",
+                        "user_name",
+                    ]
+
+                    for key in candidate_keys:
+                        value = user_info_dict.get(key)
+                        if isinstance(value, str) and value.strip():
+                            stripped = value.strip()
+                            if memory_user_display is None:
+                                memory_user_display = stripped
+                            elif stripped not in memory_aliases:
+                                memory_aliases.append(stripped)
+
+                    attr_keys = [
+                        "user_cardname",
+                        "user_nickname",
+                        "nickname",
+                        "remark",
+                        "display_name",
+                        "name",
+                    ]
+
+                    for attr in attr_keys:
+                        value = getattr(user_info_obj, attr, None)
+                        if isinstance(value, str) and value.strip():
+                            stripped = value.strip()
+                            if memory_user_display is None:
+                                memory_user_display = stripped
+                            elif stripped not in memory_aliases:
+                                memory_aliases.append(stripped)
+
+                    alias_values = (
+                        user_info_dict.get("aliases")
+                        or user_info_dict.get("alias_names")
+                        or user_info_dict.get("alias")
+                    )
+                    if isinstance(alias_values, (list, tuple, set)):
+                        for alias in alias_values:
+                            if isinstance(alias, str) and alias.strip():
+                                stripped = alias.strip()
+                                if stripped not in memory_aliases and stripped != memory_user_display:
+                                    memory_aliases.append(stripped)
+
+                memory_context = {
+                    "user_id": memory_user_id,
+                    "user_display_name": memory_user_display or "",
+                    "user_name": memory_user_display or "",
+                    "nickname": memory_user_display or "",
+                    "sender_name": memory_user_display or "",
+                    "platform": getattr(stream, "platform", None),
+                    "chat_id": stream.stream_id,
+                    "stream_id": stream.stream_id,
+                }
+
+                if memory_aliases:
+                    memory_context["user_aliases"] = memory_aliases
+
+                if group_info_obj is not None:
+                    group_name = getattr(group_info_obj, "group_name", None) or getattr(group_info_obj, "group_nickname", None)
+                    if group_name:
+                        memory_context["group_name"] = str(group_name)
+                    group_id = getattr(group_info_obj, "group_id", None)
+                    if group_id:
+                        memory_context["group_id"] = str(group_id)
+
+                memory_context = {key: value for key, value in memory_context.items() if value}
+
                 # 检索相关记忆
                 enhanced_memories = await recall_memories(
                     query=target,
-                    user_id=str(self.chat_stream.stream_id),
-                    chat_id=self.chat_stream.stream_id
+                    user_id=memory_user_id,
+                    chat_id=stream.stream_id,
+                    context=memory_context
                 )
 
                 # 异步存储聊天历史（非阻塞）
                 asyncio.create_task(
                     remember_message(
                         message=chat_history,
-                        user_id=str(self.chat_stream.stream_id),
-                        chat_id=self.chat_stream.stream_id
+                        user_id=memory_user_id,
+                        chat_id=stream.stream_id,
+                        context=memory_context
                     )
                 )
 
@@ -510,17 +604,20 @@ class DefaultReplyer:
                 if enhanced_memories and enhanced_memories.get("has_memories"):
                     for memory in enhanced_memories.get("memories", []):
                         running_memories.append({
-                            'content': memory.get("content", ""),
-                            'score': memory.get("confidence", 0.0),
-                            'memory_type': memory.get("type", "unknown")
+                            "content": memory.get("content", ""),
+                            "memory_type": memory.get("type", "unknown"),
+                            "confidence": memory.get("confidence"),
+                            "importance": memory.get("importance"),
+                            "relevance": memory.get("relevance"),
+                            "source": memory.get("source"),
+                            "structure": memory.get("structure"),
                         })
 
                 # 构建瞬时记忆字符串
                 if enhanced_memories and enhanced_memories.get("has_memories"):
-                    instant_memory = "\\n".join([
-                        f"{memory.get('content', '')} (相似度: {memory.get('confidence', 0.0):.2f})"
-                        for memory in enhanced_memories.get("memories", [])[:3]  # 取前3条
-                    ])
+                    top_memory = enhanced_memories.get("memories", [])[:1]
+                    if top_memory:
+                        instant_memory = top_memory[0].get("content", "")
 
                 logger.info(f"增强记忆系统检索到 {len(running_memories)} 条记忆")
 
@@ -528,6 +625,20 @@ class DefaultReplyer:
                 logger.warning(f"增强记忆系统检索失败: {e}")
                 running_memories = []
                 instant_memory = ""
+
+        def _format_confidence_label(value: Optional[float]) -> str:
+            if value is None:
+                return "未知"
+            mapping = {4: "已验证", 3: "高", 2: "中等", 1: "较低"}
+            rounded = int(value)
+            return mapping.get(rounded, f"{value:.2f}")
+
+        def _format_importance_label(value: Optional[float]) -> str:
+            if value is None:
+                return "未知"
+            mapping = {4: "关键", 3: "高", 2: "一般", 1: "较低"}
+            rounded = int(value)
+            return mapping.get(rounded, f"{value:.2f}")
 
         # 构建记忆字符串，即使某种记忆为空也要继续
         memory_str = ""
@@ -538,15 +649,26 @@ class DefaultReplyer:
             if not memory_str:
                 memory_str = "以下是当前在聊天中，你回忆起的记忆：\n"
             for running_memory in running_memories:
-                memory_str += f"- {running_memory['content']} (类型: {running_memory['memory_type']}, 相似度: {running_memory['score']:.2f})\n"
+                details = []
+                details.append(f"类型: {running_memory.get('memory_type', 'unknown')}")
+                if running_memory.get("confidence") is not None:
+                    details.append(f"置信度: {_format_confidence_label(running_memory.get('confidence'))}")
+                if running_memory.get("importance") is not None:
+                    details.append(f"重要性: {_format_importance_label(running_memory.get('importance'))}")
+                if running_memory.get("relevance") is not None:
+                    details.append(f"相关度: {running_memory['relevance']:.2f}")
+
+                detail_text = f" （{'，'.join(details)}）" if details else ""
+                memory_str += f"- {running_memory['content']}{detail_text}\n"
             has_any_memory = True
 
         # 添加瞬时记忆
         if instant_memory:
-            if not memory_str:
-                memory_str = "以下是当前在聊天中，你回忆起的记忆：\n"
-            memory_str += f"- {instant_memory}\n"
-            has_any_memory = True
+            if not any(rm["content"] == instant_memory for rm in running_memories):
+                if not memory_str:
+                    memory_str = "以下是当前在聊天中，你回忆起的记忆：\n"
+                memory_str += f"- 最相关记忆：{instant_memory}\n"
+                has_any_memory = True
 
         # 只有当完全没有任何记忆时才返回空字符串
         return memory_str if has_any_memory else ""

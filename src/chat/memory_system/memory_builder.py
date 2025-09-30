@@ -38,6 +38,10 @@ class ExtractionResult:
     strategy_used: ExtractionStrategy
 
 
+class MemoryExtractionError(Exception):
+    """记忆提取过程中发生的不可恢复错误"""
+
+
 class MemoryBuilder:
     """记忆构建器"""
 
@@ -87,10 +91,14 @@ class MemoryBuilder:
             logger.info(f"✅ 成功构建 {len(validated_memories)} 条记忆，耗时 {extraction_time:.2f}秒")
             return validated_memories
 
+        except MemoryExtractionError as e:
+            logger.error(f"❌ 记忆构建失败（响应解析错误）: {e}")
+            self.extraction_stats["failed_extractions"] += 1
+            raise
         except Exception as e:
             logger.error(f"❌ 记忆构建失败: {e}", exc_info=True)
             self.extraction_stats["failed_extractions"] += 1
-            return []
+            raise
 
     def _preprocess_text(self, text: str) -> str:
         """预处理文本"""
@@ -147,9 +155,11 @@ class MemoryBuilder:
 
             return memories
 
+        except MemoryExtractionError:
+            raise
         except Exception as e:
             logger.error(f"LLM提取失败: {e}")
-            return []
+            raise MemoryExtractionError(str(e)) from e
 
     def _extract_with_rules(
         self,
@@ -161,16 +171,18 @@ class MemoryBuilder:
         """使用规则提取记忆"""
         memories = []
 
+        subject_display = self._resolve_user_display(context, user_id)
+
         # 规则1: 检测个人信息
-        personal_info = self._extract_personal_info(text, user_id, timestamp, context)
+        personal_info = self._extract_personal_info(text, user_id, timestamp, context, subject_display)
         memories.extend(personal_info)
 
         # 规则2: 检测偏好信息
-        preferences = self._extract_preferences(text, user_id, timestamp, context)
+        preferences = self._extract_preferences(text, user_id, timestamp, context, subject_display)
         memories.extend(preferences)
 
         # 规则3: 检测事件信息
-        events = self._extract_events(text, user_id, timestamp, context)
+        events = self._extract_events(text, user_id, timestamp, context, subject_display)
         memories.extend(events)
 
         return memories
@@ -202,6 +214,45 @@ class MemoryBuilder:
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         chat_id = context.get("chat_id", "unknown")
         message_type = context.get("message_type", "normal")
+        target_user_id = context.get("user_id", "用户")
+        target_user_id = str(target_user_id)
+
+        target_user_name = (
+            context.get("user_display_name")
+            or context.get("user_name")
+            or context.get("nickname")
+            or context.get("sender_name")
+        )
+        if isinstance(target_user_name, str):
+            target_user_name = target_user_name.strip()
+        else:
+            target_user_name = ""
+
+        if not target_user_name or self._looks_like_system_identifier(target_user_name):
+            target_user_name = "该用户"
+
+        target_user_id_display = target_user_id
+        if self._looks_like_system_identifier(target_user_id_display):
+            target_user_id_display = "（系统ID，勿写入记忆）"
+
+        bot_name = context.get("bot_name")
+        bot_identity = context.get("bot_identity")
+        bot_personality = context.get("bot_personality")
+        bot_personality_side = context.get("bot_personality_side")
+        bot_aliases = context.get("bot_aliases") or []
+        if isinstance(bot_aliases, str):
+            bot_aliases = [bot_aliases]
+
+        bot_name_display = bot_name or "机器人"
+        alias_display = "、".join(a for a in bot_aliases if a) or "无"
+        persona_details = []
+        if bot_identity:
+            persona_details.append(f"身份: {bot_identity}")
+        if bot_personality:
+            persona_details.append(f"核心人设: {bot_personality}")
+        if bot_personality_side:
+            persona_details.append(f"侧写: {bot_personality_side}")
+        persona_display = "；".join(persona_details) if persona_details else "无"
 
         prompt = f"""
 你是一个专业的记忆提取专家。请从以下对话中主动识别并提取所有可能重要的信息，特别是包含个人事实、事件、偏好、观点等要素的内容。
@@ -209,6 +260,20 @@ class MemoryBuilder:
 当前时间: {current_date}
 聊天ID: {chat_id}
 消息类型: {message_type}
+目标用户ID: {target_user_id_display}
+目标用户称呼: {target_user_name}
+
+## 🤖 机器人身份（仅供参考，禁止写入记忆）
+- 机器人名称: {bot_name_display}
+- 别名: {alias_display}
+- 机器人人设概述: {persona_display}
+
+这些信息是机器人的固定设定，可用于帮助你理解对话。你可以在需要时记录机器人自身的状态、行为或设定，但要与用户信息清晰区分，避免误将系统ID写入记忆。
+
+请务必遵守以下命名规范：
+- 当说话者是机器人时，请使用“{bot_name_display}”或其他明确称呼作为主语；
+- 如果看到系统自动生成的长ID（类似 {target_user_id}），请改用“{target_user_name}”、机器人的称呼或“该用户”描述，不要把ID写入记忆；
+- 记录关键事实时，请准确标记主体是机器人还是用户，避免混淆。
 
 对话内容:
 {text}
@@ -231,6 +296,7 @@ class MemoryBuilder:
 - 日常活动：上班、上学、约会、看电影、吃饭
 - 特殊经历：考试、面试、会议、搬家、购物
 - 计划安排：约会、会议、旅行、活动
+
 
 **判断标准：** 涉及时间地点的具体活动和经历，都应该记忆
 
@@ -364,56 +430,255 @@ class MemoryBuilder:
         context: Dict[str, Any]
     ) -> List[MemoryChunk]:
         """解析LLM响应"""
-        memories = []
+        if not response:
+            raise MemoryExtractionError("LLM未返回任何响应")
+
+        json_payload = self._extract_json_payload(response)
+        if not json_payload:
+            preview = response[:200] if response else "空响应"
+            raise MemoryExtractionError(f"未在LLM响应中找到有效的JSON负载，响应片段: {preview}")
 
         try:
-            # 提取JSON负载
-            json_payload = self._extract_json_payload(response)
-            if not json_payload:
-                logger.error("未在响应中找到有效的JSON负载")
-                return memories
-
             data = orjson.loads(json_payload)
-            memory_list = data.get("memories", [])
+        except Exception as e:
+            preview = json_payload[:200]
+            raise MemoryExtractionError(
+                f"LLM响应JSON解析失败: {e}, 片段: {preview}"
+            ) from e
 
-            for mem_data in memory_list:
-                try:
-                    # 创建记忆块
-                    memory = create_memory_chunk(
-                        user_id=user_id,
-                        subject=mem_data.get("subject", user_id),
-                        predicate=mem_data.get("predicate", ""),
-                        obj=mem_data.get("object", ""),
-                        memory_type=MemoryType(mem_data.get("type", "contextual")),
-                        chat_id=context.get("chat_id"),
-                        source_context=mem_data.get("reasoning", ""),
-                        importance=ImportanceLevel(mem_data.get("importance", 2)),
-                        confidence=ConfidenceLevel(mem_data.get("confidence", 2))
-                    )
+        memory_list = data.get("memories", [])
 
-                    # 添加关键词
-                    keywords = mem_data.get("keywords", [])
-                    for keyword in keywords:
-                        memory.add_keyword(keyword)
+        bot_identifiers = self._collect_bot_identifiers(context)
+        system_identifiers = self._collect_system_identifiers(context)
+        default_subject = self._resolve_user_display(context, user_id)
 
-                    memories.append(memory)
+        bot_display = None
+        if context:
+            primary_bot_name = context.get("bot_name")
+            if isinstance(primary_bot_name, str) and primary_bot_name.strip():
+                bot_display = primary_bot_name.strip()
+            if bot_display is None:
+                aliases = context.get("bot_aliases")
+                if isinstance(aliases, (list, tuple, set)):
+                    for alias in aliases:
+                        if isinstance(alias, str) and alias.strip():
+                            bot_display = alias.strip()
+                            break
+                elif isinstance(aliases, str) and aliases.strip():
+                    bot_display = aliases.strip()
+            if bot_display is None:
+                identity = context.get("bot_identity")
+                if isinstance(identity, str) and identity.strip():
+                    bot_display = identity.strip()
 
-                except Exception as e:
-                    logger.warning(f"解析单个记忆失败: {e}, 数据: {mem_data}")
+        if not bot_display:
+            bot_display = "机器人"
+
+        bot_display = self._clean_subject_text(bot_display)
+
+        memories: List[MemoryChunk] = []
+
+        for mem_data in memory_list:
+            try:
+                subject_value = mem_data.get("subject")
+                normalized_subject = self._normalize_subject(
+                    subject_value,
+                    bot_identifiers,
+                    system_identifiers,
+                    default_subject,
+                    bot_display
+                )
+
+                if normalized_subject is None:
+                    logger.debug("跳过疑似机器人自身信息的记忆: %s", mem_data)
                     continue
 
-        except Exception as e:
-            preview = response[:200] if response else "空响应"
-            logger.error(f"解析LLM响应失败: {e}, 响应片段: {preview}")
+                # 创建记忆块
+                memory = create_memory_chunk(
+                    user_id=user_id,
+                    subject=normalized_subject,
+                    predicate=mem_data.get("predicate", ""),
+                    obj=mem_data.get("object", ""),
+                    memory_type=MemoryType(mem_data.get("type", "contextual")),
+                    chat_id=context.get("chat_id"),
+                    source_context=mem_data.get("reasoning", ""),
+                    importance=ImportanceLevel(mem_data.get("importance", 2)),
+                    confidence=ConfidenceLevel(mem_data.get("confidence", 2))
+                )
+
+                # 添加关键词
+                keywords = mem_data.get("keywords", [])
+                for keyword in keywords:
+                    memory.add_keyword(keyword)
+
+                subject_text = memory.content.subject.strip() if isinstance(memory.content.subject, str) else str(memory.content.subject)
+                if not subject_text:
+                    memory.content.subject = default_subject
+                elif subject_text.lower() in system_identifiers or self._looks_like_system_identifier(subject_text):
+                    logger.debug("将系统标识主语替换为默认用户名称: %s", subject_text)
+                    memory.content.subject = default_subject
+
+                memories.append(memory)
+
+            except Exception as e:
+                logger.warning(f"解析单个记忆失败: {e}, 数据: {mem_data}")
+                continue
 
         return memories
+
+    def _collect_bot_identifiers(self, context: Optional[Dict[str, Any]]) -> set[str]:
+        identifiers: set[str] = {"bot", "机器人", "ai助手"}
+        if not context:
+            return identifiers
+
+        for key in [
+            "bot_name",
+            "bot_identity",
+            "bot_personality",
+            "bot_personality_side",
+            "bot_account",
+        ]:
+            value = context.get(key)
+            if isinstance(value, str) and value.strip():
+                identifiers.add(value.strip().lower())
+
+        aliases = context.get("bot_aliases")
+        if isinstance(aliases, (list, tuple, set)):
+            for alias in aliases:
+                if isinstance(alias, str) and alias.strip():
+                    identifiers.add(alias.strip().lower())
+        elif isinstance(aliases, str) and aliases.strip():
+            identifiers.add(aliases.strip().lower())
+
+        return identifiers
+
+    def _collect_system_identifiers(self, context: Optional[Dict[str, Any]]) -> set[str]:
+        identifiers: set[str] = set()
+        if not context:
+            return identifiers
+
+        keys = [
+            "chat_id",
+            "stream_id",
+            "stram_id",
+            "session_id",
+            "conversation_id",
+            "message_id",
+            "topic_id",
+            "thread_id",
+        ]
+
+        for key in keys:
+            value = context.get(key)
+            if isinstance(value, str) and value.strip():
+                identifiers.add(value.strip().lower())
+
+        user_id_value = context.get("user_id")
+        if isinstance(user_id_value, str) and user_id_value.strip():
+            if self._looks_like_system_identifier(user_id_value):
+                identifiers.add(user_id_value.strip().lower())
+
+        return identifiers
+
+    def _resolve_user_display(self, context: Optional[Dict[str, Any]], user_id: str) -> str:
+        candidate_keys = [
+            "user_display_name",
+            "user_name",
+            "nickname",
+            "sender_name",
+            "member_name",
+            "display_name",
+            "from_user_name",
+            "author_name",
+            "speaker_name",
+        ]
+
+        if context:
+            for key in candidate_keys:
+                value = context.get(key)
+                if isinstance(value, str):
+                    candidate = value.strip()
+                    if candidate:
+                        return self._clean_subject_text(candidate)
+
+        if user_id and not self._looks_like_system_identifier(user_id):
+            return self._clean_subject_text(user_id)
+
+        return "该用户"
+
+    def _clean_subject_text(self, text: str) -> str:
+        if not text:
+            return ""
+        cleaned = re.sub(r"[\s\u3000]+", " ", text).strip()
+        cleaned = re.sub(r"[、，,；;]+$", "", cleaned)
+        return cleaned
+
+    def _looks_like_system_identifier(self, value: str) -> bool:
+        if not value:
+            return False
+
+        condensed = value.replace("-", "").replace("_", "").strip()
+        if len(condensed) >= 16 and re.fullmatch(r"[0-9a-fA-F]+", condensed):
+            return True
+
+        if len(value) >= 12 and re.fullmatch(r"[0-9A-Z_:-]+", value) and any(ch.isdigit() for ch in value):
+            return True
+
+        return False
+
+    def _normalize_subject(
+        self,
+        subject: Any,
+        bot_identifiers: set[str],
+        system_identifiers: set[str],
+        default_subject: str,
+        bot_display: Optional[str] = None
+    ) -> Optional[str]:
+        if subject is None:
+            return default_subject
+
+        subject_str = subject if isinstance(subject, str) else str(subject)
+        cleaned = self._clean_subject_text(subject_str)
+        if not cleaned:
+            return default_subject
+
+        lowered = cleaned.lower()
+        bot_primary = self._clean_subject_text(bot_display or "")
+
+        if lowered in bot_identifiers:
+            return bot_primary or cleaned
+
+        if lowered in {"用户", "user", "the user", "对方", "对手"}:
+            return default_subject
+
+        prefix_match = re.match(r"^(用户|User|user|USER|成员|member|Member|target|Target|TARGET)[\s:：\-\u2014_]*?(.*)$", cleaned)
+        if prefix_match:
+            remainder = self._clean_subject_text(prefix_match.group(2))
+            if not remainder:
+                return default_subject
+            remainder_lower = remainder.lower()
+            if remainder_lower in bot_identifiers:
+                return bot_primary or remainder
+            if (
+                remainder_lower in system_identifiers
+                or self._looks_like_system_identifier(remainder)
+            ):
+                return default_subject
+            cleaned = remainder
+            lowered = cleaned.lower()
+
+        if lowered in system_identifiers or self._looks_like_system_identifier(cleaned):
+            return default_subject
+
+        return cleaned
 
     def _extract_personal_info(
         self,
         text: str,
         user_id: str,
         timestamp: float,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        subject_display: str
     ) -> List[MemoryChunk]:
         """提取个人信息"""
         memories = []
@@ -437,7 +702,7 @@ class MemoryBuilder:
 
                 memory = create_memory_chunk(
                     user_id=user_id,
-                    subject=user_id,
+                    subject=subject_display,
                     predicate=predicate,
                     obj=obj,
                     memory_type=MemoryType.PERSONAL_FACT,
@@ -455,7 +720,8 @@ class MemoryBuilder:
         text: str,
         user_id: str,
         timestamp: float,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        subject_display: str
     ) -> List[MemoryChunk]:
         """提取偏好信息"""
         memories = []
@@ -474,7 +740,7 @@ class MemoryBuilder:
             if match:
                 memory = create_memory_chunk(
                     user_id=user_id,
-                    subject=user_id,
+                    subject=subject_display,
                     predicate=predicate,
                     obj=match.group(1),
                     memory_type=MemoryType.PREFERENCE,
@@ -492,7 +758,8 @@ class MemoryBuilder:
         text: str,
         user_id: str,
         timestamp: float,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        subject_display: str
     ) -> List[MemoryChunk]:
         """提取事件信息"""
         memories = []
@@ -503,7 +770,7 @@ class MemoryBuilder:
         if any(keyword in text for keyword in event_keywords):
             memory = create_memory_chunk(
                 user_id=user_id,
-                subject=user_id,
+                    subject=subject_display,
                 predicate="mentioned_event",
                 obj={"event_text": text, "timestamp": timestamp},
                 memory_type=MemoryType.EVENT,
@@ -634,26 +901,24 @@ class MemoryBuilder:
             r'明年|下一年': str(current_time.year + 1),
         }
 
-        # 检查并替换记忆内容中的相对时间
-        memory_content = memory.content.description
+        def _normalize_value(value):
+            if isinstance(value, str):
+                normalized = value
+                for pattern, replacement in relative_time_patterns.items():
+                    normalized = re.sub(pattern, replacement, normalized)
+                return normalized
+            if isinstance(value, dict):
+                return {k: _normalize_value(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_normalize_value(item) for item in value]
+            return value
 
-        # 应用时间规范化
-        for pattern, replacement in relative_time_patterns.items():
-            memory_content = re.sub(pattern, replacement, memory_content)
+        # 规范化主语和谓语（通常是字符串）
+        memory.content.subject = _normalize_value(memory.content.subject)
+        memory.content.predicate = _normalize_value(memory.content.predicate)
 
-        # 更新记忆内容
-        memory.content.description = memory_content
-
-        # 如果记忆有对象信息，也进行时间规范化
-        if hasattr(memory.content, 'object') and isinstance(memory.content.object, dict):
-            obj_str = str(memory.content.object)
-            for pattern, replacement in relative_time_patterns.items():
-                obj_str = re.sub(pattern, replacement, obj_str)
-            try:
-                # 尝试解析回字典（如果原来是字典）
-                memory.content.object = eval(obj_str) if obj_str.startswith('{') else obj_str
-            except Exception:
-                memory.content.object = obj_str
+        # 规范化宾语（可能是字符串、列表或字典）
+        memory.content.object = _normalize_value(memory.content.object)
 
         # 记录时间规范化操作
         logger.debug(f"记忆 {memory.memory_id} 已进行时间规范化")

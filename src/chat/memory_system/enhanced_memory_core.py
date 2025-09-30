@@ -17,7 +17,7 @@ from src.common.logger import get_logger
 from src.llm_models.utils_model import LLMRequest
 from src.config.config import model_config, global_config
 from src.chat.memory_system.memory_chunk import MemoryChunk
-from src.chat.memory_system.memory_builder import MemoryBuilder
+from src.chat.memory_system.memory_builder import MemoryBuilder, MemoryExtractionError
 from src.chat.memory_system.memory_fusion import MemoryFusionEngine
 from src.chat.memory_system.vector_storage import VectorStorageManager, VectorStorageConfig
 from src.chat.memory_system.metadata_index import MetadataIndexManager
@@ -295,6 +295,9 @@ class EnhancedMemorySystem:
             # 4. 存储记忆
             await self._store_memories(fused_chunks)
 
+            # 4.1 控制台预览
+            self._log_memory_preview(fused_chunks)
+
             # 5. 更新统计
             self.total_memories += len(fused_chunks)
             self.last_build_time = time.time()
@@ -307,6 +310,15 @@ class EnhancedMemorySystem:
             self.status = original_status
             return fused_chunks
 
+        except MemoryExtractionError as e:
+            if build_scope_key and build_marker_time is not None:
+                recorded_time = self._last_memory_build_times.get(build_scope_key)
+                if recorded_time == build_marker_time:
+                    self._last_memory_build_times.pop(build_scope_key, None)
+            self.status = original_status
+            logger.warning("记忆构建因LLM响应问题中断: %s", e)
+            return []
+
         except Exception as e:
             if build_scope_key and build_marker_time is not None:
                 recorded_time = self._last_memory_build_times.get(build_scope_key)
@@ -315,6 +327,23 @@ class EnhancedMemorySystem:
             self.status = MemorySystemStatus.ERROR
             logger.error(f"❌ 记忆构建失败: {e}", exc_info=True)
             raise
+
+    def _log_memory_preview(self, memories: List[MemoryChunk]) -> None:
+        """在控制台输出记忆预览，便于人工检查"""
+        if not memories:
+            logger.info("📝 本次未生成新的记忆")
+            return
+
+        logger.info(f"📝 本次生成的记忆预览 ({len(memories)} 条):")
+        for idx, memory in enumerate(memories, start=1):
+            text = memory.text_content or ""
+            if len(text) > 120:
+                text = text[:117] + "..."
+
+            logger.info(
+                f"  {idx}) 类型={memory.memory_type.value} 重要性={memory.metadata.importance.name} "
+                f"置信度={memory.metadata.confidence.name} | 内容={text}"
+            )
 
     async def process_conversation_memory(
         self,

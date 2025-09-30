@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import re
 import time
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
@@ -31,6 +32,7 @@ class EnhancedMemoryResult:
     timestamp: float
     source: str = "enhanced_memory"
     relevance_score: float = 0.0
+    structure: Dict[str, Any] | None = None
 
 
 class EnhancedMemoryManager:
@@ -40,6 +42,14 @@ class EnhancedMemoryManager:
         self.enhanced_system: Optional[EnhancedMemorySystem] = None
         self.is_initialized = False
         self.user_cache = {}  # 用户记忆缓存
+
+    def _clean_text(self, text: Any) -> str:
+        if text is None:
+            return ""
+
+        cleaned = re.sub(r"[\s\u3000]+", " ", str(text)).strip()
+        cleaned = re.sub(r"[、，,；;]+$", "", cleaned)
+        return cleaned
 
     async def initialize(self):
         """初始化增强记忆系统"""
@@ -271,14 +281,16 @@ class EnhancedMemoryManager:
 
             results = []
             for memory in relevant_memories:
+                formatted_content, structure = self._format_memory_chunk(memory)
                 result = EnhancedMemoryResult(
-                    content=memory.text_content,
+                    content=formatted_content,
                     memory_type=memory.memory_type.value,
                     confidence=memory.metadata.confidence.value,
                     importance=memory.metadata.importance.value,
                     timestamp=memory.metadata.created_at,
                     source="enhanced_memory",
-                    relevance_score=memory.metadata.relevance_score
+                    relevance_score=memory.metadata.relevance_score,
+                    structure=structure
                 )
                 results.append(result)
 
@@ -287,6 +299,197 @@ class EnhancedMemoryManager:
         except Exception as e:
             logger.error(f"get_enhanced_memory_context 失败: {e}")
             return []
+
+    def _format_memory_chunk(self, memory: MemoryChunk) -> Tuple[str, Dict[str, Any]]:
+        """将记忆块转换为更易读的文本描述"""
+        structure = memory.content.to_dict()
+        subject = structure.get("subject")
+        predicate = structure.get("predicate") or ""
+        obj = structure.get("object")
+
+        subject_display = self._format_subject(subject, memory)
+        formatted = self._apply_predicate_format(subject_display, predicate, obj)
+
+        if not formatted:
+            predicate_display = self._format_predicate(predicate)
+            object_display = self._format_object(obj)
+            formatted = f"{subject_display}{predicate_display}{object_display}".strip()
+
+        formatted = self._clean_text(formatted)
+
+        return formatted, structure
+
+    def _format_subject(self, subject: Optional[str], memory: MemoryChunk) -> str:
+        if not subject:
+            return "该用户"
+
+        if subject == memory.metadata.user_id:
+            return "该用户"
+        if memory.metadata.chat_id and subject == memory.metadata.chat_id:
+            return "该聊天"
+        return self._clean_text(subject)
+
+    def _apply_predicate_format(self, subject: str, predicate: str, obj: Any) -> Optional[str]:
+        predicate = (predicate or "").strip()
+        obj_value = obj
+
+        if predicate == "is_named":
+            name = self._extract_from_object(obj_value, ["name", "nickname"]) or self._format_object(obj_value)
+            name = self._clean_text(name)
+            if not name:
+                return None
+            name_display = name if (name.startswith("「") and name.endswith("」")) else f"「{name}」"
+            return f"{subject}的昵称是{name_display}"
+        if predicate == "is_age":
+            age = self._extract_from_object(obj_value, ["age"]) or self._format_object(obj_value)
+            age = self._clean_text(age)
+            if not age:
+                return None
+            return f"{subject}今年{age}岁"
+        if predicate == "is_profession":
+            profession = self._extract_from_object(obj_value, ["profession", "job"]) or self._format_object(obj_value)
+            profession = self._clean_text(profession)
+            if not profession:
+                return None
+            return f"{subject}的职业是{profession}"
+        if predicate == "lives_in":
+            location = self._extract_from_object(obj_value, ["location", "city", "place"]) or self._format_object(obj_value)
+            location = self._clean_text(location)
+            if not location:
+                return None
+            return f"{subject}居住在{location}"
+        if predicate == "has_phone":
+            phone = self._extract_from_object(obj_value, ["phone", "number"]) or self._format_object(obj_value)
+            phone = self._clean_text(phone)
+            if not phone:
+                return None
+            return f"{subject}的电话号码是{phone}"
+        if predicate == "has_email":
+            email = self._extract_from_object(obj_value, ["email"]) or self._format_object(obj_value)
+            email = self._clean_text(email)
+            if not email:
+                return None
+            return f"{subject}的邮箱是{email}"
+        if predicate == "likes":
+            liked = self._format_object(obj_value)
+            if not liked:
+                return None
+            return f"{subject}喜欢{liked}"
+        if predicate == "likes_food":
+            food = self._format_object(obj_value)
+            if not food:
+                return None
+            return f"{subject}爱吃{food}"
+        if predicate == "dislikes":
+            disliked = self._format_object(obj_value)
+            if not disliked:
+                return None
+            return f"{subject}不喜欢{disliked}"
+        if predicate == "hates":
+            hated = self._format_object(obj_value)
+            if not hated:
+                return None
+            return f"{subject}讨厌{hated}"
+        if predicate == "favorite_is":
+            favorite = self._format_object(obj_value)
+            if not favorite:
+                return None
+            return f"{subject}最喜欢{favorite}"
+        if predicate == "mentioned_event":
+            event_text = self._extract_from_object(obj_value, ["event_text", "description"]) or self._format_object(obj_value)
+            event_text = self._clean_text(self._truncate(event_text))
+            if not event_text:
+                return None
+            return f"{subject}提到了计划或事件：{event_text}"
+        if predicate in {"正在", "在", "正在进行"}:
+            action = self._format_object(obj_value)
+            if not action:
+                return None
+            return f"{subject}{predicate}{action}"
+        if predicate in {"感到", "觉得", "表示", "提到", "说道", "说"}:
+            feeling = self._format_object(obj_value)
+            if not feeling:
+                return None
+            return f"{subject}{predicate}{feeling}"
+        if predicate in {"与", "和", "跟"}:
+            counterpart = self._format_object(obj_value)
+            if counterpart:
+                return f"{subject}{predicate}{counterpart}"
+            return f"{subject}{predicate}"
+
+        return None
+
+    def _format_predicate(self, predicate: str) -> str:
+        if not predicate:
+            return ""
+        predicate_map = {
+            "is_named": "的昵称是",
+            "is_profession": "的职业是",
+            "lives_in": "居住在",
+            "has_phone": "的电话是",
+            "has_email": "的邮箱是",
+            "likes": "喜欢",
+            "dislikes": "不喜欢",
+            "likes_food": "爱吃",
+            "hates": "讨厌",
+            "favorite_is": "最喜欢",
+            "mentioned_event": "提到的事件",
+        }
+        if predicate in predicate_map:
+            connector = predicate_map[predicate]
+            if connector.startswith("的"):
+                return connector
+            return f" {connector} "
+        cleaned = predicate.replace("_", " ").strip()
+        if re.search(r"[\u4e00-\u9fff]", cleaned):
+            return cleaned
+        return f" {cleaned} "
+
+    def _format_object(self, obj: Any) -> str:
+        if obj is None:
+            return ""
+        if isinstance(obj, dict):
+            parts = []
+            for key, value in obj.items():
+                formatted_value = self._format_object(value)
+                if not formatted_value:
+                    continue
+                pretty_key = {
+                    "name": "名字",
+                    "profession": "职业",
+                    "location": "位置",
+                    "event_text": "内容",
+                    "timestamp": "时间",
+                }.get(key, key)
+                parts.append(f"{pretty_key}: {formatted_value}")
+            return self._clean_text("；".join(parts))
+        if isinstance(obj, list):
+            formatted_items = [self._format_object(item) for item in obj]
+            filtered = [item for item in formatted_items if item]
+            return self._clean_text("、".join(filtered)) if filtered else ""
+        if isinstance(obj, (int, float)):
+            return str(obj)
+        text = self._truncate(str(obj).strip())
+        return self._clean_text(text)
+
+    def _extract_from_object(self, obj: Any, keys: List[str]) -> Optional[str]:
+        if isinstance(obj, dict):
+            for key in keys:
+                if key in obj and obj[key]:
+                    value = obj[key]
+                    if isinstance(value, (dict, list)):
+                        return self._clean_text(self._format_object(value))
+                    return self._clean_text(value)
+        if isinstance(obj, list) and obj:
+            return self._clean_text(self._format_object(obj[0]))
+        if isinstance(obj, (str, int, float)):
+            return self._clean_text(obj)
+        return None
+
+    def _truncate(self, text: str, max_length: int = 80) -> str:
+        if len(text) <= max_length:
+            return text
+        return text[: max_length - 1] + "…"
 
     async def shutdown(self):
         """关闭增强记忆系统"""

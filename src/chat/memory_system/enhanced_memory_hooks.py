@@ -55,12 +55,27 @@ class EnhancedMemoryHooks:
             if not enhanced_memory_manager.is_initialized:
                 await enhanced_memory_manager.initialize()
 
+            # 注入机器人基础人设，帮助记忆构建时避免记录自身信息
+            bot_config = getattr(global_config, "bot", None)
+            personality_config = getattr(global_config, "personality", None)
+            bot_context = {}
+            if bot_config is not None:
+                bot_context["bot_name"] = getattr(bot_config, "nickname", None)
+                bot_context["bot_aliases"] = list(getattr(bot_config, "alias_names", []) or [])
+                bot_context["bot_account"] = getattr(bot_config, "qq_account", None)
+
+            if personality_config is not None:
+                bot_context["bot_identity"] = getattr(personality_config, "identity", None)
+                bot_context["bot_personality"] = getattr(personality_config, "personality_core", None)
+                bot_context["bot_personality_side"] = getattr(personality_config, "personality_side", None)
+
             # 构建上下文
             memory_context = {
                 "chat_id": chat_id,
                 "message_id": message_id,
                 "timestamp": datetime.now().timestamp(),
                 "message_type": "user_message",
+                **bot_context,
                 **(context or {})
             }
 
@@ -92,7 +107,8 @@ class EnhancedMemoryHooks:
         query_text: str,
         user_id: str,
         chat_id: str,
-        limit: int = 5
+        limit: int = 5,
+        extra_context: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         为回复获取相关记忆
@@ -123,6 +139,9 @@ class EnhancedMemoryHooks:
                 ]
             }
 
+            if extra_context:
+                context.update(extra_context)
+
             # 获取相关记忆
             enhanced_results = await enhanced_memory_manager.get_enhanced_memory_context(
                 query_text=query_text,
@@ -140,7 +159,9 @@ class EnhancedMemoryHooks:
                     "confidence": result.confidence,
                     "importance": result.importance,
                     "timestamp": result.timestamp,
-                    "source": result.source
+                    "source": result.source,
+                    "relevance": result.relevance_score,
+                    "structure": result.structure,
                 }
                 results.append(memory_dict)
 

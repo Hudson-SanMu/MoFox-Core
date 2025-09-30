@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Tuple, Set, Any
 from dataclasses import dataclass
 from datetime import datetime
 import threading
-from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -130,10 +129,11 @@ class VectorStorageManager:
             await self.initialize_embedding_model()
 
             # 批量获取嵌入向量
-            embedding_tasks = []
             memory_texts = []
 
             for memory in memories:
+                # 预先缓存记忆，确保后续流程可访问
+                self.memory_cache[memory.memory_id] = memory
                 if memory.embedding is None:
                     # 如果没有嵌入向量，需要生成
                     text = self._prepare_embedding_text(memory)
@@ -183,10 +183,10 @@ class VectorStorageManager:
             memory_ids = [memory_id for memory_id, _ in memory_texts]
 
             # 批量生成嵌入向量
-            embeddings = await self._batch_generate_embeddings(texts)
+            embeddings = await self._batch_generate_embeddings(memory_ids, texts)
 
             # 存储向量和记忆
-            for memory_id, embedding in zip(memory_ids, embeddings):
+            for memory_id, embedding in embeddings.items():
                 if embedding and len(embedding) == self.config.dimension:
                     memory = self.memory_cache.get(memory_id)
                     if memory:
@@ -195,76 +195,43 @@ class VectorStorageManager:
         except Exception as e:
             logger.error(f"❌ 批量生成嵌入向量失败: {e}")
 
-    async def _batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    async def _batch_generate_embeddings(self, memory_ids: List[str], texts: List[str]) -> Dict[str, List[float]]:
         """批量生成嵌入向量"""
         if not texts:
-            return []
+            return {}
+
+        results: Dict[str, List[float]] = {}
 
         try:
-            # 创建新的事件循环来运行异步操作
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            semaphore = asyncio.Semaphore(min(4, max(1, len(texts))))
 
-            try:
-                # 使用线程池并行生成嵌入向量
-                with ThreadPoolExecutor(max_workers=min(4, len(texts))) as executor:
-                    tasks = []
-                    for text in texts:
-                        task = loop.run_in_executor(
-                            executor,
-                            self._generate_single_embedding,
-                            text
-                        )
-                        tasks.append(task)
+            async def generate_embedding(memory_id: str, text: str) -> None:
+                async with semaphore:
+                    try:
+                        embedding, _ = await self.embedding_model.get_embedding(text)
+                        if embedding and len(embedding) == self.config.dimension:
+                            results[memory_id] = embedding
+                        else:
+                            logger.warning(
+                                "嵌入向量维度不匹配: 期望 %d, 实际 %d (memory_id=%s)",
+                                self.config.dimension,
+                                len(embedding) if embedding else 0,
+                                memory_id,
+                            )
+                            results[memory_id] = []
+                    except Exception as exc:
+                        logger.warning("生成记忆 %s 的嵌入向量失败: %s", memory_id, exc)
+                        results[memory_id] = []
 
-                    embeddings = await asyncio.gather(*tasks, return_exceptions=True)
-
-                # 处理结果
-                valid_embeddings = []
-                for i, embedding in enumerate(embeddings):
-                    if isinstance(embedding, Exception):
-                        logger.warning(f"生成第 {i} 个文本的嵌入向量失败: {embedding}")
-                        valid_embeddings.append([])
-                    elif embedding and len(embedding) == self.config.dimension:
-                        valid_embeddings.append(embedding)
-                    else:
-                        logger.warning(f"第 {i} 个文本的嵌入向量格式异常")
-                        valid_embeddings.append([])
-
-                return valid_embeddings
-
-            finally:
-                loop.close()
+            tasks = [asyncio.create_task(generate_embedding(mid, text)) for mid, text in zip(memory_ids, texts)]
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         except Exception as e:
             logger.error(f"❌ 批量生成嵌入向量失败: {e}")
-            return [[] for _ in texts]
+            for memory_id in memory_ids:
+                results.setdefault(memory_id, [])
 
-    def _generate_single_embedding(self, text: str) -> List[float]:
-        """生成单个文本的嵌入向量"""
-        try:
-            # 创建新的事件循环
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            try:
-                # 使用模型生成嵌入向量
-                embedding, _ = loop.run_until_complete(
-                    self.embedding_model.get_embedding(text)
-                )
-
-                if embedding and len(embedding) == self.config.dimension:
-                    return embedding
-                else:
-                    logger.warning(f"嵌入向量维度不匹配: 期望 {self.config.dimension}, 实际 {len(embedding) if embedding else 0}")
-                    return []
-
-            finally:
-                loop.close()
-
-        except Exception as e:
-            logger.error(f"生成嵌入向量失败: {e}")
-            return []
+        return results
 
     async def _add_single_memory(self, memory: MemoryChunk, embedding: List[float]):
         """添加单个记忆到向量存储"""

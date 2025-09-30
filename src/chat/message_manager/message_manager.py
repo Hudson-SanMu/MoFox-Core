@@ -8,6 +8,7 @@ import random
 import time
 from typing import Dict, Optional, Any, TYPE_CHECKING, List
 
+from src.chat.message_receive.chat_stream import ChatStream
 from src.common.logger import get_logger
 from src.common.data_models.database_data_model import DatabaseMessages
 from src.common.data_models.message_manager_data_model import StreamContext, MessageManagerStats, StreamStats
@@ -86,11 +87,8 @@ class MessageManager:
             if not chat_stream:
                 logger.warning(f"MessageManager.add_message: 聊天流 {stream_id} 不存在")
                 return
-            success = await chat_stream.context_manager.add_message(message)
-            if success:
-                logger.debug(f"添加消息到聊天流 {stream_id}: {message.message_id}")
-            else:
-                logger.warning(f"添加消息到聊天流 {stream_id} 失败")
+            await self._check_and_handle_interruption(chat_stream)
+            chat_stream.context_manager.context.processing_task = asyncio.create_task(chat_stream.context_manager.add_message(message))
         except Exception as e:
             logger.error(f"添加消息到聊天流 {stream_id} 时发生错误: {e}")
 
@@ -280,51 +278,51 @@ class MessageManager:
         except Exception as e:
             logger.error(f"清理不活跃聊天流时发生错误: {e}")
 
-    async def _check_and_handle_interruption(self, context: StreamContext, stream_id: str):
+    async def _check_and_handle_interruption(self, chat_stream: Optional[ChatStream] = None):
         """检查并处理消息打断"""
         if not global_config.chat.interruption_enabled:
             return
 
         # 检查是否有正在进行的处理任务
-        if context.processing_task and not context.processing_task.done():
+        if chat_stream.context_manager.context.processing_task and not chat_stream.context_manager.context.processing_task.done():
             # 计算打断概率
-            interruption_probability = context.calculate_interruption_probability(
+            interruption_probability = chat_stream.context_manager.context.calculate_interruption_probability(
                 global_config.chat.interruption_max_limit, global_config.chat.interruption_probability_factor
             )
 
             # 检查是否已达到最大打断次数
-            if context.interruption_count >= global_config.chat.interruption_max_limit:
+            if chat_stream.context_manager.context.interruption_count >= global_config.chat.interruption_max_limit:
                 logger.debug(
-                    f"聊天流 {stream_id} 已达到最大打断次数 {context.interruption_count}/{global_config.chat.interruption_max_limit}，跳过打断检查"
+                    f"聊天流 {chat_stream.stream_id} 已达到最大打断次数 {chat_stream.context_manager.context.interruption_count}/{global_config.chat.interruption_max_limit}，跳过打断检查"
                 )
                 return
 
             # 根据概率决定是否打断
             if random.random() < interruption_probability:
-                logger.info(f"聊天流 {stream_id} 触发消息打断，打断概率: {interruption_probability:.2f}")
+                logger.info(f"聊天流 {chat_stream.stream_id} 触发消息打断，打断概率: {interruption_probability:.2f}")
 
                 # 取消现有任务
-                context.processing_task.cancel()
+                chat_stream.context_manager.context.processing_task.cancel()
                 try:
-                    await context.processing_task
+                    await chat_stream.context_manager.context.processing_task
                 except asyncio.CancelledError:
                     pass
 
                 # 增加打断计数并应用afc阈值降低
-                context.increment_interruption_count()
-                context.apply_interruption_afc_reduction(global_config.chat.interruption_afc_reduction)
+                chat_stream.context_manager.context.increment_interruption_count()
+                chat_stream.context_manager.context.apply_interruption_afc_reduction(global_config.chat.interruption_afc_reduction)
 
                 # 检查是否已达到最大次数
-                if context.interruption_count >= global_config.chat.interruption_max_limit:
+                if chat_stream.context_manager.context.interruption_count >= global_config.chat.interruption_max_limit:
                     logger.warning(
-                        f"聊天流 {stream_id} 已达到最大打断次数 {context.interruption_count}/{global_config.chat.interruption_max_limit}，后续消息将不再打断"
+                        f"聊天流 {chat_stream.stream_id} 已达到最大打断次数 {chat_stream.context_manager.context.interruption_count}/{global_config.chat.interruption_max_limit}，后续消息将不再打断"
                     )
                 else:
                     logger.info(
-                        f"聊天流 {stream_id} 已打断，当前打断次数: {context.interruption_count}/{global_config.chat.interruption_max_limit}, afc阈值调整: {context.get_afc_threshold_adjustment()}"
+                        f"聊天流 {chat_stream.stream_id} 已打断，当前打断次数: {chat_stream.context_manager.context.interruption_count}/{global_config.chat.interruption_max_limit}, afc阈值调整: {chat_stream.context_manager.context.get_afc_threshold_adjustment()}"
                     )
             else:
-                logger.debug(f"聊天流 {stream_id} 未触发打断，打断概率: {interruption_probability:.2f}")
+                logger.debug(f"聊天流 {chat_stream.stream_id} 未触发打断，打断概率: {interruption_probability:.2f}")
 
     async def clear_all_unread_messages(self, stream_id: str):
         """清除指定上下文中的所有未读消息，在消息处理完成后调用"""
@@ -358,4 +356,4 @@ class MessageManager:
 
 
 # 创建全局消息管理器实例
-message_manager = MessageManager()
+message_manager = MessageManag

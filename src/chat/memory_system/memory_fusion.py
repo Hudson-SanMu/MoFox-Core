@@ -80,6 +80,12 @@ class MemoryFusionEngine:
                 new_memories, existing_memories or []
             )
 
+            if not duplicate_groups:
+                fusion_time = time.time() - start_time
+                self._update_fusion_stats(len(new_memories), 0, fusion_time)
+                logger.info("✅ 记忆融合完成: %d 条记忆，移除 0 条重复", len(new_memories))
+                return new_memories
+
             # 2. 对每个重复组进行融合
             fused_memories = []
             removed_count = 0
@@ -113,6 +119,7 @@ class MemoryFusionEngine:
     ) -> List[DuplicateGroup]:
         """检测重复记忆组"""
         all_memories = new_memories + existing_memories
+        new_memory_ids = {memory.memory_id for memory in new_memories}
         groups = []
         processed_ids = set()
 
@@ -147,6 +154,10 @@ class MemoryFusionEngine:
                 # 选择代表性记忆
                 group.representative_memory = self._select_representative_memory(group)
                 groups.append(group)
+            else:
+                # 仅包含单条记忆，只有当其来自新记忆列表时保留
+                if memory1.memory_id in new_memory_ids:
+                    groups.append(group)
 
         logger.debug(f"检测到 {len(groups)} 个重复记忆组")
         return groups

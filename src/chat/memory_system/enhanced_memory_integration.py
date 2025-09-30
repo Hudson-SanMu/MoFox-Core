@@ -56,7 +56,8 @@ async def get_relevant_memories_for_response(
     query_text: str,
     user_id: str,
     chat_id: str,
-    limit: int = 5
+    limit: int = 5,
+    extra_context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     为回复获取相关记忆
@@ -65,7 +66,8 @@ async def get_relevant_memories_for_response(
         query_text: 查询文本（通常是用户的当前消息）
         user_id: 用户ID
         chat_id: 聊天ID
-        limit: 返回记忆数量限制
+    limit: 返回记忆数量限制
+    extra_context: 额外上下文信息
 
     Returns:
         Dict: 包含记忆信息的字典
@@ -75,7 +77,8 @@ async def get_relevant_memories_for_response(
             query_text=query_text,
             user_id=user_id,
             chat_id=chat_id,
-            limit=limit
+            limit=limit,
+            extra_context=extra_context
         )
 
         result = {
@@ -157,7 +160,8 @@ def get_memory_system_status() -> Dict[str, Any]:
 async def remember_message(
     message: str,
     user_id: str = "default_user",
-    chat_id: str = "default_chat"
+    chat_id: str = "default_chat",
+    context: Optional[Dict[str, Any]] = None
 ) -> bool:
     """
     便捷的记忆构建函数
@@ -176,7 +180,8 @@ async def remember_message(
         message_content=message,
         user_id=user_id,
         chat_id=chat_id,
-        message_id=message_id
+        message_id=message_id,
+        context=context
     )
 
 
@@ -184,7 +189,8 @@ async def recall_memories(
     query: str,
     user_id: str = "default_user",
     chat_id: str = "default_chat",
-    limit: int = 5
+    limit: int = 5,
+    context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     便捷的记忆检索函数
@@ -202,5 +208,6 @@ async def recall_memories(
         query_text=query,
         user_id=user_id,
         chat_id=chat_id,
-        limit=limit
+        limit=limit,
+        extra_context=context
     )

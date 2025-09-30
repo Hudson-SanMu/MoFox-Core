@@ -421,7 +421,7 @@ class Prompt:
                     context_data[key] = value
 
         except asyncio.TimeoutError:
-            logger.error(f"构建超时 ({timeout_seconds}s)")
+            logger.error("构建超时")
             context_data = {}
             for key, value in pre_built_params.items():
                 if value:
@@ -584,14 +584,18 @@ class Prompt:
 
             # 构建记忆块
             memory_parts = []
+            existing_contents = set()
 
             if running_memories:
                 memory_parts.append("以下是当前在聊天中，你回忆起的记忆：")
                 for memory in running_memories:
-                    memory_parts.append(f"- {memory['content']}")
+                    content = memory["content"]
+                    memory_parts.append(f"- {content}")
+                    existing_contents.add(content)
 
             if instant_memory:
-                memory_parts.append(f"- {instant_memory}")
+                if instant_memory not in existing_contents:
+                    memory_parts.append(f"- 最相关记忆：{instant_memory}")
 
             memory_block = "\n".join(memory_parts) if memory_parts else ""
 
