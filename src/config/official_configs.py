@@ -158,6 +158,9 @@ class ChatConfig(ValidatedConfigBase):
     dynamic_distribution_jitter_factor: float = Field(
         default=0.2, ge=0.0, le=0.5, description="分发间隔随机扰动因子"
     )
+    max_concurrent_distributions: int = Field(
+        default=10, ge=1, le=100, description="最大并发处理的消息流数量"
+    )
 
     def get_current_talk_frequency(self, chat_stream_id: Optional[str] = None) -> float:
         """

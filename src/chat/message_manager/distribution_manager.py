@@ -34,8 +34,8 @@ class StreamLoopManager:
         }
 
         # 配置参数
-        self.max_concurrent_streams = max_concurrent_streams or getattr(
-            global_config.chat, "max_concurrent_distributions", 10
+        self.max_concurrent_streams = (
+            max_concurrent_streams or global_config.chat.max_concurrent_distributions
         )
 
         # 强制分发策略

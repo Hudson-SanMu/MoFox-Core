@@ -1,5 +1,5 @@
 [inner]
-version = "7.0.2"
+version = "7.0.3"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -155,6 +155,7 @@ dynamic_distribution_base_interval = 5.0 # 基础分发间隔（秒）
 dynamic_distribution_min_interval = 1.0 # 最小分发间隔（秒）
 dynamic_distribution_max_interval = 30.0 # 最大分发间隔（秒）
 dynamic_distribution_jitter_factor = 0.2 # 分发间隔随机扰动因子
+max_concurrent_distributions = 10 # 最大并发处理的消息流数量，可以根据API性能和服务器负载调整
 
 talk_frequency_adjust = [
     ["", "8:00,0.5", "12:00,0.6", "18:00,0.8", "01:00,0.3"],
