@@ -111,17 +111,47 @@ class ChatterPlanExecutor:
         }
 
     async def _execute_reply_actions(self, reply_actions: List[ActionPlannerInfo], plan: Plan) -> Dict[str, any]:
-        """串行执行所有回复动作"""
+        """串行执行所有回复动作，增加去重逻辑，避免对同一消息多次回复"""
         results = []
-        total_actions = len(reply_actions)
-        if total_actions > 1:
+
+        # --- 新增去重逻辑 ---
+        unique_actions = []
+        replied_message_ids = set()
+        for action_info in reply_actions:
+            target_message = action_info.action_message
+            message_id = None
+            if target_message:
+                # 兼容 Pydantic 对象和字典两种情况
+                if hasattr(target_message, "message_id"):
+                    message_id = getattr(target_message, "message_id", None)
+                elif isinstance(target_message, dict):
+                    message_id = target_message.get("message_id")
+
+            if message_id:
+                if message_id not in replied_message_ids:
+                    unique_actions.append(action_info)
+                    replied_message_ids.add(message_id)
+                else:
+                    logger.warning(
+                        f"[多重回复] 检测到对消息ID '{message_id}' 的重复回复，已过滤。"
+                        f" (动作: {action_info.action_type}, 原因: {action_info.reasoning})"
+                    )
+            else:
+                # 如果没有message_id，无法去重，直接添加
+                unique_actions.append(action_info)
+        # --- 去重逻辑结束 ---
+
+        total_actions = len(unique_actions)
+        if len(reply_actions) > total_actions:
+            logger.info(f"[多重回复] 原始回复任务 {len(reply_actions)} 个，去重后剩余 {total_actions} 个。")
+        elif total_actions > 1:
             logger.info(f"[多重回复] 开始执行 {total_actions} 个回复任务。")
 
-        for i, action_info in enumerate(reply_actions):
+        for i, action_info in enumerate(unique_actions):
             is_last_action = i == total_actions - 1
             if total_actions > 1:
                 logger.info(f"[多重回复] 正在执行第 {i+1}/{total_actions} 个回复...")
-            
+
             # 传递 clear_unread 参数
             result = await self._execute_single_reply_action(action_info, plan, clear_unread=is_last_action)
             results.append(result)
