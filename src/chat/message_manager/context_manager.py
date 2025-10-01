@@ -59,7 +59,7 @@ class SingleStreamContextManager:
             self.total_messages += 1
             self.last_access_time = time.time()
             # 启动流的循环任务（如果还未启动）
-            await stream_loop_manager.start_stream_loop(self.stream_id)
+            asyncio.create_task(stream_loop_manager.start_stream_loop(self.stream_id))
             logger.debug(f"添加消息{message.processed_plain_text}到单流上下文: {self.stream_id}")
             return True
         except Exception as e:
@@ -275,7 +275,7 @@ class SingleStreamContextManager:
             self.last_access_time = time.time()
 
             # 启动流的循环任务（如果还未启动）
-            await stream_loop_manager.start_stream_loop(self.stream_id)
+            asyncio.create_task(stream_loop_manager.start_stream_loop(self.stream_id))
 
             logger.debug(f"添加消息到单流上下文(异步): {self.stream_id} (兴趣度待计算)")
             return True

@@ -6,6 +6,33 @@ import urllib3
 import ssl
 import io
 
+import asyncio
+import time
+from asyncio import Lock
+
+_internal_cache = {}
+_cache_lock = Lock()
+CACHE_TIMEOUT = 300  # 缓存5分钟
+
+
+async def get_from_cache(key: str):
+    async with _cache_lock:
+        data = _internal_cache.get(key)
+        if not data:
+            return None
+
+        result, timestamp = data
+        if time.time() - timestamp < CACHE_TIMEOUT:
+            logger.debug(f"从缓存命中: {key}")
+            return result
+        return None
+
+
+async def set_to_cache(key: str, value: any):
+    async with _cache_lock:
+        _internal_cache[key] = (value, time.time())
+
+
 from .database import BanUser, db_manager
 from src.common.logger import get_logger
 
@@ -27,11 +54,16 @@ class SSLAdapter(urllib3.PoolManager):
 
 async def get_group_info(websocket: Server.ServerConnection, group_id: int) -> dict | None:
     """
-    获取群相关信息
+    获取群相关信息 (带缓存)
 
     返回值需要处理可能为空的情况
     """
-    logger.debug("获取群聊信息中")
+    cache_key = f"group_info:{group_id}"
+    cached_data = await get_from_cache(cache_key)
+    if cached_data:
+        return cached_data
+
+    logger.debug(f"获取群聊信息中 (无缓存): {group_id}")
     request_uuid = str(uuid.uuid4())
     payload = json.dumps({"action": "get_group_info", "params": {"group_id": group_id}, "echo": request_uuid})
     try:
@@ -43,8 +75,11 @@ async def get_group_info(websocket: Server.ServerConnection, group_id: int) -> d
     except Exception as e:
         logger.error(f"获取群信息失败: {e}")
         return None
-    logger.debug(socket_response)
-    return socket_response.get("data")
+    
+    data = socket_response.get("data")
+    if data:
+        await set_to_cache(cache_key, data)
+    return data
 
 
 async def get_group_detail_info(websocket: Server.ServerConnection, group_id: int) -> dict | None:
@@ -71,11 +106,16 @@ async def get_group_detail_info(websocket: Server.ServerConnection, group_id: in
 
 async def get_member_info(websocket: Server.ServerConnection, group_id: int, user_id: int) -> dict | None:
     """
-    获取群成员信息
+    获取群成员信息 (带缓存)
 
     返回值需要处理可能为空的情况
     """
-    logger.debug("获取群成员信息中")
+    cache_key = f"member_info:{group_id}:{user_id}"
+    cached_data = await get_from_cache(cache_key)
+    if cached_data:
+        return cached_data
+        
+    logger.debug(f"获取群成员信息中 (无缓存): group={group_id}, user={user_id}")
     request_uuid = str(uuid.uuid4())
     payload = json.dumps(
         {
@@ -93,8 +133,11 @@ async def get_member_info(websocket: Server.ServerConnection, group_id: int, use
     except Exception as e:
         logger.error(f"获取成员信息失败: {e}")
         return None
-    logger.debug(socket_response)
-    return socket_response.get("data")
+    
+    data = socket_response.get("data")
+    if data:
+        await set_to_cache(cache_key, data)
+    return data
 
 
 async def get_image_base64(url: str) -> str:
@@ -137,13 +180,18 @@ def convert_image_to_gif(image_base64: str) -> str:
 
 async def get_self_info(websocket: Server.ServerConnection) -> dict | None:
     """
-    获取自身信息
+    获取自身信息 (带缓存)
     Parameters:
         websocket: WebSocket连接对象
     Returns:
         data: dict: 返回的自身信息
     """
-    logger.debug("获取自身信息中")
+    cache_key = "self_info"
+    cached_data = await get_from_cache(cache_key)
+    if cached_data:
+        return cached_data
+
+    logger.debug("获取自身信息中 (无缓存)")
     request_uuid = str(uuid.uuid4())
     payload = json.dumps({"action": "get_login_info", "params": {}, "echo": request_uuid})
     try:
@@ -155,8 +203,11 @@ async def get_self_info(websocket: Server.ServerConnection) -> dict | None:
     except Exception as e:
         logger.error(f"获取自身信息失败: {e}")
         return None
-    logger.debug(response)
-    return response.get("data")
+    
+    data = response.get("data")
+    if data:
+        await set_to_cache(cache_key, data)
+    return data
 
 
 def get_image_format(raw_data: str) -> str:
