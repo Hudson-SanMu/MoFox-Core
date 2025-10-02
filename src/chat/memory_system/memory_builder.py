@@ -96,19 +96,8 @@ class MemoryBuilder:
         try:
             logger.debug(f"开始从对话构建记忆，文本长度: {len(conversation_text)}")
 
-            # 预处理文本
-            processed_text = self._preprocess_text(conversation_text)
-
-            # 确定提取策略
-            strategy = self._determine_extraction_strategy(processed_text, context)
-
-            # 根据策略提取记忆
-            if strategy == ExtractionStrategy.LLM_BASED:
-                memories = await self._extract_with_llm(processed_text, context, user_id, timestamp)
-            elif strategy == ExtractionStrategy.RULE_BASED:
-                memories = self._extract_with_rules(processed_text, context, user_id, timestamp)
-            else:  # HYBRID
-                memories = await self._extract_with_hybrid(processed_text, context, user_id, timestamp)
+            # 使用LLM提取记忆
+            memories = await self._extract_with_llm(conversation_text, context, user_id, timestamp)
 
             # 后处理和验证
             validated_memories = self._validate_and_enhance_memories(memories, context)
@@ -128,41 +117,6 @@ class MemoryBuilder:
             logger.error(f"❌ 记忆构建失败: {e}", exc_info=True)
             self.extraction_stats["failed_extractions"] += 1
             raise
-
-    def _preprocess_text(self, text: str) -> str:
-        """预处理文本"""
-        # 移除多余的空白字符
-        text = re.sub(r'\s+', ' ', text.strip())
-
-        # 移除特殊字符，但保留基本标点
-        text = re.sub(r'[^\w\s\u4e00-\u9fff，。！？、；：""''（）【】]', '', text)
-
-        # 截断过长的文本
-        if len(text) > 2000:
-            text = text[:2000] + "..."
-
-        return text
-
-    def _determine_extraction_strategy(self, text: str, context: Dict[str, Any]) -> ExtractionStrategy:
-        """确定提取策略"""
-        text_length = len(text)
-        has_structured_data = any(key in context for key in ["structured_data", "entities", "keywords"])
-        message_type = context.get("message_type", "normal")
-
-        # 短文本使用规则提取
-        if text_length < 50:
-            return ExtractionStrategy.RULE_BASED
-
-        # 包含结构化数据使用混合策略
-        if has_structured_data:
-            return ExtractionStrategy.HYBRID
-
-        # 系统消息或命令使用规则提取
-        if message_type in ["command", "system"]:
-            return ExtractionStrategy.RULE_BASED
-
-        # 默认使用LLM提取
-        return ExtractionStrategy.LLM_BASED
 
     async def _extract_with_llm(
         self,
@@ -190,79 +144,10 @@ class MemoryBuilder:
             logger.error(f"LLM提取失败: {e}")
             raise MemoryExtractionError(str(e)) from e
 
-    def _extract_with_rules(
-        self,
-        text: str,
-        context: Dict[str, Any],
-        user_id: str,
-        timestamp: float
-    ) -> List[MemoryChunk]:
-        """使用规则提取记忆"""
-        memories = []
-
-        subjects = self._resolve_conversation_participants(context, user_id)
-
-        # 规则1: 检测个人信息
-        personal_info = self._extract_personal_info(text, user_id, timestamp, context, subjects)
-        memories.extend(personal_info)
-
-        # 规则2: 检测偏好信息
-        preferences = self._extract_preferences(text, user_id, timestamp, context, subjects)
-        memories.extend(preferences)
-
-        # 规则3: 检测事件信息
-        events = self._extract_events(text, user_id, timestamp, context, subjects)
-        memories.extend(events)
-
-        return memories
-
-    async def _extract_with_hybrid(
-        self,
-        text: str,
-        context: Dict[str, Any],
-        user_id: str,
-        timestamp: float
-    ) -> List[MemoryChunk]:
-        """混合策略提取记忆"""
-        all_memories = []
-
-        # 首先使用规则提取
-        rule_memories = self._extract_with_rules(text, context, user_id, timestamp)
-        all_memories.extend(rule_memories)
-
-        # 然后使用LLM提取
-        llm_memories = await self._extract_with_llm(text, context, user_id, timestamp)
-
-        # 合并和去重
-        final_memories = self._merge_hybrid_results(all_memories, llm_memories)
-
-        return final_memories
-
     def _build_llm_extraction_prompt(self, text: str, context: Dict[str, Any]) -> str:
         """构建LLM提取提示"""
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        chat_id = context.get("chat_id", "unknown")
         message_type = context.get("message_type", "normal")
-        target_user_id = context.get("user_id", "用户")
-        target_user_id = str(target_user_id)
-
-        target_user_name = (
-            context.get("user_display_name")
-            or context.get("user_name")
-            or context.get("nickname")
-            or context.get("sender_name")
-        )
-        if isinstance(target_user_name, str):
-            target_user_name = target_user_name.strip()
-        else:
-            target_user_name = ""
-
-        if not target_user_name or self._looks_like_system_identifier(target_user_name):
-            target_user_name = "该用户"
-
-        target_user_id_display = target_user_id
-        if self._looks_like_system_identifier(target_user_id_display):
-            target_user_id_display = "（系统ID，勿写入记忆）"
 
         bot_name = context.get("bot_name")
         bot_identity = context.get("bot_identity")
@@ -965,145 +850,6 @@ class MemoryBuilder:
         if predicate:
             return f"{subject_phrase}{predicate}".strip()
         return subject_phrase
-
-    def _extract_personal_info(
-        self,
-        text: str,
-        user_id: str,
-        timestamp: float,
-        context: Dict[str, Any],
-        subjects: List[str]
-    ) -> List[MemoryChunk]:
-        """提取个人信息"""
-        memories = []
-
-        # 常见个人信息模式
-        patterns = {
-            r"我叫(\w+)": ("is_named", {"name": "$1"}),
-            r"我今年(\d+)岁": ("is_age", {"age": "$1"}),
-            r"我是(\w+)": ("is_profession", {"profession": "$1"}),
-            r"我住在(\w+)": ("lives_in", {"location": "$1"}),
-            r"我的电话是(\d+)": ("has_phone", {"phone": "$1"}),
-            r"我的邮箱是(\w+@\w+\.\w+)": ("has_email", {"email": "$1"}),
-        }
-
-        for pattern, (predicate, obj_template) in patterns.items():
-            match = re.search(pattern, text)
-            if match:
-                obj = obj_template
-                for i, group in enumerate(match.groups(), 1):
-                    obj = {k: v.replace(f"${i}", group) for k, v in obj.items()}
-
-                memory = create_memory_chunk(
-                    user_id=user_id,
-                    subject=subjects,
-                    predicate=predicate,
-                    obj=obj,
-                    memory_type=MemoryType.PERSONAL_FACT,
-                    chat_id=context.get("chat_id"),
-                    importance=ImportanceLevel.HIGH,
-                    confidence=ConfidenceLevel.HIGH,
-                    display=self._compose_display_text(subjects, predicate, obj)
-                )
-
-                memories.append(memory)
-
-        return memories
-
-    def _extract_preferences(
-        self,
-        text: str,
-        user_id: str,
-        timestamp: float,
-        context: Dict[str, Any],
-        subjects: List[str]
-    ) -> List[MemoryChunk]:
-        """提取偏好信息"""
-        memories = []
-
-        # 偏好模式
-        preference_patterns = [
-            (r"我喜欢(.+)", "likes"),
-            (r"我不喜欢(.+)", "dislikes"),
-            (r"我爱吃(.+)", "likes_food"),
-            (r"我讨厌(.+)", "hates"),
-            (r"我最喜欢的(.+)", "favorite_is"),
-        ]
-
-        for pattern, predicate in preference_patterns:
-            match = re.search(pattern, text)
-            if match:
-                memory = create_memory_chunk(
-                    user_id=user_id,
-                    subject=subjects,
-                    predicate=predicate,
-                    obj=match.group(1),
-                    memory_type=MemoryType.PREFERENCE,
-                    chat_id=context.get("chat_id"),
-                    importance=ImportanceLevel.NORMAL,
-                    confidence=ConfidenceLevel.MEDIUM,
-                    display=self._compose_display_text(subjects, predicate, match.group(1))
-                )
-
-                memories.append(memory)
-
-        return memories
-
-    def _extract_events(
-        self,
-        text: str,
-        user_id: str,
-        timestamp: float,
-        context: Dict[str, Any],
-        subjects: List[str]
-    ) -> List[MemoryChunk]:
-        """提取事件信息"""
-        memories = []
-
-        # 事件关键词
-        event_keywords = ["明天", "今天", "昨天", "上周", "下周", "约会", "会议", "活动", "旅行", "生日"]
-
-        if any(keyword in text for keyword in event_keywords):
-            memory = create_memory_chunk(
-                user_id=user_id,
-                subject=subjects,
-                predicate="mentioned_event",
-                obj={"event_text": text, "timestamp": timestamp},
-                memory_type=MemoryType.EVENT,
-                chat_id=context.get("chat_id"),
-                importance=ImportanceLevel.NORMAL,
-                confidence=ConfidenceLevel.MEDIUM,
-                display=self._compose_display_text(subjects, "mentioned_event", text)
-            )
-
-            memories.append(memory)
-
-        return memories
-
-    def _merge_hybrid_results(
-        self,
-        rule_memories: List[MemoryChunk],
-        llm_memories: List[MemoryChunk]
-    ) -> List[MemoryChunk]:
-        """合并混合策略结果"""
-        all_memories = rule_memories.copy()
-
-        # 添加LLM记忆，避免重复
-        for llm_memory in llm_memories:
-            is_duplicate = False
-            for rule_memory in rule_memories:
-                if llm_memory.is_similar_to(rule_memory, threshold=0.7):
-                    is_duplicate = True
-                    # 合并置信度
-                    rule_memory.metadata.confidence = ConfidenceLevel(
-                        max(rule_memory.metadata.confidence.value, llm_memory.metadata.confidence.value)
-                    )
-                    break
-
-            if not is_duplicate:
-                all_memories.append(llm_memory)
-
-        return all_memories
 
     def _validate_and_enhance_memories(
         self,

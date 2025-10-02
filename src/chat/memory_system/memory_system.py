@@ -380,11 +380,11 @@ class MemorySystem:
                 self.status = original_status
                 return []
 
-            # 2. 构建记忆块
+            # 2. 构建记忆块（所有记忆统一使用 global 作用域，实现完全共享）
             memory_chunks = await self.memory_builder.build_memories(
                 conversation_text,
                 normalized_context,
-                GLOBAL_MEMORY_SCOPE,
+                GLOBAL_MEMORY_SCOPE,  # 强制使用 global，不区分用户
                 timestamp or time.time()
             )
 
@@ -609,7 +609,7 @@ class MemorySystem:
         limit: int = 5,
         **kwargs
     ) -> List[MemoryChunk]:
-        """检索相关记忆（简化版，使用统一存储）"""
+        """检索相关记忆（三阶段召回：元数据粗筛 → 向量精筛 → 综合重排）"""
         raw_query = query_text or kwargs.get("query")
         if not raw_query:
             raise ValueError("query_text 或 query 参数不能为空")
@@ -619,6 +619,8 @@ class MemorySystem:
             return []
 
         context = context or {}
+        
+        # 所有记忆完全共享，统一使用 global 作用域，不区分用户
         resolved_user_id = GLOBAL_MEMORY_SCOPE
 
         self.status = MemorySystemStatus.RETRIEVING
@@ -626,48 +628,165 @@ class MemorySystem:
 
         try:
             normalized_context = self._normalize_context(context, GLOBAL_MEMORY_SCOPE, None)
-
             effective_limit = limit or self.config.final_recall_limit
 
-            # 构建过滤器
-            filters = {
-                "user_id": resolved_user_id
+            # === 阶段一：元数据粗筛（软性过滤） ===
+            coarse_filters = {
+                "user_id": GLOBAL_MEMORY_SCOPE,  # 必选：确保作用域正确
             }
+            
+            # 可选：添加重要性阈值（过滤低价值记忆）
+            if hasattr(self.config, 'memory_importance_threshold'):
+                importance_threshold = self.config.memory_importance_threshold
+                if importance_threshold > 0:
+                    coarse_filters["importance"] = {"$gte": importance_threshold}
+                    logger.debug(f"[阶段一] 启用重要性过滤: >= {importance_threshold}")
+            
+            # 可选：添加时间范围（只搜索最近N天）
+            if hasattr(self.config, 'memory_recency_days'):
+                recency_days = self.config.memory_recency_days
+                if recency_days > 0:
+                    cutoff_time = time.time() - (recency_days * 24 * 3600)
+                    coarse_filters["created_at"] = {"$gte": cutoff_time}
+                    logger.debug(f"[阶段一] 启用时间过滤: 最近 {recency_days} 天")
 
-            # 应用查询规划结果
+            # 应用查询规划（优化查询语句并构建元数据过滤）
+            optimized_query = raw_query
+            metadata_filters = {}
+            
             if self.query_planner:
                 try:
                     query_plan = await self.query_planner.plan_query(raw_query, normalized_context)
-                    if getattr(query_plan, "memory_types", None):
-                        filters["memory_types"] = [mt.value for mt in query_plan.memory_types]
-                    if getattr(query_plan, "subject_includes", None):
-                        filters["keywords"] = query_plan.subject_includes
+                    
+                    # 使用LLM优化后的查询语句（更精确的语义表达）
                     if getattr(query_plan, "semantic_query", None):
-                        raw_query = query_plan.semantic_query
+                        optimized_query = query_plan.semantic_query
+                    
+                    # 构建JSON元数据过滤条件（用于阶段一粗筛）
+                    # 将查询规划的结果转换为元数据过滤条件
+                    if getattr(query_plan, "memory_types", None):
+                        metadata_filters['memory_types'] = [mt.value for mt in query_plan.memory_types]
+                    
+                    if getattr(query_plan, "subject_includes", None):
+                        metadata_filters['subjects'] = query_plan.subject_includes
+                    
+                    if getattr(query_plan, "required_keywords", None):
+                        metadata_filters['keywords'] = query_plan.required_keywords
+                    
+                    # 时间范围过滤
+                    recency = getattr(query_plan, "recency_preference", "any")
+                    current_time = time.time()
+                    if recency == "recent":
+                        # 最近7天
+                        metadata_filters['created_after'] = current_time - (7 * 24 * 3600)
+                    elif recency == "historical":
+                        # 30天以前
+                        metadata_filters['created_before'] = current_time - (30 * 24 * 3600)
+                    
+                    # 添加用户ID到元数据过滤
+                    metadata_filters['user_id'] = GLOBAL_MEMORY_SCOPE
+                    
+                    logger.debug(f"[阶段一] 查询优化: '{raw_query}' → '{optimized_query}'")
+                    logger.debug(f"[阶段一] 元数据过滤条件: {metadata_filters}")
+                    
                 except Exception as plan_exc:
-                    logger.warning("查询规划失败，使用默认检索策略: %s", plan_exc, exc_info=True)
+                    logger.warning("查询规划失败，使用原始查询: %s", plan_exc, exc_info=True)
+                    # 即使查询规划失败，也保留基本的user_id过滤
+                    metadata_filters = {'user_id': GLOBAL_MEMORY_SCOPE}
 
-            # 使用Vector DB存储搜索
+            # === 阶段二：向量精筛 ===
+            coarse_limit = self.config.coarse_recall_limit  # 粗筛阶段返回更多候选
+            
+            logger.debug(f"[阶段二] 开始向量搜索: query='{optimized_query[:60]}...', limit={coarse_limit}")
+            
             search_results = await self.unified_storage.search_similar_memories(
-                query_text=raw_query,
-                limit=effective_limit,
-                filters=filters
+                query_text=optimized_query,
+                limit=coarse_limit,
+                filters=coarse_filters,  # ChromaDB where条件（保留兼容）
+                metadata_filters=metadata_filters  # JSON元数据索引过滤
             )
+            
+            logger.info(f"[阶段二] 向量搜索完成: 返回 {len(search_results)} 条候选")
 
-            # 转换为记忆对象 - search_results 返回 List[Tuple[MemoryChunk, float]]
-            final_memories = []
-            for memory, similarity_score in search_results:
+            # === 阶段三：综合重排 ===
+            scored_memories = []
+            current_time = time.time()
+            
+            for memory, vector_similarity in search_results:
+                # 1. 向量相似度得分（已归一化到 0-1）
+                vector_score = vector_similarity
+                
+                # 2. 时效性得分（指数衰减，30天半衰期）
+                age_seconds = current_time - memory.metadata.created_at
+                age_days = age_seconds / (24 * 3600)
+                # 使用 math.exp 而非 np.exp（避免依赖numpy）
+                import math
+                recency_score = math.exp(-age_days / 30)
+                
+                # 3. 重要性得分（枚举值转换为归一化得分 0-1）
+                # ImportanceLevel: LOW=1, NORMAL=2, HIGH=3, CRITICAL=4
+                importance_enum = memory.metadata.importance
+                if hasattr(importance_enum, 'value'):
+                    # 枚举类型，转换为0-1范围：(value - 1) / 3
+                    importance_score = (importance_enum.value - 1) / 3.0
+                else:
+                    # 如果已经是数值，直接使用
+                    importance_score = float(importance_enum) if importance_enum else 0.5
+                
+                # 4. 访问频率得分（归一化，访问10次以上得满分）
+                access_count = memory.metadata.access_count
+                frequency_score = min(access_count / 10.0, 1.0)
+                
+                # 综合得分（加权平均）
+                final_score = (
+                    self.config.vector_weight * vector_score +
+                    self.config.recency_weight * recency_score +
+                    self.config.context_weight * importance_score +
+                    0.1 * frequency_score  # 访问频率权重（固定10%）
+                )
+                
+                scored_memories.append((memory, final_score, {
+                    "vector": vector_score,
+                    "recency": recency_score,
+                    "importance": importance_score,
+                    "frequency": frequency_score,
+                    "final": final_score
+                }))
+                
+                # 更新访问记录
                 memory.update_access()
-                final_memories.append(memory)
 
+            # 按综合得分排序
+            scored_memories.sort(key=lambda x: x[1], reverse=True)
+            
+            # 返回 Top-K
+            final_memories = [mem for mem, score, details in scored_memories[:effective_limit]]
+            
             retrieval_time = time.time() - start_time
 
+            # 详细日志
+            if scored_memories:
+                logger.info(f"[阶段三] 综合重排完成: Top 3 得分详情")
+                for i, (mem, score, details) in enumerate(scored_memories[:3], 1):
+                    try:
+                        summary = mem.content[:60] if hasattr(mem, 'content') and mem.content else ""
+                    except:
+                        summary = ""
+                    logger.info(
+                        f"  #{i} | final={details['final']:.3f} "
+                        f"(vec={details['vector']:.3f}, rec={details['recency']:.3f}, "
+                        f"imp={details['importance']:.3f}, freq={details['frequency']:.3f}) "
+                        f"| {summary}"
+                    )
+
             logger.info(
-                "✅ 简化记忆检索完成"
+                "✅ 三阶段记忆检索完成"
                 f" | user={resolved_user_id}"
-                f" | count={len(final_memories)}"
+                f" | 粗筛={len(search_results)}"
+                f" | 精筛={len(scored_memories)}"
+                f" | 返回={len(final_memories)}"
                 f" | duration={retrieval_time:.3f}s"
-                f" | query='{raw_query}'"
+                f" | query='{optimized_query[:60]}...'"
             )
 
             self.last_retrieval_time = time.time()
@@ -717,8 +836,8 @@ class MemorySystem:
             except Exception:
                 context = dict(raw_context or {})
 
-        # 基础字段（统一使用全局作用域）
-        context["user_id"] = GLOBAL_MEMORY_SCOPE
+        # 基础字段：强制使用传入的 user_id 参数（已统一为 GLOBAL_MEMORY_SCOPE）
+        context["user_id"] = user_id or GLOBAL_MEMORY_SCOPE
         context["timestamp"] = context.get("timestamp") or timestamp or time.time()
         context["message_type"] = context.get("message_type") or "normal"
         context["platform"] = context.get("platform") or context.get("source_platform") or "unknown"

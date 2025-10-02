@@ -311,11 +311,12 @@ class MemoryConfig(ValidatedConfigBase):
     enable_vector_instant_memory: bool = Field(default=True, description="启用基于向量的瞬时记忆")
     
     # Vector DB配置
-    vector_db_memory_collection: str = Field(default="unified_memory_v2", description="Vector DB集合名称")
-    vector_db_similarity_threshold: float = Field(default=0.8, description="Vector DB相似度阈值")
+    vector_db_memory_collection: str = Field(default="unified_memory_v2", description="Vector DB记忆集合名称")
+    vector_db_metadata_collection: str = Field(default="memory_metadata_v2", description="Vector DB元数据集合名称")
+    vector_db_similarity_threshold: float = Field(default=0.5, description="Vector DB相似度阈值（推荐0.5-0.6，过高会导致检索不到结果）")
     vector_db_search_limit: int = Field(default=20, description="Vector DB搜索限制")
     vector_db_batch_size: int = Field(default=100, description="批处理大小")
-    vector_db_enable_caching: bool = Field(default=True, description="启用缓存")
+    vector_db_enable_caching: bool = Field(default=True, description="启用内存缓存")
     vector_db_cache_size_limit: int = Field(default=1000, description="缓存大小限制")
     vector_db_auto_cleanup_interval: int = Field(default=3600, description="自动清理间隔（秒）")
     vector_db_retention_hours: int = Field(default=720, description="记忆保留时间（小时，默认30天）")

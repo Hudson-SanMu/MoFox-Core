@@ -127,6 +127,8 @@ class MemoryMetadata:
 
     # 来源信息
     source_context: Optional[str] = None    # 来源上下文片段
+    # 兼容旧字段: 一些代码或旧版本可能直接访问 metadata.source
+    source: Optional[str] = None
 
     def __post_init__(self):
         """后初始化处理"""
@@ -149,6 +151,19 @@ class MemoryMetadata:
 
         if self.last_forgetting_check == 0:
             self.last_forgetting_check = current_time
+
+        # 兼容性：如果旧字段 source 被使用，保证 source 与 source_context 同步
+        if not getattr(self, 'source', None) and getattr(self, 'source_context', None):
+            try:
+                self.source = str(self.source_context)
+            except Exception:
+                self.source = None
+        # 如果有 source 字段但 source_context 为空，也同步回去
+        if not getattr(self, 'source_context', None) and getattr(self, 'source', None):
+            try:
+                self.source_context = str(self.source)
+            except Exception:
+                self.source_context = None
 
     def update_access(self):
         """更新访问信息"""

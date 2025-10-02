@@ -26,6 +26,7 @@ from src.common.vector_db import vector_db_service
 from src.chat.utils.utils import get_embedding
 from src.chat.memory_system.memory_chunk import MemoryChunk
 from src.chat.memory_system.memory_forgetting_engine import MemoryForgettingEngine
+from src.chat.memory_system.memory_metadata_index import MemoryMetadataIndex, MemoryMetadataIndexEntry
 
 logger = get_logger(__name__)
 
@@ -38,7 +39,7 @@ class VectorStorageConfig:
     metadata_collection: str = "memory_metadata_v2"
     
     # 检索配置
-    similarity_threshold: float = 0.8
+    similarity_threshold: float = 0.5  # 降低阈值以提高召回率（0.5-0.6 是合理范围）
     search_limit: int = 20
     batch_size: int = 100
     
@@ -50,6 +51,26 @@ class VectorStorageConfig:
     # 遗忘配置
     enable_forgetting: bool = True
     retention_hours: int = 24 * 30  # 30天
+    
+    @classmethod
+    def from_global_config(cls):
+        """从全局配置创建实例"""
+        from src.config.config import global_config
+        
+        memory_cfg = global_config.memory
+        
+        return cls(
+            memory_collection=getattr(memory_cfg, 'vector_db_memory_collection', 'unified_memory_v2'),
+            metadata_collection=getattr(memory_cfg, 'vector_db_metadata_collection', 'memory_metadata_v2'),
+            similarity_threshold=getattr(memory_cfg, 'vector_db_similarity_threshold', 0.5),
+            search_limit=getattr(memory_cfg, 'vector_db_search_limit', 20),
+            batch_size=getattr(memory_cfg, 'vector_db_batch_size', 100),
+            enable_caching=getattr(memory_cfg, 'vector_db_enable_caching', True),
+            cache_size_limit=getattr(memory_cfg, 'vector_db_cache_size_limit', 1000),
+            auto_cleanup_interval=getattr(memory_cfg, 'vector_db_auto_cleanup_interval', 3600),
+            enable_forgetting=getattr(memory_cfg, 'enable_memory_forgetting', True),
+            retention_hours=getattr(memory_cfg, 'vector_db_retention_hours', 720),
+        )
 
 
 class VectorMemoryStorage:
@@ -71,7 +92,16 @@ class VectorMemoryStorage:
     """基于Vector DB的记忆存储系统"""
     
     def __init__(self, config: Optional[VectorStorageConfig] = None):
-        self.config = config or VectorStorageConfig()
+        # 默认从全局配置读取，如果没有传入config
+        if config is None:
+            try:
+                self.config = VectorStorageConfig.from_global_config()
+                logger.info("✅ Vector存储配置已从全局配置加载")
+            except Exception as e:
+                logger.warning(f"从全局配置加载失败，使用默认配置: {e}")
+                self.config = VectorStorageConfig()
+        else:
+            self.config = config
         
         # 从配置中获取批处理大小和集合名称
         self.batch_size = self.config.batch_size
@@ -82,6 +112,9 @@ class VectorMemoryStorage:
         self.memory_cache: Dict[str, MemoryChunk] = {}
         self.cache_timestamps: Dict[str, float] = {}
         self._cache = self.memory_cache  # 别名，兼容旧代码
+        
+        # 元数据索引管理器（JSON文件索引）
+        self.metadata_index = MemoryMetadataIndex()
         
         # 遗忘引擎
         self.forgetting_engine: Optional[MemoryForgettingEngine] = None
@@ -354,14 +387,45 @@ class VectorMemoryStorage:
                     success = True
                     
                     if success:
-                        # 更新缓存
+                        # 更新缓存和元数据索引
+                        metadata_entries = []
                         for item in batch:
                             memory_id = item["id"]
                             # 从原始 memories 列表中找到对应的 MemoryChunk
                             memory = next((m for m in memories if (getattr(m.metadata, 'memory_id', None) or getattr(m, 'memory_id', None)) == memory_id), None)
                             if memory:
+                                # 更新缓存
                                 self._cache[memory_id] = memory
                                 success_count += 1
+                                
+                                # 创建元数据索引条目
+                                try:
+                                    index_entry = MemoryMetadataIndexEntry(
+                                        memory_id=memory_id,
+                                        user_id=memory.metadata.user_id or "unknown",
+                                        memory_type=memory.memory_type.value,
+                                        subjects=memory.subjects,
+                                        objects=[str(memory.content.object)] if memory.content.object else [],
+                                        keywords=memory.keywords,
+                                        tags=memory.tags,
+                                        importance=memory.metadata.importance.value,
+                                        confidence=memory.metadata.confidence.value,
+                                        created_at=memory.metadata.created_at,
+                                        access_count=memory.metadata.access_count,
+                                        chat_id=memory.metadata.chat_id,
+                                        content_preview=str(memory.content)[:100] if memory.content else None
+                                    )
+                                    metadata_entries.append(index_entry)
+                                except Exception as e:
+                                    logger.warning(f"创建元数据索引条目失败 (memory_id={memory_id}): {e}")
+                        
+                        # 批量更新元数据索引
+                        if metadata_entries:
+                            try:
+                                self.metadata_index.batch_add_or_update(metadata_entries)
+                                logger.debug(f"更新元数据索引: {len(metadata_entries)} 条")
+                            except Exception as e:
+                                logger.error(f"批量更新元数据索引失败: {e}")
                     else:
                         logger.warning(f"批次存储失败，跳过 {len(batch)} 条记忆")
                         
@@ -371,6 +435,14 @@ class VectorMemoryStorage:
 
             duration = (datetime.now() - start_time).total_seconds()
             logger.info(f"成功存储 {success_count}/{len(memories)} 条记忆，耗时 {duration:.2f}秒")
+            
+            # 保存元数据索引到磁盘
+            if success_count > 0:
+                try:
+                    self.metadata_index.save()
+                    logger.debug("元数据索引已保存到磁盘")
+                except Exception as e:
+                    logger.error(f"保存元数据索引失败: {e}")
             
             return success_count
 
@@ -388,13 +460,57 @@ class VectorMemoryStorage:
         query_text: str,
         limit: int = 10,
         similarity_threshold: Optional[float] = None,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        # 新增：元数据过滤参数（用于JSON索引粗筛）
+        metadata_filters: Optional[Dict[str, Any]] = None
     ) -> List[Tuple[MemoryChunk, float]]:
-        """搜索相似记忆"""
+        """
+        搜索相似记忆（混合索引模式）
+        
+        Args:
+            query_text: 查询文本
+            limit: 返回数量限制
+            similarity_threshold: 相似度阈值
+            filters: ChromaDB where条件（保留用于兼容）
+            metadata_filters: JSON元数据索引过滤条件，支持:
+                - memory_types: List[str]
+                - subjects: List[str]
+                - keywords: List[str]
+                - tags: List[str]
+                - importance_min: int
+                - importance_max: int
+                - created_after: float
+                - created_before: float
+                - user_id: str
+        """
         if not query_text.strip():
             return []
         
         try:
+            # === 阶段一：JSON元数据粗筛（可选） ===
+            candidate_ids: Optional[List[str]] = None
+            if metadata_filters:
+                logger.debug(f"[JSON元数据粗筛] 开始，过滤条件: {metadata_filters}")
+                candidate_ids = self.metadata_index.search(
+                    memory_types=metadata_filters.get('memory_types'),
+                    subjects=metadata_filters.get('subjects'),
+                    keywords=metadata_filters.get('keywords'),
+                    tags=metadata_filters.get('tags'),
+                    importance_min=metadata_filters.get('importance_min'),
+                    importance_max=metadata_filters.get('importance_max'),
+                    created_after=metadata_filters.get('created_after'),
+                    created_before=metadata_filters.get('created_before'),
+                    user_id=metadata_filters.get('user_id'),
+                    limit=self.config.search_limit * 2  # 粗筛返回更多候选
+                )
+                logger.info(f"[JSON元数据粗筛] 完成，筛选出 {len(candidate_ids)} 个候选ID")
+                
+                # 如果粗筛后没有结果，直接返回
+                if not candidate_ids:
+                    logger.warning("JSON元数据粗筛后无候选，返回空结果")
+                    return []
+            
+            # === 阶段二：向量精筛 ===
             # 生成查询向量
             query_embedding = await get_embedding(query_text)
             if not query_embedding:
@@ -405,7 +521,14 @@ class VectorMemoryStorage:
             # 构建where条件
             where_conditions = filters or {}
             
+            # 如果有候选ID列表，添加到where条件
+            if candidate_ids:
+                # ChromaDB的where条件需要使用$in操作符
+                where_conditions["memory_id"] = {"$in": candidate_ids}
+                logger.debug(f"[向量精筛] 限制在 {len(candidate_ids)} 个候选ID内搜索")
+            
             # 查询Vector DB
+            logger.debug(f"[向量精筛] 开始，limit={min(limit, self.config.search_limit)}")
             results = vector_db_service.query(
                 collection_name=self.config.memory_collection,
                 query_embeddings=[query_embedding],
