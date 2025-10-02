@@ -113,17 +113,6 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"forget_memory 失败: {e}")
 
-    async def consolidate_memory(self):
-        """兼容原有接口 - 记忆巩固"""
-        if not self.is_initialized or not self.memory_system:
-            return
-
-        try:
-            # 增强记忆系统自动处理记忆巩固
-            logger.debug("consolidate_memory 调用 - 增强记忆系统自动处理")
-        except Exception as e:
-            logger.error(f"consolidate_memory 失败: {e}")
-
     async def get_memory_from_text(
         self,
         text: str,

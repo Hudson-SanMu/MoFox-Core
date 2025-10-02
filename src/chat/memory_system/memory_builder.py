@@ -253,6 +253,12 @@ class MemoryBuilder:
 3. **上下文关联** - 结合对话背景理解信息重要性
 4. **细节丰富** - 记录具体的细节和描述
 
+### 🚫 禁止使用模糊代称原则：
+1. **绝对禁止使用"用户"作为代称** - 必须使用明确的名字或称呼
+2. **优先使用真实姓名** - 如果知道对方的名字，必须使用真实姓名
+3. **使用昵称或特定称呼** - 如果没有真实姓名，使用对话中出现的昵称
+4. **无法获取具体名字时拒绝构建** - 如果不知道对方的具体名字，宁可不构建这条记忆，也不要使用"用户"、"该对话者"等模糊代称
+
 ### 🕒 时间处理原则（重要）：
 1. **绝对时间要求** - 涉及时间的记忆必须使用绝对时间（年月日）
 2. **相对时间转换** - 将"明天"、"后天"、"下周"等相对时间转换为具体日期
@@ -297,15 +303,17 @@ class MemoryBuilder:
 
 注意：
 1. `display` 字段必填，必须是完整顺畅的自然语言，禁止依赖字符串拼接
-2. **display 字段格式要求**: 使用自然流畅的中文描述，格式示例：
-   - 用户养了一只名叫Whiskers的猫。
-   - 用户特别喜欢拿铁咖啡。
-   - 在2024年5月15日，用户提到对新项目感到很有压力。
-   - 用户认为这个电影很有趣。
-3. 主谓宾用于索引和检索，提示词构建仅使用 `display` 的自然语言描述
-4. 只提取确实值得记忆的信息，不要提取琐碎内容
-5. 确保提取的信息准确、具体、有价值
-6. 重要性等级: 1=低, 2=一般, 3=高, 4=关键；置信度: 1=低, 2=中等, 3=高, 4=已验证
+2. **display 字段格式要求**: 使用自然流畅的中文描述，**绝对禁止使用"用户"作为代称**，格式示例：
+   - 杰瑞喵养了一只名叫Whiskers的猫。
+   - why ocean QAQ特别喜欢拿铁咖啡。
+   - 在2024年5月15日，velida QAQ提到对新项目感到很有压力。
+   - 杰瑞喵认为这个电影很有趣。
+3. **必须使用明确的名字**：如果知道对话者的名字（如杰瑞喵、why ocean QAQ等），必须直接使用其名字
+4. **不知道名字时不要构建**：如果无法从对话中确定对方的具体名字，宁可不构建这条记忆
+5. 主谓宾用于索引和检索，提示词构建仅使用 `display` 的自然语言描述
+6. 只提取确实值得记忆的信息，不要提取琐碎内容
+7. 确保提取的信息准确、具体、有价值
+8. 重要性等级: 1=低, 2=一般, 3=高, 4=关键；置信度: 1=低, 2=中等, 3=高, 4=已验证
 
 ## 🚨 时间处理要求（强制）：
 - **绝对时间优先**：任何涉及时间的记忆都必须使用绝对日期格式
@@ -396,6 +404,12 @@ class MemoryBuilder:
 
         for mem_data in memory_list:
             try:
+                # 检查是否包含模糊代称
+                display_text = mem_data.get("display", "")
+                if any(ambiguous_term in display_text for ambiguous_term in ["用户", "user", "the user", "对方", "对手"]):
+                    logger.debug(f"拒绝构建包含模糊代称的记忆，display字段: {display_text}")
+                    continue
+
                 subject_value = mem_data.get("subject")
                 normalized_subject = self._normalize_subjects(
                     subject_value,
@@ -742,8 +756,9 @@ class MemoryBuilder:
                 continue
 
             if lowered in {"用户", "user", "the user", "对方", "对手"}:
-                normalized.extend(defaults)
-                continue
+                # 直接拒绝构建包含模糊代称的记忆
+                logger.debug(f"拒绝构建包含模糊代称的记忆: {candidate}")
+                return []  # 返回空列表表示拒绝构建
 
             if lowered in system_identifiers or self._looks_like_system_identifier(candidate):
                 continue

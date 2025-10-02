@@ -250,7 +250,7 @@ class MemorySystem:
 
             self.forgetting_engine = MemoryForgettingEngine(forgetting_config)
 
-            planner_task_config = getattr(model_config.model_task_config, "planner", None)
+            planner_task_config = getattr(model_config.model_task_config, "utils_small", None)
             planner_model: Optional[LLMRequest] = None
             try:
                 planner_model = LLMRequest(
@@ -358,9 +358,7 @@ class MemorySystem:
                 if last_time and (current_time - last_time) < min_interval:
                     remaining = min_interval - (current_time - last_time)
                     logger.info(
-                        "距离上次记忆构建间隔不足，跳过此次构建 | key=%s | 剩余%.2f秒",
-                        build_scope_key,
-                        remaining,
+                        f"距离上次记忆构建间隔不足，跳过此次构建 | key={build_scope_key} | 剩余{remaining:.2f}秒",
                     )
                     self.status = MemorySystemStatus.READY
                     return []
