@@ -12,7 +12,7 @@
   "host_application": {
     "min_version": "0.10.0"
   },
-  "keywords": ["emoji", "reaction", "like", "表情", "回应", "点赞"],
+  "keywords": ["主动思考","自己发消息"],
   "categories": ["Chat", "Integration"],
   
   "default_locale": "zh-CN",
