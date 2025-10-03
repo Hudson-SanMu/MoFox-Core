@@ -19,6 +19,12 @@ from src.chat.memory_system.memory_builder import MemoryBuilder, MemoryExtractio
 from src.chat.memory_system.memory_chunk import MemoryChunk
 from src.chat.memory_system.memory_fusion import MemoryFusionEngine
 from src.chat.memory_system.memory_query_planner import MemoryQueryPlanner
+# 简化的记忆采样模式枚举
+class MemorySamplingMode(Enum):
+    """记忆采样模式"""
+    HIPPOCAMPUS = "hippocampus"  # 海马体模式：定时任务采样
+    IMMEDIATE = "immediate"       # 即时模式：回复后立即采样
+    ALL = "all"                   # 所有模式：同时使用海马体和即时采样
 from src.common.logger import get_logger
 from src.config.config import global_config, model_config
 from src.llm_models.utils_model import LLMRequest
@@ -148,6 +154,9 @@ class MemorySystem:
         # 记忆指纹缓存，用于快速检测重复记忆
         self._memory_fingerprints: dict[str, str] = {}
 
+        # 海马体采样器
+        self.hippocampus_sampler = None
+
         logger.info("MemorySystem 初始化开始")
 
     async def initialize(self):
@@ -249,6 +258,16 @@ class MemorySystem:
 
             self.query_planner = MemoryQueryPlanner(planner_model, default_limit=self.config.final_recall_limit)
 
+            # 初始化海马体采样器
+            if global_config.memory.enable_hippocampus_sampling:
+                try:
+                    from .hippocampus_sampler import initialize_hippocampus_sampler
+                    self.hippocampus_sampler = await initialize_hippocampus_sampler(self)
+                    logger.info("✅ 海马体采样器初始化成功")
+                except Exception as e:
+                    logger.warning(f"海马体采样器初始化失败: {e}")
+                    self.hippocampus_sampler = None
+
             # 统一存储已经自动加载数据，无需额外加载
             logger.info("✅ 简化版记忆系统初始化完成")
 
@@ -283,14 +302,14 @@ class MemorySystem:
 
         try:
             # 使用统一存储检索相似记忆
+            filters = {"user_id": user_id} if user_id else None
             search_results = await self.unified_storage.search_similar_memories(
-                query_text=query_text, limit=limit, scope_id=user_id
+                query_text=query_text, limit=limit, filters=filters
             )
 
             # 转换为记忆对象
             memories = []
-            for memory_id, similarity_score in search_results:
-                memory = self.unified_storage.get_memory_by_id(memory_id)
+            for memory, similarity_score in search_results:
                 if memory:
                     memory.update_access()  # 更新访问信息
                     memories.append(memory)
@@ -302,7 +321,7 @@ class MemorySystem:
             return []
 
     async def build_memory_from_conversation(
-        self, conversation_text: str, context: dict[str, Any], timestamp: float | None = None
+        self, conversation_text: str, context: dict[str, Any], timestamp: float | None = None, bypass_interval: bool = False
     ) -> list[MemoryChunk]:
         """从对话中构建记忆
 
@@ -310,6 +329,7 @@ class MemorySystem:
             conversation_text: 对话文本
             context: 上下文信息
             timestamp: 时间戳，默认为当前时间
+            bypass_interval: 是否绕过构建间隔检查（海马体采样器专用）
 
         Returns:
             构建的记忆块列表
@@ -328,7 +348,8 @@ class MemorySystem:
             min_interval = max(0.0, getattr(self.config, "min_build_interval_seconds", 0.0))
             current_time = time.time()
 
-            if build_scope_key and min_interval > 0:
+            # 构建间隔检查（海马体采样器可以绕过）
+            if build_scope_key and min_interval > 0 and not bypass_interval:
                 last_time = self._last_memory_build_times.get(build_scope_key)
                 if last_time and (current_time - last_time) < min_interval:
                     remaining = min_interval - (current_time - last_time)
@@ -340,18 +361,35 @@ class MemorySystem:
 
                 build_marker_time = current_time
                 self._last_memory_build_times[build_scope_key] = current_time
+            elif bypass_interval:
+                # 海马体采样模式：不更新构建时间记录，避免影响即时模式
+                logger.debug("海马体采样模式：绕过构建间隔检查")
 
             conversation_text = await self._resolve_conversation_context(conversation_text, normalized_context)
 
             logger.debug("开始构建记忆，文本长度: %d", len(conversation_text))
 
-            # 1. 信息价值评估
-            value_score = await self._assess_information_value(conversation_text, normalized_context)
+            # 1. 信息价值评估（海马体采样器可以绕过）
+            if not bypass_interval and not context.get("bypass_value_threshold", False):
+                value_score = await self._assess_information_value(conversation_text, normalized_context)
 
-            if value_score < self.config.memory_value_threshold:
-                logger.info(f"信息价值评分 {value_score:.2f} 低于阈值，跳过记忆构建")
-                self.status = original_status
-                return []
+                if value_score < self.config.memory_value_threshold:
+                    logger.info(f"信息价值评分 {value_score:.2f} 低于阈值，跳过记忆构建")
+                    self.status = original_status
+                    return []
+            else:
+                # 海马体采样器：使用默认价值分数或简单评估
+                value_score = 0.6  # 默认中等价值
+                if context.get("is_hippocampus_sample", False):
+                    # 对海马体样本进行简单价值评估
+                    if len(conversation_text) > 100:  # 长文本可能有更多信息
+                        value_score = 0.7
+                    elif len(conversation_text) > 50:
+                        value_score = 0.6
+                    else:
+                        value_score = 0.5
+
+                logger.debug(f"海马体采样模式：使用价值评分 {value_score:.2f}")
 
             # 2. 构建记忆块（所有记忆统一使用 global 作用域，实现完全共享）
             memory_chunks = await self.memory_builder.build_memories(
@@ -469,7 +507,7 @@ class MemorySystem:
                     continue
                 search_tasks.append(
                     self.unified_storage.search_similar_memories(
-                        query_text=display_text, limit=8, scope_id=GLOBAL_MEMORY_SCOPE
+                        query_text=display_text, limit=8, filters={"user_id": GLOBAL_MEMORY_SCOPE}
                     )
                 )
 
@@ -512,12 +550,70 @@ class MemorySystem:
         return existing_candidates
 
     async def process_conversation_memory(self, context: dict[str, Any]) -> dict[str, Any]:
-        """对外暴露的对话记忆处理接口，仅依赖上下文信息"""
+        """对外暴露的对话记忆处理接口，支持海马体、即时、所有三种采样模式"""
         start_time = time.time()
 
         try:
             context = dict(context or {})
 
+            # 获取配置的采样模式
+            sampling_mode = getattr(global_config.memory, 'memory_sampling_mode', 'immediate')
+            current_mode = MemorySamplingMode(sampling_mode)
+
+            logger.debug(f"使用记忆采样模式: {current_mode.value}")
+
+            # 根据采样模式处理记忆
+            if current_mode == MemorySamplingMode.HIPPOCAMPUS:
+                # 海马体模式：仅后台定时采样，不立即处理
+                return {
+                    "success": True,
+                    "created_memories": [],
+                    "memory_count": 0,
+                    "processing_time": time.time() - start_time,
+                    "status": self.status.value,
+                    "processing_mode": "hippocampus",
+                    "message": "海马体模式：记忆将由后台定时任务采样处理",
+                }
+
+            elif current_mode == MemorySamplingMode.IMMEDIATE:
+                # 即时模式：立即处理记忆构建
+                return await self._process_immediate_memory(context, start_time)
+
+            elif current_mode == MemorySamplingMode.ALL:
+                # 所有模式：同时进行即时处理和海马体采样
+                immediate_result = await self._process_immediate_memory(context, start_time)
+
+                # 海马体采样器会在后台继续处理，这里只是记录
+                if self.hippocampus_sampler:
+                    immediate_result["processing_mode"] = "all_modes"
+                    immediate_result["hippocampus_status"] = "background_sampling_enabled"
+                    immediate_result["message"] = "所有模式：即时处理已完成，海马体采样将在后台继续"
+                else:
+                    immediate_result["processing_mode"] = "immediate_fallback"
+                    immediate_result["hippocampus_status"] = "not_available"
+                    immediate_result["message"] = "海马体采样器不可用，回退到即时模式"
+
+                return immediate_result
+
+            else:
+                # 默认回退到即时模式
+                logger.warning(f"未知的采样模式 {sampling_mode}，回退到即时模式")
+                return await self._process_immediate_memory(context, start_time)
+
+        except Exception as e:
+            processing_time = time.time() - start_time
+            logger.error(f"对话记忆处理失败: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time": processing_time,
+                "status": self.status.value,
+                "processing_mode": "error",
+            }
+
+    async def _process_immediate_memory(self, context: dict[str, Any], start_time: float) -> dict[str, Any]:
+        """即时记忆处理的辅助方法"""
+        try:
             conversation_candidate = (
                 context.get("conversation_text")
                 or context.get("message_content")
@@ -537,6 +633,23 @@ class MemorySystem:
             normalized_context = self._normalize_context(context, GLOBAL_MEMORY_SCOPE, timestamp)
             normalized_context.setdefault("conversation_text", conversation_text)
 
+            # 检查信息价值阈值
+            value_score = await self._assess_information_value(conversation_text, normalized_context)
+            threshold = getattr(global_config.memory, 'precision_memory_reply_threshold', 0.5)
+
+            if value_score < threshold:
+                logger.debug(f"信息价值评分 {value_score:.2f} 低于阈值 {threshold}，跳过记忆构建")
+                return {
+                    "success": True,
+                    "created_memories": [],
+                    "memory_count": 0,
+                    "processing_time": time.time() - start_time,
+                    "status": self.status.value,
+                    "processing_mode": "immediate",
+                    "skip_reason": f"value_score_{value_score:.2f}_below_threshold_{threshold}",
+                    "value_score": value_score,
+                }
+
             memories = await self.build_memory_from_conversation(
                 conversation_text=conversation_text, context=normalized_context, timestamp=timestamp
             )
@@ -550,12 +663,20 @@ class MemorySystem:
                 "memory_count": memory_count,
                 "processing_time": processing_time,
                 "status": self.status.value,
+                "processing_mode": "immediate",
+                "value_score": value_score,
             }
 
         except Exception as e:
             processing_time = time.time() - start_time
-            logger.error(f"对话记忆处理失败: {e}", exc_info=True)
-            return {"success": False, "error": str(e), "processing_time": processing_time, "status": self.status.value}
+            logger.error(f"即时记忆处理失败: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time": processing_time,
+                "status": self.status.value,
+                "processing_mode": "immediate_error",
+            }
 
     async def retrieve_relevant_memories(
         self,
@@ -1372,10 +1493,52 @@ class MemorySystem:
         except Exception as e:
             logger.error(f"❌ 记忆系统维护失败: {e}", exc_info=True)
 
+    def start_hippocampus_sampling(self):
+        """启动海马体采样"""
+        if self.hippocampus_sampler:
+            asyncio.create_task(self.hippocampus_sampler.start_background_sampling())
+            logger.info("🚀 海马体后台采样已启动")
+        else:
+            logger.warning("海马体采样器未初始化，无法启动采样")
+
+    def stop_hippocampus_sampling(self):
+        """停止海马体采样"""
+        if self.hippocampus_sampler:
+            self.hippocampus_sampler.stop_background_sampling()
+            logger.info("🛑 海马体后台采样已停止")
+
+    def get_system_stats(self) -> dict[str, Any]:
+        """获取系统统计信息"""
+        base_stats = {
+            "status": self.status.value,
+            "total_memories": self.total_memories,
+            "last_build_time": self.last_build_time,
+            "last_retrieval_time": self.last_retrieval_time,
+            "config": asdict(self.config),
+        }
+
+        # 添加海马体采样器统计
+        if self.hippocampus_sampler:
+            base_stats["hippocampus_sampler"] = self.hippocampus_sampler.get_sampling_stats()
+
+        # 添加存储统计
+        if self.unified_storage:
+            try:
+                storage_stats = self.unified_storage.get_storage_stats()
+                base_stats["storage_stats"] = storage_stats
+            except Exception as e:
+                logger.debug(f"获取存储统计失败: {e}")
+
+        return base_stats
+
     async def shutdown(self):
         """关闭系统（简化版）"""
         try:
             logger.info("正在关闭简化记忆系统...")
+
+            # 停止海马体采样
+            if self.hippocampus_sampler:
+                self.hippocampus_sampler.stop_background_sampling()
 
             # 保存统一存储数据
             if self.unified_storage:
@@ -1456,4 +1619,10 @@ async def initialize_memory_system(llm_model: LLMRequest | None = None):
     if memory_system is None:
         memory_system = MemorySystem(llm_model=llm_model)
     await memory_system.initialize()
+
+    # 根据配置启动海马体采样
+    sampling_mode = getattr(global_config.memory, 'memory_sampling_mode', 'immediate')
+    if sampling_mode in ['hippocampus', 'all']:
+        memory_system.start_hippocampus_sampling()
+
     return memory_system

@@ -337,6 +337,41 @@ class MemoryConfig(ValidatedConfigBase):
     # 休眠机制
     dormant_threshold_days: int = Field(default=90, description="休眠状态判定天数")
 
+    # === 混合记忆系统配置 ===
+    # 采样模式配置
+    memory_sampling_mode: Literal["adaptive", "hippocampus", "precision"] = Field(
+        default="adaptive", description="记忆采样模式：adaptive(自适应)，hippocampus(海马体双峰采样)，precision(精准记忆)"
+    )
+
+    # 海马体双峰采样配置
+    enable_hippocampus_sampling: bool = Field(default=True, description="启用海马体双峰采样策略")
+    hippocampus_sample_interval: int = Field(default=1800, description="海马体采样间隔（秒，默认30分钟）")
+    hippocampus_sample_size: int = Field(default=30, description="海马体每次采样的消息数量")
+    hippocampus_batch_size: int = Field(default=5, description="海马体每批处理的记忆数量")
+
+    # 双峰分布配置 [近期均值, 近期标准差, 近期权重, 远期均值, 远期标准差, 远期权重]
+    hippocampus_distribution_config: list[float] = Field(
+        default=[12.0, 8.0, 0.7, 48.0, 24.0, 0.3],
+        description="海马体双峰分布配置：[近期均值(h), 近期标准差(h), 近期权重, 远期均值(h), 远期标准差(h), 远期权重]"
+    )
+
+    # 自适应采样配置
+    adaptive_sampling_enabled: bool = Field(default=True, description="启用自适应采样策略")
+    adaptive_sampling_threshold: float = Field(default=0.8, description="自适应采样负载阈值（0-1）")
+    adaptive_sampling_check_interval: int = Field(default=300, description="自适应采样检查间隔（秒）")
+    adaptive_sampling_max_concurrent_builds: int = Field(default=3, description="自适应采样最大并发记忆构建数")
+
+    # 精准记忆配置（现有系统的增强版本）
+    precision_memory_reply_threshold: float = Field(
+        default=0.6, description="精准记忆回复触发阈值（对话价值评分超过此值时触发记忆构建）"
+    )
+    precision_memory_max_builds_per_hour: int = Field(default=10, description="精准记忆每小时最大构建数量")
+
+    # 混合系统优化配置
+    memory_system_load_balancing: bool = Field(default=True, description="启用记忆系统负载均衡")
+    memory_build_throttling: bool = Field(default=True, description="启用记忆构建节流")
+    memory_priority_queue_enabled: bool = Field(default=True, description="启用记忆优先级队列")
+
 
 class MoodConfig(ValidatedConfigBase):
     """情绪配置类"""
