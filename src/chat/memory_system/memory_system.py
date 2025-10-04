@@ -162,7 +162,6 @@ class MemorySystem:
     async def initialize(self):
         """异步初始化记忆系统"""
         try:
-            logger.info("正在初始化记忆系统...")
 
             # 初始化LLM模型
             fallback_task = getattr(self.llm_model, "model_for_task", None) if self.llm_model else None
@@ -268,11 +267,8 @@ class MemorySystem:
                     logger.warning(f"海马体采样器初始化失败: {e}")
                     self.hippocampus_sampler = None
 
-            # 统一存储已经自动加载数据，无需额外加载
-            logger.info("✅ 简化版记忆系统初始化完成")
 
             self.status = MemorySystemStatus.READY
-            logger.info("✅ 记忆系统初始化完成")
 
         except Exception as e:
             self.status = MemorySystemStatus.ERROR
