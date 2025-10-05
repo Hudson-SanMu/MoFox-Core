@@ -33,9 +33,10 @@ from src.llm_models.utils_model import LLMRequest
 
 if TYPE_CHECKING:
     from src.chat.memory_system.memory_forgetting_engine import MemoryForgettingEngine
+    from src.chat.memory_system.vector_memory_storage_v2 import VectorMemoryStorage
     from src.common.data_models.database_data_model import DatabaseMessages
 
-logger = get_logger(__name__)
+logger = get_logger("memory_system")
 
 # 全局记忆作用域（共享记忆库）
 GLOBAL_MEMORY_SCOPE = "global"
@@ -135,15 +136,15 @@ class MemorySystem:
         self.status = MemorySystemStatus.INITIALIZING
 
         # 核心组件（简化版）
-        self.memory_builder: MemoryBuilder = None
-        self.fusion_engine: MemoryFusionEngine = None
-        self.unified_storage = None  # 统一存储系统
-        self.query_planner: MemoryQueryPlanner = None
+        self.memory_builder: MemoryBuilder | None = None
+        self.fusion_engine: MemoryFusionEngine | None = None
+        self.unified_storage: VectorMemoryStorage | None = None  # 统一存储系统
+        self.query_planner: MemoryQueryPlanner | None = None
         self.forgetting_engine: MemoryForgettingEngine | None = None
 
         # LLM模型
-        self.value_assessment_model: LLMRequest = None
-        self.memory_extraction_model: LLMRequest = None
+        self.value_assessment_model: LLMRequest | None = None
+        self.memory_extraction_model: LLMRequest | None = None
 
         # 统计信息
         self.total_memories = 0
@@ -478,7 +479,7 @@ class MemorySystem:
                 existing_id = self._memory_fingerprints.get(fingerprint_key)
                 if existing_id and existing_id not in new_memory_ids:
                     candidate_ids.add(existing_id)
-            except Exception as exc:
+            except Exception as exc:  # noqa: PERF203
                 logger.debug("构建记忆指纹失败，跳过候选收集: %s", exc)
 
         # 基于主体索引的候选（使用统一存储）
@@ -842,7 +843,7 @@ class MemorySystem:
                 for i, (mem, score, details) in enumerate(scored_memories[:3], 1):
                     try:
                         summary = mem.content[:60] if hasattr(mem, "content") and mem.content else ""
-                    except:
+                    except Exception:
                         summary = ""
                     logger.info(
                         f"  #{i} | final={details['final']:.3f} "
@@ -1439,8 +1440,8 @@ class MemorySystem:
         context_keywords = context.get("keywords") or []
         keyword_overlap = 0.0
         if context_keywords:
-            memory_keywords = set(k.lower() for k in memory.keywords)
-            keyword_overlap = len(memory_keywords & set(k.lower() for k in context_keywords)) / max(
+            memory_keywords = {k.lower() for k in memory.keywords}
+            keyword_overlap = len(memory_keywords & {k.lower() for k in context_keywords}) / max(
                 len(context_keywords), 1
             )
 
@@ -1552,12 +1553,13 @@ class MemorySystem:
 
             # 收集需要重建向量的记忆
             memories_to_rebuild = []
-            for memory_id, memory in self.unified_storage.memory_cache.items():
-                # 检查记忆是否有有效的 display 文本
-                if memory.display and memory.display.strip():
-                    memories_to_rebuild.append(memory)
-                elif memory.text_content and memory.text_content.strip():
-                    memories_to_rebuild.append(memory)
+            if self.unified_storage:
+                for memory in self.unified_storage.memory_cache.values():
+                    # 检查记忆是否有有效的 display 文本
+                    if memory.display and memory.display.strip():
+                        memories_to_rebuild.append(memory)
+                    elif memory.text_content and memory.text_content.strip():
+                        memories_to_rebuild.append(memory)
 
             if not memories_to_rebuild:
                 logger.warning("没有找到可重建向量的记忆")
