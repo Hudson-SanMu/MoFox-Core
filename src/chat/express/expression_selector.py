@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import random
 import time
@@ -291,14 +292,6 @@ class ExpressionSelector:
         try:
             # start_time = time.time()
             content, (reasoning_content, model_name, _) = await self.llm_model.generate_response_async(prompt=prompt)
-            # logger.info(f"LLM请求时间: {model_name}  {time.time() - start_time} \n{prompt}")
-
-            # logger.info(f"模型名称: {model_name}")
-            logger.info(f"LLM返回结果: {content}")
-            # if reasoning_content:
-            #     logger.info(f"LLM推理: {reasoning_content}")
-            # else:
-            #     logger.info(f"LLM推理: 无")
 
             if not content:
                 logger.warning("LLM返回空结果")
@@ -327,7 +320,7 @@ class ExpressionSelector:
 
             # 对选中的所有表达方式，一次性更新count数
             if valid_expressions:
-                await self.update_expressions_count_batch(valid_expressions, 0.006)
+                asyncio.create_task(self.update_expressions_count_batch(valid_expressions, 0.006))
 
             # logger.info(f"LLM从{len(all_expressions)}个情境中选择了{len(valid_expressions)}个")
             return valid_expressions, selected_ids

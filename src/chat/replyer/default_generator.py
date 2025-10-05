@@ -303,14 +303,14 @@ class DefaultReplyer:
         try:
             # 构建 Prompt
             with Timer("构建Prompt", {}):  # 内部计时器，可选保留
-                prompt = await asyncio.create_task(self.build_prompt_reply_context(
+                prompt = await self.build_prompt_reply_context(
                     reply_to=reply_to,
                     extra_info=extra_info,
                     available_actions=available_actions,
                     choosen_actions=choosen_actions,
                     enable_tool=enable_tool,
                     reply_message=reply_message,
-                ))
+                )
 
             if not prompt:
                 logger.warning("构建prompt失败，跳过回复生成")

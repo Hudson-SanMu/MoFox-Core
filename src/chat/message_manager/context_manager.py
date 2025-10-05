@@ -13,6 +13,7 @@ from src.common.data_models.database_data_model import DatabaseMessages
 from src.common.data_models.message_manager_data_model import StreamContext
 from src.common.logger import get_logger
 from src.config.config import global_config
+from src.plugin_system.base.component_types import ChatType
 
 from .distribution_manager import stream_loop_manager
 
@@ -54,7 +55,13 @@ class SingleStreamContextManager:
             bool: 是否成功添加
         """
         try:
-            self.context.add_message(message)
+            # 直接操作上下文的消息列表
+            message.is_read = False
+            self.context.unread_messages.append(message)
+
+            # 自动检测和更新chat type
+            self._detect_chat_type(message)
+
             # 在上下文管理器中计算兴趣值
             await self._calculate_message_interest(message)
             self.total_messages += 1
@@ -78,7 +85,28 @@ class SingleStreamContextManager:
             bool: 是否成功更新
         """
         try:
-            self.context.update_message_info(message_id, **updates)
+            # 直接在未读消息中查找并更新
+            for message in self.context.unread_messages:
+                if message.message_id == message_id:
+                    if "interest_value" in updates:
+                        message.interest_value = updates["interest_value"]
+                    if "actions" in updates:
+                        message.actions = updates["actions"]
+                    if "should_reply" in updates:
+                        message.should_reply = updates["should_reply"]
+                    break
+
+            # 在历史消息中查找并更新
+            for message in self.context.history_messages:
+                if message.message_id == message_id:
+                    if "interest_value" in updates:
+                        message.interest_value = updates["interest_value"]
+                    if "actions" in updates:
+                        message.actions = updates["actions"]
+                    if "should_reply" in updates:
+                        message.should_reply = updates["should_reply"]
+                    break
+
             logger.debug(f"更新单流上下文消息: {self.stream_id}/{message_id}")
             return True
         except Exception as e:
@@ -259,36 +287,17 @@ class SingleStreamContextManager:
             logger.error(f"计算消息兴趣度时发生错误: {e}", exc_info=True)
             return 0.5
 
-    async def add_message_async(self, message: DatabaseMessages, skip_energy_update: bool = False) -> bool:
-        """异步实现的 add_message：将消息添加到 context，并 await 能量更新与分发。"""
-        try:
-            self.context.add_message(message)
-
-            # 在上下文管理器中计算兴趣值
-            await self._calculate_message_interest(message)
-
-            self.total_messages += 1
-            self.last_access_time = time.time()
-
-            # 启动流的循环任务（如果还未启动）
-            asyncio.create_task(stream_loop_manager.start_stream_loop(self.stream_id))
-
-            logger.debug(f"添加消息到单流上下文(异步): {self.stream_id}")
-            return True
-        except Exception as e:
-            logger.error(f"添加消息到单流上下文失败 (async) {self.stream_id}: {e}", exc_info=True)
-            return False
-
-    async def update_message_async(self, message_id: str, updates: dict[str, Any]) -> bool:
-        """异步实现的 update_message：更新消息并在需要时 await 能量更新。"""
-        try:
-            self.context.update_message_info(message_id, **updates)
-
-            logger.debug(f"更新单流上下文消息(异步): {self.stream_id}/{message_id}")
-            return True
-        except Exception as e:
-            logger.error(f"更新单流上下文消息失败 (async) {self.stream_id}/{message_id}: {e}", exc_info=True)
-            return False
+    def _detect_chat_type(self, message: DatabaseMessages):
+        """根据消息内容自动检测聊天类型"""
+        # 只有在第一次添加消息时才检测聊天类型，避免后续消息改变类型
+        if len(self.context.unread_messages) == 1:  # 只有这条消息
+            # 如果消息包含群组信息，则为群聊
+            if hasattr(message, "chat_info_group_id") and message.chat_info_group_id:
+                self.context.chat_type = ChatType.GROUP
+            elif hasattr(message, "chat_info_group_name") and message.chat_info_group_name:
+                self.context.chat_type = ChatType.GROUP
+            else:
+                self.context.chat_type = ChatType.PRIVATE
 
     async def clear_context_async(self) -> bool:
         """异步实现的 clear_context：清空消息并 await 能量重算。"""

@@ -185,7 +185,7 @@ class ChatterActionManager:
                 logger.info(f"{log_prefix} 选择不回复，原因: {reason}")
 
                 # 存储no_reply信息到数据库
-                await database_api.store_action_info(
+                asyncio.create_task(database_api.store_action_info(
                     chat_stream=chat_stream,
                     action_build_into_prompt=False,
                     action_prompt_display=reason,
@@ -193,10 +193,10 @@ class ChatterActionManager:
                     thinking_id=thinking_id,
                     action_data={"reason": reason},
                     action_name="no_reply",
-                )
+                ))
 
                 # 自动清空所有未读消息
-                await self._clear_all_unread_messages(chat_stream.stream_id, "no_reply")
+                asyncio.create_task(self._clear_all_unread_messages(chat_stream.stream_id, "no_reply"))
 
                 return {"action_type": "no_reply", "success": True, "reply_text": "", "command": ""}
 
@@ -214,12 +214,12 @@ class ChatterActionManager:
 
                 # 记录执行的动作到目标消息
                 if success:
-                    await self._record_action_to_message(chat_stream, action_name, target_message, action_data)
+                    asyncio.create_task(self._record_action_to_message(chat_stream, action_name, target_message, action_data))
                     # 自动清空所有未读消息
                     if clear_unread_messages:
-                        await self._clear_all_unread_messages(chat_stream.stream_id, action_name)
+                        asyncio.create_task(self._clear_all_unread_messages(chat_stream.stream_id, action_name))
                     # 重置打断计数
-                    await self._reset_interruption_count_after_action(chat_stream.stream_id)
+                    asyncio.create_task(self._reset_interruption_count_after_action(chat_stream.stream_id))
 
                 return {
                     "action_type": action_name,
@@ -260,13 +260,13 @@ class ChatterActionManager:
                 )
 
                 # 记录回复动作到目标消息
-                await self._record_action_to_message(chat_stream, "reply", target_message, action_data)
+                asyncio.create_task(self._record_action_to_message(chat_stream, "reply", target_message, action_data))
 
                 if clear_unread_messages:
-                    await self._clear_all_unread_messages(chat_stream.stream_id, "reply")
+                    asyncio.create_task(self._clear_all_unread_messages(chat_stream.stream_id, "reply"))
 
                 # 回复成功，重置打断计数
-                await self._reset_interruption_count_after_action(chat_stream.stream_id)
+                asyncio.create_task(self._reset_interruption_count_after_action(chat_stream.stream_id))
 
                 return {"action_type": "reply", "success": True, "reply_text": reply_text, "loop_info": loop_info}
 

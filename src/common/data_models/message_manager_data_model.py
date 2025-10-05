@@ -53,38 +53,8 @@ class StreamContext(BaseDataModel):
     priority_mode: str | None = None
     priority_info: dict | None = None
 
-    def add_message(self, message: "DatabaseMessages"):
-        """添加消息到上下文"""
-        message.is_read = False
-        self.unread_messages.append(message)
-
-        # 自动检测和更新chat type
-        self._detect_chat_type(message)
-
-    def update_message_info(
-        self, message_id: str, interest_value: float = None, actions: list = None, should_reply: bool = None
-    ):
-        """
-        更新消息信息
-
-        Args:
-            message_id: 消息ID
-            interest_value: 兴趣度值
-            actions: 执行的动作列表
-            should_reply: 是否应该回复
-        """
-        # 在未读消息中查找并更新
-        for message in self.unread_messages:
-            if message.message_id == message_id:
-                message.update_message_info(interest_value, actions, should_reply)
-                break
-
-        # 在历史消息中查找并更新
-        for message in self.history_messages:
-            if message.message_id == message_id:
-                message.update_message_info(interest_value, actions, should_reply)
-                break
-
+  
+    
     def add_action_to_message(self, message_id: str, action: str):
         """
         向指定消息添加执行的动作
@@ -105,42 +75,8 @@ class StreamContext(BaseDataModel):
                 message.add_action(action)
                 break
 
-    def _detect_chat_type(self, message: "DatabaseMessages"):
-        """根据消息内容自动检测聊天类型"""
-        # 只有在第一次添加消息时才检测聊天类型，避免后续消息改变类型
-        if len(self.unread_messages) == 1:  # 只有这条消息
-            # 如果消息包含群组信息，则为群聊
-            if hasattr(message, "chat_info_group_id") and message.chat_info_group_id:
-                self.chat_type = ChatType.GROUP
-            elif hasattr(message, "chat_info_group_name") and message.chat_info_group_name:
-                self.chat_type = ChatType.GROUP
-            else:
-                self.chat_type = ChatType.PRIVATE
 
-    def update_chat_type(self, chat_type: ChatType):
-        """手动更新聊天类型"""
-        self.chat_type = chat_type
 
-    def set_chat_mode(self, chat_mode: ChatMode):
-        """设置聊天模式"""
-        self.chat_mode = chat_mode
-
-    def is_group_chat(self) -> bool:
-        """检查是否为群聊"""
-        return self.chat_type == ChatType.GROUP
-
-    def is_private_chat(self) -> bool:
-        """检查是否为私聊"""
-        return self.chat_type == ChatType.PRIVATE
-
-    def get_chat_type_display(self) -> str:
-        """获取聊天类型的显示名称"""
-        if self.chat_type == ChatType.GROUP:
-            return "群聊"
-        elif self.chat_type == ChatType.PRIVATE:
-            return "私聊"
-        else:
-            return "未知类型"
 
     def mark_message_as_read(self, message_id: str):
         """标记消息为已读"""

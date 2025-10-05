@@ -175,7 +175,6 @@ class PromptManager:
         self._prompts = {}
         self._counter = 0
         self._context = PromptContext()
-        self._lock = asyncio.Lock()
 
     @asynccontextmanager
     async def async_message_scope(self, message_id: str | None = None):
@@ -190,10 +189,9 @@ class PromptManager:
             logger.debug(f"从上下文中获取提示词: {name} {context_prompt}")
             return context_prompt
 
-        async with self._lock:
-            if name not in self._prompts:
-                raise KeyError(f"Prompt '{name}' not found")
-            return self._prompts[name]
+        if name not in self._prompts:
+            raise KeyError(f"Prompt '{name}' not found")
+        return self._prompts[name]
 
     def generate_name(self, template: str) -> str:
         """为未命名的prompt生成名称"""

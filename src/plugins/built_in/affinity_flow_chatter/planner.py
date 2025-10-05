@@ -3,6 +3,7 @@
 集成兴趣度评分系统和用户关系追踪机制，实现智能化的聊天决策。
 """
 
+import asyncio
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
@@ -98,10 +99,11 @@ class ChatterActionPlanner:
 
             unread_messages = context.get_unread_messages() if context else []
             # 2. 使用新的兴趣度管理系统进行评分
-            score = 0.0
-            should_reply = False
+            message_interest = 0.0
             reply_not_available = False
             interest_updates: list[dict[str, Any]] = []
+            message_should_act = False 
+            message_should_reply = False
 
             if unread_messages:
                 # 直接使用消息中已计算的标志，无需重复计算兴趣值
@@ -111,17 +113,8 @@ class ChatterActionPlanner:
                         message_should_reply = getattr(message, "should_reply", False)
                         message_should_act = getattr(message, "should_act", False)
 
-                        # 确保interest_value不是None
-                        if message_interest is None:
-                            message_interest = 0.3
-
-                        # 更新最高兴趣度消息
-                        if message_interest > score:
-                            score = message_interest
-                            if message_should_reply:
-                                should_reply = True
-                            else:
-                                reply_not_available = True
+                        if not message_should_reply:
+                            reply_not_available = True
 
                         # 如果should_act为false，强制设为no_action
                         if not message_should_act:
@@ -142,22 +135,23 @@ class ChatterActionPlanner:
                                 "message_id": message.message_id,
                                 "interest_value": 0.0,
                                 "should_reply": False,
+                                "should_act": False,
                             }
                         )
 
                 if interest_updates:
-                    await self._commit_interest_updates(interest_updates)
+                    asyncio.create_task(self._commit_interest_updates(interest_updates))
 
             # 检查兴趣度是否达到非回复动作阈值
             non_reply_action_interest_threshold = global_config.affinity_flow.non_reply_action_interest_threshold
-            if score < non_reply_action_interest_threshold:
-                logger.info(f"兴趣度 {score:.3f} 低于阈值 {non_reply_action_interest_threshold:.3f}，不执行动作")
+            if not message_should_act:
+                logger.info(f"兴趣度 {message_interest:.3f} 低于阈值 {non_reply_action_interest_threshold:.3f}，不执行动作")
                 # 直接返回 no_action
                 from src.common.data_models.info_data_model import ActionPlannerInfo
 
                 no_action = ActionPlannerInfo(
                     action_type="no_action",
-                    reasoning=f"兴趣度评分 {score:.3f} 未达阈值 {non_reply_action_interest_threshold:.3f}",
+                    reasoning=f"兴趣度评分 {message_interest:.3f} 未达阈值 {non_reply_action_interest_threshold:.3f}",
                     action_data={},
                     action_message=None,
                 )
@@ -168,9 +162,6 @@ class ChatterActionPlanner:
                 available_actions = list(initial_plan.available_actions.keys())
                 plan_filter = ChatterPlanFilter(self.chat_id, available_actions)
                 filtered_plan = await plan_filter.filter(reply_not_available, initial_plan)
-
-            # 检查filtered_plan是否有reply动作，用于统计
-            has_reply_action = any(decision.action_type == "reply" for decision in filtered_plan.decided_actions)
 
             # 5. 使用 PlanExecutor 执行 Plan
             execution_result = await self.executor.execute(filtered_plan)

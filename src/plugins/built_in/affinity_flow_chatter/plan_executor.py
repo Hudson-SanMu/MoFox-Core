@@ -220,11 +220,11 @@ class ChatterPlanExecutor:
         except Exception as e:
             error_message = str(e)
             logger.error(f"执行回复动作失败: {action_info.action_type}, 错误: {error_message}")
-
+        '''
         # 记录用户关系追踪
         if success and action_info.action_message:
             await self._track_user_interaction(action_info, plan, reply_content)
-
+        '''
         execution_time = time.time() - start_time
         self.execution_stats["execution_times"].append(execution_time)
 
