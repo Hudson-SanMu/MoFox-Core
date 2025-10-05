@@ -69,9 +69,6 @@ class MemoryManager:
             # 初始化记忆系统
             self.memory_system = await initialize_memory_system(llm_model)
 
-            # 设置全局实例
-            global_memory_manager = self.memory_system
-
             self.is_initialized = True
             logger.info(" 记忆系统初始化完成")
 
@@ -439,7 +436,7 @@ class MemoryManager:
             formatted_items = [self._format_object(item) for item in obj]
             filtered = [item for item in formatted_items if item]
             return self._clean_text("、".join(filtered)) if filtered else ""
-        if isinstance(obj, (int, float)):
+        if isinstance(obj, int | float):
             return str(obj)
         text = self._truncate(str(obj).strip())
         return self._clean_text(text)
@@ -449,12 +446,12 @@ class MemoryManager:
             for key in keys:
                 if obj.get(key):
                     value = obj[key]
-                    if isinstance(value, (dict, list)):
+                    if isinstance(value, dict | list):
                         return self._clean_text(self._format_object(value))
                     return self._clean_text(value)
         if isinstance(obj, list) and obj:
             return self._clean_text(self._format_object(obj[0]))
-        if isinstance(obj, (str, int, float)):
+        if isinstance(obj, str | int | float):
             return self._clean_text(obj)
         return None
 

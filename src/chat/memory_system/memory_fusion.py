@@ -215,8 +215,8 @@ class MemoryFusionEngine:
         if not keywords1 or not keywords2:
             return 0.0
 
-        set1 = set(k.lower() for k in keywords1)
-        set2 = set(k.lower() for k in keywords2)
+        set1 = set(k.lower() for k in keywords1)  # noqa: C401
+        set2 = set(k.lower() for k in keywords2)  # noqa: C401
 
         intersection = set1 & set2
         union = set1 | set2
