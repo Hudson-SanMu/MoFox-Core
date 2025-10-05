@@ -30,6 +30,7 @@ from .memory_system import MemorySystem, MemorySystemConfig, get_memory_system, 
 
 # Vector DB存储系统
 from .vector_memory_storage_v2 import VectorMemoryStorage, VectorStorageConfig, get_vector_memory_storage
+from .memory_formatter import format_memories_bracket_style
 
 __all__ = [
     # 核心数据结构
@@ -62,6 +63,8 @@ __all__ = [
     "MemoryActivator",
     "memory_activator",
     "enhanced_memory_activator",  # 兼容性别名
+    # 格式化工具
+    "format_memories_bracket_style",
 ]
 
 # 版本信息

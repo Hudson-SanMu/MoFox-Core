@@ -263,7 +263,7 @@ class MessageRecv(Message):
                                 logger.warning("视频消息中没有base64数据")
                                 return "[收到视频消息，但数据异常]"
                         except Exception as e:
-                            logger.error(f"视频处理失败: {e!s}")
+                            logger.error(f"视频处理失败: {str(e)}")
                             import traceback
 
                             logger.error(f"错误详情: {traceback.format_exc()}")
@@ -277,7 +277,7 @@ class MessageRecv(Message):
                 logger.info("未启用视频识别")
                 return "[视频]"
         except Exception as e:
-            logger.error(f"处理消息段失败: {e!s}, 类型: {segment.type}, 数据: {segment.data}")
+            logger.error(f"处理消息段失败: {str(e)}, 类型: {segment.type}, 数据: {segment.data}")
             return f"[处理失败的{segment.type}消息]"
 
 
@@ -427,7 +427,7 @@ class MessageRecvS4U(MessageRecv):
 
                                 # 使用video analyzer分析视频
                                 video_analyzer = get_video_analyzer()
-                                result = await video_analyzer.analyze_video_from_bytes(
+                                result = await video_analyzer.analyze_video(
                                     video_bytes, filename, prompt=global_config.video_analysis.batch_analysis_prompt
                                 )
 

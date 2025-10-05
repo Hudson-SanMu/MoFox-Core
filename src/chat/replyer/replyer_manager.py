@@ -37,6 +37,7 @@ class ReplyerManager:
         target_stream = chat_stream
         if not target_stream:
             if chat_manager := get_chat_manager():
+                # get_stream 为异步，需要等待
                 target_stream = await chat_manager.get_stream(stream_id)
 
         if not target_stream:

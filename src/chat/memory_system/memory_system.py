@@ -997,6 +997,7 @@ class MemorySystem:
             from src.chat.message_receive.chat_stream import get_chat_manager
 
             chat_manager = get_chat_manager()
+            # get_stream 为异步方法，需要 await
             chat_stream = await chat_manager.get_stream(stream_id)
 
             if not chat_stream or not hasattr(chat_stream, "context_manager"):
@@ -1111,6 +1112,7 @@ class MemorySystem:
                 from src.chat.message_receive.chat_stream import get_chat_manager
 
                 chat_manager = get_chat_manager()
+                # ChatManager.get_stream 是异步方法，需要 await，否则会产生 "coroutine was never awaited" 警告
                 chat_stream = await chat_manager.get_stream(stream_id)
                 if chat_stream and hasattr(chat_stream, "context_manager"):
                     history_limit = self._determine_history_limit(context)
