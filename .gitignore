@@ -193,6 +193,7 @@ celerybeat.pid
 
 # Environments
 .venv
+.venv311/
 env/
 venv/
 ENV/
