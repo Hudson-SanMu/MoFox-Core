@@ -845,7 +845,7 @@ class MemorySystem:
 
             # 详细日志 - 打印检索到的有效记忆的完整内容
             if scored_memories:
-                logger.info("🧠 检索到的有效记忆内容详情:")
+                logger.debug("🧠 检索到的有效记忆内容详情:")
                 for i, (mem, score, details) in enumerate(scored_memories[:effective_limit], 1):
                     try:
                         # 获取记忆的完整内容
@@ -868,26 +868,26 @@ class MemorySystem:
                         created_time_str = datetime.datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S") if created_time else "unknown"
 
                         # 打印记忆详细信息
-                        logger.info(f"  📝 记忆 #{i}")
-                        logger.info(f"     类型: {memory_type} | 重要性: {importance} | 置信度: {confidence}")
-                        logger.info(f"     创建时间: {created_time_str}")
-                        logger.info(f"     综合得分: {details['final']:.3f} (向量:{details['vector']:.3f}, 时效:{details['recency']:.3f}, 重要性:{details['importance']:.3f}, 频率:{details['frequency']:.3f})")
+                        logger.debug(f"  📝 记忆 #{i}")
+                        logger.debug(f"     类型: {memory_type} | 重要性: {importance} | 置信度: {confidence}")
+                        logger.debug(f"     创建时间: {created_time_str}")
+                        logger.debug(f"     综合得分: {details['final']:.3f} (向量:{details['vector']:.3f}, 时效:{details['recency']:.3f}, 重要性:{details['importance']:.3f}, 频率:{details['frequency']:.3f})")
 
                         # 处理长内容，如果超过200字符则截断并添加省略号
                         display_content = memory_content
                         if len(memory_content) > 200:
                             display_content = memory_content[:200] + "..."
 
-                        logger.info(f"     内容: {display_content}")
+                        logger.debug(f"     内容: {display_content}")
 
                         # 如果有关键词，也打印出来
                         if hasattr(mem, "keywords") and mem.keywords:
                             keywords_str = ", ".join(mem.keywords[:10])  # 最多显示10个关键词
                             if len(mem.keywords) > 10:
                                 keywords_str += f" ... (共{len(mem.keywords)}个关键词)"
-                            logger.info(f"     关键词: {keywords_str}")
+                            logger.debug(f"     关键词: {keywords_str}")
 
-                        logger.info("")  # 空行分隔
+                        logger.debug("")  # 空行分隔
 
                     except Exception as e:
                         logger.warning(f"打印记忆详情时出错: {e}")
