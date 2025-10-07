@@ -35,6 +35,8 @@ class PromptParameters:
     reply_to: str = ""
     extra_info: str = ""
     prompt_mode: Literal["s4u", "normal", "minimal"] = "s4u"
+    bot_name: str = ""
+    bot_nickname: str = ""
 
     # 功能开关
     enable_tool: bool = True
@@ -454,6 +456,8 @@ class Prompt:
                 "reply_target_block": self.parameters.reply_target_block,
                 "mood_state": self.parameters.mood_prompt,
                 "action_descriptions": self.parameters.action_descriptions,
+                "bot_name": self.parameters.bot_name,
+                "bot_nickname": self.parameters.bot_nickname,
             }
         )
 

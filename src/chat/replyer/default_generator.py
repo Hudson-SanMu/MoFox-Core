@@ -67,6 +67,9 @@ def init_prompt():
 {moderation_prompt}
 不要复读你前面发过的内容，意思相近也不行。
 不要浮夸，不要夸张修辞，平淡且不要输出多余内容(包括前后缀，冒号和引号，括号，表情包，at或 @等 )，只输出一条回复就好。
+
+*你叫{bot_name}，也有人叫你{bot_nickname}*
+
 现在，你说：
 """,
         "default_expressor_prompt",
@@ -147,6 +150,8 @@ def init_prompt():
 请注意不要输出多余内容(包括前后缀，冒号和引号，at或 @等 )。只输出回复内容。
 {moderation_prompt}
 
+*你叫{bot_name}，也有人叫你{bot_nickname}*
+
 现在，你说：
 """,
         "replyer_self_prompt",
@@ -211,6 +216,9 @@ If you need to use the search tool, please directly call the function "lpmm_sear
 2.  可以分享你的看法、提出相关问题，或者开个合适的玩笑。
 3.  目的是让对话更有趣、更深入。
 最终请输出一条简短、完整且口语化的回复。
+
+*你叫{bot_name}，也有人叫你{bot_nickname}*
+
 现在，你说：
 """,
         "normal_style_prompt",
@@ -1488,7 +1496,8 @@ class DefaultReplyer:
             reply_target_block=reply_target_block,
             mood_prompt=mood_prompt,
             action_descriptions=action_descriptions,
-            read_mark=read_mark,
+            bot_name=global_config.bot.nickname,
+            bot_nickname=",".join(global_config.bot.alias_names) if global_config.bot.alias_names else "",
         )
 
         # 使用新的统一Prompt系统 - 使用正确的模板名称
@@ -1648,6 +1657,8 @@ class DefaultReplyer:
             # 添加已构建的表达习惯和关系信息
             expression_habits_block=expression_habits_block,
             relation_info_block=relation_info,
+            bot_name=global_config.bot.nickname,
+            bot_nickname=",".join(global_config.bot.alias_names) if global_config.bot.alias_names else "",
         )
 
         # 使用新的统一Prompt系统 - Expressor模式
