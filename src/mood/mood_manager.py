@@ -58,24 +58,50 @@ class ChatMood:
     async def _initialize(self):
         """异步初始化方法"""
         if not self._initialized:
-            from src.chat.message_receive.chat_stream import get_chat_manager
+            try:
+                from src.chat.message_receive.chat_stream import get_chat_manager
 
-            chat_manager = get_chat_manager()
-            self.chat_stream = await chat_manager.get_stream(self.chat_id)
+                chat_manager = get_chat_manager()
+                self.chat_stream = await chat_manager.get_stream(self.chat_id)
 
-            if not self.chat_stream:
-                raise ValueError(f"Chat stream for chat_id {self.chat_id} not found")
+                if not self.chat_stream:
+                    # 如果找不到聊天流，使用基础日志前缀但不抛出异常
+                    self.log_prefix = f"[{self.chat_id}]"
+                    logger.warning(f"Chat stream for chat_id {self.chat_id} not found during mood initialization")
+                else:
+                    self.log_prefix = f"[{self.chat_stream.group_info.group_name if self.chat_stream.group_info else self.chat_stream.user_info.user_nickname}]"
 
-            self.log_prefix = f"[{self.chat_stream.group_info.group_name if self.chat_stream.group_info else self.chat_stream.user_info.user_nickname}]"
-            self._initialized = True
+                # 初始化回归计数
+                if not hasattr(self, 'regression_count'):
+                    self.regression_count = 0
 
-        self.regression_count: int = 0
+                # 初始化情绪模型
+                if not hasattr(self, 'mood_model'):
+                    self.mood_model = LLMRequest(model_set=model_config.model_task_config.emotion, request_type="mood")
 
-        self.mood_model = LLMRequest(model_set=model_config.model_task_config.emotion, request_type="mood")
+                # 初始化最后变化时间
+                if not hasattr(self, 'last_change_time'):
+                    self.last_change_time = 0
 
-        self.last_change_time: float = 0
+                self._initialized = True
+                logger.debug(f"{self.log_prefix} 情绪系统初始化完成")
+
+            except Exception as e:
+                logger.error(f"情绪系统初始化失败: {e}")
+                # 设置基础初始化状态，避免重复尝试
+                self.log_prefix = f"[{self.chat_id}]"
+                self._initialized = True
+                if not hasattr(self, 'regression_count'):
+                    self.regression_count = 0
+                if not hasattr(self, 'mood_model'):
+                    self.mood_model = LLMRequest(model_set=model_config.model_task_config.emotion, request_type="mood")
+                if not hasattr(self, 'last_change_time'):
+                    self.last_change_time = 0
 
     async def update_mood_by_message(self, message: MessageRecv | DatabaseMessages, interested_rate: float):
+        # 确保异步初始化已完成
+        await self._initialize()
+
         # 如果当前聊天处于失眠状态，则锁定情绪，不允许更新
         if self.chat_id in mood_manager.insomnia_chats:
             logger.debug(f"{self.log_prefix} 处于失眠状态，情绪已锁定，跳过更新。")
@@ -89,7 +115,8 @@ class ChatMood:
         else:  # DatabaseMessages
             message_time = message.time
 
-        during_last_time = message_time - self.last_change_time
+        # 防止负时间差
+        during_last_time = max(0, message_time - self.last_change_time)
 
         base_probability = 0.05
         time_multiplier = 4 * (1 - math.exp(-0.01 * during_last_time))
@@ -107,6 +134,7 @@ class ChatMood:
         )
 
         if random.random() > update_probability:
+            logger.debug(f"{self.log_prefix} 情绪更新概率未达到阈值，跳过更新。概率: {update_probability:.3f}")
             return
 
         logger.debug(

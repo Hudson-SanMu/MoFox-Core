@@ -582,6 +582,21 @@ class ChatBot:
                     logger.error(f"存储消息到数据库失败: {e}")
                     traceback.print_exc()
 
+                # 情绪系统更新 - 在消息存储后触发情绪更新
+                try:
+                    if global_config.mood.enable_mood:
+                        # 获取兴趣度用于情绪更新
+                        interest_rate = getattr(message, "interest_value", 0.0)
+                        logger.debug(f"开始更新情绪状态，兴趣度: {interest_rate:.2f}")
+
+                        # 获取当前聊天的情绪对象并更新情绪状态
+                        chat_mood = mood_manager.get_mood_by_chat_id(message.chat_stream.stream_id)
+                        await chat_mood.update_mood_by_message(message, interest_rate)
+                        logger.debug("情绪状态更新完成")
+                except Exception as e:
+                    logger.error(f"更新情绪状态失败: {e}")
+                    traceback.print_exc()
+
             if template_group_name:
                 async with global_prompt_manager.async_message_scope(template_group_name):
                     await preprocess()
