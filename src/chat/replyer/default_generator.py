@@ -32,10 +32,8 @@ from src.common.logger import get_logger
 from src.config.config import global_config, model_config
 from src.individuality.individuality import get_individuality
 from src.llm_models.utils_model import LLMRequest
-from src.mais4u.mai_think import mai_thinking_manager
 
-# 旧记忆系统已被移除
-# 旧记忆系统已被移除
+
 from src.mood.mood_manager import mood_manager
 from src.person_info.person_info import get_person_info_manager
 from src.plugin_system.apis import llm_api
@@ -1166,84 +1164,6 @@ class DefaultReplyer:
 
         return interest_scores
 
-    @staticmethod
-    def build_mai_think_context(
-            chat_id: str,
-        memory_block: str,
-        relation_info: str,
-        time_block: str,
-        chat_target_1: str,
-        chat_target_2: str,
-        mood_prompt: str,
-        identity_block: str,
-        sender: str,
-        target: str,
-        chat_info: str,
-    ) -> Any:
-        """构建 mai_think 上下文信息
-
-        Args:
-            chat_id: 聊天ID
-            memory_block: 记忆块内容
-            relation_info: 关系信息
-            time_block: 时间块内容
-            chat_target_1: 聊天目标1
-            chat_target_2: 聊天目标2
-            mood_prompt: 情绪提示
-            identity_block: 身份块内容
-            sender: 发送者名称
-            target: 目标消息内容
-            chat_info: 聊天信息
-
-        Returns:
-            Any: mai_think 实例
-        """
-        mai_think = mai_thinking_manager.get_mai_think(chat_id)
-        mai_think.memory_block = memory_block
-        mai_think.relation_info_block = relation_info
-        mai_think.time_block = time_block
-        mai_think.chat_target = chat_target_1
-        mai_think.chat_target_2 = chat_target_2
-        mai_think.chat_info = chat_info
-        mai_think.mood_state = mood_prompt
-        mai_think.identity = identity_block
-        mai_think.sender = sender
-        mai_think.target = target
-        return mai_think
-    
-    
-    async def build_actions_prompt(self, available_actions, choosen_actions: Optional[List[Dict[str, Any]]] = None) -> str:
-        """构建动作提示
-        """
-        
-        action_descriptions = ""
-        if available_actions:
-            action_descriptions = "你可以做以下这些动作：\n"
-            for action_name, action_info in available_actions.items():
-                action_description = action_info.description
-                action_descriptions += f"- {action_name}: {action_description}\n"
-            action_descriptions += "\n"
-        
-        choosen_action_descriptions = ""
-        if choosen_actions:
-            for action in choosen_actions:
-                action_name = action.get('action_type', 'unknown_action')
-                if action_name =="reply":
-                    continue
-                action_description = action.get('reason', '无描述')
-                reasoning = action.get('reasoning', '无原因')
-
-                choosen_action_descriptions += f"- {action_name}: {action_description}，原因：{reasoning}\n"
-        
-        if choosen_action_descriptions:
-            action_descriptions += "根据聊天情况，你决定在回复的同时做以下这些动作：\n"
-            action_descriptions += choosen_action_descriptions
-
-    async def _async_init(self):
-        if self._initialized:
-            return
-        self.is_group_chat, self.chat_target_info = await get_chat_type_and_target_info(self.chat_stream.stream_id)
-        self._initialized = True
 
     async def build_prompt_reply_context(
         self,
