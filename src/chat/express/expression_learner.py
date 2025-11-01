@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from typing import Any
 
+import aiofiles
 import orjson
 from sqlalchemy import select
 
@@ -718,8 +719,9 @@ class ExpressionLearnerManager:
                     continue
 
                 try:
-                    with open(expr_file, encoding="utf-8") as f:
-                        expressions = orjson.loads(f.read())
+                    async with aiofiles.open(expr_file, encoding="utf-8") as f:
+                        content = await f.read()
+                        expressions = orjson.loads(content)
 
                 for chat_id in chat_ids:
                     expr_file = os.path.join(type_dir, chat_id, "expressions.json")
@@ -780,21 +782,23 @@ class ExpressionLearnerManager:
                 except Exception as e:
                     logger.error(f"迁移表达方式 {expr_file} 失败: {e}")
 
-        # 检查并处理grammar表达删除
-        if not os.path.exists(done_flag2):
-            logger.info("开始删除所有grammar类型的表达...")
-            try:
-                deleted_count = self.delete_all_grammar_expressions()
-                logger.info(f"grammar表达删除完成，共删除 {deleted_count} 个表达")
-                
-                # 创建done.done2标记文件
-                with open(done_flag2, "w", encoding="utf-8") as f:
-                    f.write("done\n")
-                logger.info("已创建done.done2标记文件，grammar表达删除标记完成")
-            except Exception as e:
-                logger.error(f"删除grammar表达或创建标记文件失败: {e}")
-        else:
-            logger.info("grammar表达已删除，跳过重复删除")
+        # 标记迁移完成
+        try:
+            # 确保done.done文件的父目录存在
+            done_parent_dir = os.path.dirname(done_flag)
+            if not os.path.exists(done_parent_dir):
+                os.makedirs(done_parent_dir, exist_ok=True)
+                logger.debug(f"为done.done创建父目录: {done_parent_dir}")
+
+            async with aiofiles.open(done_flag, "w", encoding="utf-8") as f:
+                await f.write("done\n")
+            logger.info(f"表达方式JSON迁移已完成，共迁移 {migrated_count} 个表达方式，已写入done.done标记文件")
+        except PermissionError as e:
+            logger.error(f"权限不足，无法写入done.done标记文件: {e}")
+        except OSError as e:
+            logger.error(f"文件系统错误，无法写入done.done标记文件: {e}")
+        except Exception as e:
+            logger.error(f"写入done.done标记文件失败: {e}")
 
     @staticmethod
     async def _migrate_old_data_create_date():
