@@ -928,67 +928,68 @@ def assign_message_ids_flexible(
 # result3 = assign_message_ids_flexible(messages, prefix="ts", use_timestamp=True)
 # # 结果: [{'id': 'ts123a1b', 'message': 'Hello'}, {'id': 'ts123c2d', 'message': 'World'}, {'id': 'ts123e3f', 'message': 'Test message'}]
 
-def parse_keywords_string(keywords_input) -> list[str]:
+
+def filter_system_format_content(content: str | None) -> str:
     """
-    统一的关键词解析函数，支持多种格式的关键词字符串解析
-    
-    支持的格式：
-    1. 字符串列表格式：'["utils.py", "修改", "代码", "动作"]'
-    2. 斜杠分隔格式：'utils.py/修改/代码/动作'
-    3. 逗号分隔格式：'utils.py,修改,代码,动作'
-    4. 空格分隔格式：'utils.py 修改 代码 动作'
-    5. 已经是列表的情况：["utils.py", "修改", "代码", "动作"]
-    6. JSON格式字符串：'{"keywords": ["utils.py", "修改", "代码", "动作"]}'
-    
+    过滤系统格式化内容，移除回复、@、图片、表情包等系统生成的格式文本
+
+    此方法过滤以下类型的系统格式化内容：
+    1. 回复格式：[回复xxx]，说：xxx
+    2. 表情包格式：[表情包：xxx]
+    3. 图片格式：[图片:xxx]
+    4. @格式：@<xxx>
+    5. 错误格式：[表情包(...)]、[图片(...)]
+    6. [回复开头的格式
+
     Args:
-        keywords_input: 关键词输入，可以是字符串或列表
-        
+        content: 原始内容
+
     Returns:
-        list[str]: 解析后的关键词列表，去除空白项
+        过滤后的纯文本内容
     """
-    if not keywords_input:
-        return []
-    
-    # 如果已经是列表，直接处理
-    if isinstance(keywords_input, list):
-        return [str(k).strip() for k in keywords_input if str(k).strip()]
-    
-    # 转换为字符串处理
-    keywords_str = str(keywords_input).strip()
-    if not keywords_str:
-        return []
-    
-    try:
-        # 尝试作为JSON对象解析（支持 {"keywords": [...]} 格式）
-        import json
-        json_data = json.loads(keywords_str)
-        if isinstance(json_data, dict) and "keywords" in json_data:
-            keywords_list = json_data["keywords"]
-            if isinstance(keywords_list, list):
-                return [str(k).strip() for k in keywords_list if str(k).strip()]
-        elif isinstance(json_data, list):
-            # 直接是JSON数组格式
-            return [str(k).strip() for k in json_data if str(k).strip()]
-    except (json.JSONDecodeError, ValueError):
-        pass
-    
-    try:
-        # 尝试使用 ast.literal_eval 解析（支持Python字面量格式）
-        import ast
-        parsed = ast.literal_eval(keywords_str)
-        if isinstance(parsed, list):
-            return [str(k).strip() for k in parsed if str(k).strip()]
-    except (ValueError, SyntaxError):
-        pass
-    
-    # 尝试不同的分隔符
-    separators = ['/', ',', ' ', '|', ';']
-    
-    for separator in separators:
-        if separator in keywords_str:
-            keywords_list = [k.strip() for k in keywords_str.split(separator) if k.strip()]
-            if len(keywords_list) > 1:  # 确保分割有效
-                return keywords_list
-    
-    # 如果没有分隔符，返回单个关键词
-    return [keywords_str] if keywords_str else []
+    if not content:
+        return ""
+
+    original_content = content
+    cleaned_content = content.strip()
+
+    # 1. 移除回复格式：[回复xxx]，说：xxx（各种变体）
+    # 匹配所有包含"]，说："格式的回复
+    cleaned_content = re.sub(r"\[回复[^\]]*\]，说：\s*", "", cleaned_content)
+    # 匹配 [回复<xxx:数字>]，说：xxx 格式
+    cleaned_content = re.sub(r"\[回复<[^>]*>\]，说：\s*", "", cleaned_content)
+
+    # 2. 处理原有的[回复开头格式（保持向后兼容）
+    # 注意：这步要在上面处理完成后再执行，避免冲突
+    if cleaned_content.startswith("[回复"):
+        last_bracket_index = cleaned_content.rfind("]")
+        if last_bracket_index != -1:
+            cleaned_content = cleaned_content[last_bracket_index + 1 :].strip()
+
+    # 3. 移除表情包格式：[表情包：xxx]
+    cleaned_content = re.sub(r"\[表情包：[^\]]*\]", "", cleaned_content)
+
+    # 4. 移除图片格式：[图片:xxx]
+    cleaned_content = re.sub(r"\[图片:[^\]]*\]", "", cleaned_content)
+
+    # 5. 移除@格式：@<xxx>
+    cleaned_content = re.sub(r"@<[^>]*>", "", cleaned_content)
+
+    # 6. 移除其他可能的系统格式
+    # [表情包(描述生成失败)] 等错误格式
+    cleaned_content = re.sub(r"\[表情包\([^)]*\)\]", "", cleaned_content)
+    # [图片(描述生成失败)] 等错误格式
+    cleaned_content = re.sub(r"\[图片\([^)]*\)\]", "", cleaned_content)
+
+    # 清理多余空格
+    cleaned_content = re.sub(r"\s+", " ", cleaned_content).strip()
+
+    # 记录过滤操作
+    if cleaned_content != original_content.strip():
+        logger.info(
+            f"[系统格式过滤器] 检测到并清理了系统格式化文本。"
+            f"原始内容: '{original_content}', "
+            f"清理后: '{cleaned_content}'"
+        )
+
+    return cleaned_content
