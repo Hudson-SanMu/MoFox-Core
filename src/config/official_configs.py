@@ -269,6 +269,16 @@ class ToolConfig(ValidatedConfigBase):
     """工具配置类"""
 
     enable_tool: bool = Field(default=False, description="启用工具")
+    force_parallel_execution: bool = Field(
+        default=True,
+        description="����LLM����ͬʱ������Ҫʹ�ù�����ʱǿ��ʹ�ò���ģʽ��ֹ���������Ϣ",
+    )
+    max_parallel_invocations: int = Field(
+        default=5, ge=1, le=50, description="��ͬһ�������п��Խ������ܹ��ߵ�������"
+    )
+    tool_timeout: float = Field(
+        default=60.0, ge=1.0, le=600.0, description="�������ߵ��õĳ�ʱʱ�䣨�룩"
+    )
 
 
 class VoiceConfig(ValidatedConfigBase):
@@ -779,7 +789,13 @@ class PluginHttpSystemConfig(ValidatedConfigBase):
         default="100/minute", description="插件API的默认速率限制策略"
     )
     plugin_api_valid_keys: list[str] = Field(
-        default_factory=list, description="有效的API密钥列表，用于插件认证"
+        default_factory=list, description="��Ч��API��Կ�б������ڲ����֤"
+    )
+    event_handler_timeout: float = Field(
+        default=30.0, ge=1.0, le=300.0, description="�¼����������ִ�г�ʱʱ�䣨�룩"
+    )
+    event_handler_max_concurrency: int = Field(
+        default=20, ge=1, le=200, description="����ÿ���¼�ͬʱִ�е�������߸���0��ʾ����������"
     )
 
 

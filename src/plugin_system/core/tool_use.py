@@ -108,12 +108,28 @@ class ToolExecutor:
         """
         self.chat_id = chat_id
         self.execution_config = execution_config or ToolExecutionConfig()
+        if execution_config is None:
+            self._apply_config_defaults()
 
         # chat_stream 和 log_prefix 将在异步方法中初始化
         self.chat_stream = None  # type: ignore
         self.log_prefix = f"[{chat_id}]"
 
         self.llm_model = LLMRequest(model_set=model_config.model_task_config.tool_use, request_type="tool_executor")
+
+    def _apply_config_defaults(self) -> None:
+        tool_cfg = getattr(global_config, "tool", None)
+        if not tool_cfg:
+            return
+        if hasattr(tool_cfg, "force_parallel_execution"):
+            self.execution_config.enable_parallel = bool(tool_cfg.force_parallel_execution)
+        max_invocations = getattr(tool_cfg, "max_parallel_invocations", None)
+        if max_invocations:
+            self.execution_config.max_concurrent_tools = max(1, max_invocations)
+        timeout = getattr(tool_cfg, "tool_timeout", None)
+        if timeout:
+            self.execution_config.tool_timeout = max(1.0, float(timeout))
+
 
         # 二步工具调用状态管理
         self._pending_step_two_tools: dict[str, dict[str, Any]] = {}

@@ -356,7 +356,7 @@ class MessageHandler:
                 case RealMessageType.text:
                     ret_seg = await self.handle_text_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.TEXT, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -365,7 +365,7 @@ class MessageHandler:
                 case RealMessageType.face:
                     ret_seg = await self.handle_face_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.FACE, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -375,7 +375,7 @@ class MessageHandler:
                     if not in_reply:
                         ret_seg = await self.handle_reply_message(sub_message)
                         if ret_seg:
-                            await event_manager.trigger_event(
+                            event_manager.emit_event(
                                 NapcatEvent.ON_RECEIVED.REPLY, permission_group=PLUGIN_NAME, message_seg=ret_seg
                             )
                             seg_message += ret_seg
@@ -385,7 +385,7 @@ class MessageHandler:
                     logger.debug("开始处理图片消息段")
                     ret_seg = await self.handle_image_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.IMAGE, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -396,7 +396,7 @@ class MessageHandler:
                 case RealMessageType.record:
                     ret_seg = await self.handle_record_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.RECORD, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.clear()
@@ -408,7 +408,7 @@ class MessageHandler:
                     logger.debug(f"开始处理VIDEO消息段: {sub_message}")
                     ret_seg = await self.handle_video_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.VIDEO, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -422,7 +422,7 @@ class MessageHandler:
                         raw_message.get("group_id"),
                     )
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.AT, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -431,7 +431,7 @@ class MessageHandler:
                 case RealMessageType.rps:
                     ret_seg = await self.handle_rps_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.RPS, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -440,7 +440,7 @@ class MessageHandler:
                 case RealMessageType.dice:
                     ret_seg = await self.handle_dice_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.DICE, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -449,7 +449,7 @@ class MessageHandler:
                 case RealMessageType.shake:
                     ret_seg = await self.handle_shake_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.SHAKE, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)
@@ -478,7 +478,7 @@ class MessageHandler:
                 case RealMessageType.json:
                     ret_seg = await self.handle_json_message(sub_message)
                     if ret_seg:
-                        await event_manager.trigger_event(
+                        event_manager.emit_event(
                             NapcatEvent.ON_RECEIVED.JSON, permission_group=PLUGIN_NAME, message_seg=ret_seg
                         )
                         seg_message.append(ret_seg)

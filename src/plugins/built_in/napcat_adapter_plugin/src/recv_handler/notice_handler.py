@@ -133,7 +133,7 @@ class NoticeHandler:
 
                         from ...event_types import NapcatEvent
 
-                        await event_manager.trigger_event(NapcatEvent.ON_RECEIVED.FRIEND_INPUT, permission_group=PLUGIN_NAME)
+                        event_manager.emit_event(NapcatEvent.ON_RECEIVED.FRIEND_INPUT, permission_group=PLUGIN_NAME)
                     case _:
                         logger.warning(f"不支持的notify类型: {notice_type}.{sub_type}")
             case NoticeType.group_msg_emoji_like:    
@@ -376,7 +376,7 @@ class NoticeHandler:
         )
         
         like_emoji_id = raw_message.get("likes")[0].get("emoji_id")
-        await event_manager.trigger_event(
+        event_manager.emit_event(
                         NapcatEvent.ON_RECEIVED.EMOJI_LIEK, 
                         permission_group=PLUGIN_NAME, 
                         group_id=group_id,

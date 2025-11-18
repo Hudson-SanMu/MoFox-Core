@@ -30,7 +30,7 @@ async def send_message(message: MessageSending, show_log=True) -> bool:
             from src.plugin_system.core.event_manager import event_manager
 
             if message.chat_stream:
-                await event_manager.trigger_event(
+                event_manager.emit_event(
                     EventType.AFTER_SEND,
                     permission_group="SYSTEM",
                     stream_id=message.chat_stream.stream_id,
