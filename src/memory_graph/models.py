@@ -43,6 +43,21 @@ class GraphOperationType(Enum):
     DELETE_MEMORY = "delete_memory"  # 删除记忆
     MERGE_MEMORIES = "merge_memories"  # 合并记忆
 
+    @classmethod
+    def _missing_(cls, value: Any):  # type: ignore[override]
+        """
+        在从原始数据重构时，允许进行不区分大小写/别名的查找。
+        """
+        if isinstance(value, str):
+            normalized = value.strip().lower().replace("-", "_")
+            for member in cls:
+                if (
+                    member.value == normalized
+                    or member.name.lower() == normalized
+                ):
+                    return member
+        return None
+
 
 class ShortTermOperation(Enum):
     """短期记忆操作类型枚举"""
