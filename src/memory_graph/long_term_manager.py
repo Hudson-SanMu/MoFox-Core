@@ -658,7 +658,9 @@ class LongTermMemoryManager:
             memory.metadata["transfer_time"] = datetime.now().isoformat()
 
             logger.info(f"✅ 创建长期记忆: {memory.id} (来自短期记忆 {source_stm.id})")
-            self._register_temp_id(op.target_id, memory.id, temp_id_map)
+            # 强制注册 target_id，无论它是否符合 placeholder 格式
+            # 这样即使 LLM 使用了中文描述作为 ID (如 "新创建的记忆"), 也能正确映射
+            self._register_temp_id(op.target_id, memory.id, temp_id_map, force=True)
             self._register_aliases_from_params(
                 op.parameters,
                 memory.id,
@@ -766,7 +768,8 @@ class LongTermMemoryManager:
             # 尝试为新节点生成 embedding (异步)
             asyncio.create_task(self._generate_node_embedding(node_id, content))
             logger.info(f"✅ 创建节点: {content} ({node_type}) -> {memory_id}")
-            self._register_temp_id(op.target_id, node_id, temp_id_map)
+            # 强制注册 target_id，无论它是否符合 placeholder 格式
+            self._register_temp_id(op.target_id, node_id, temp_id_map, force=True)
             self._register_aliases_from_params(
                 op.parameters,
                 node_id,
