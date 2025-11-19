@@ -553,9 +553,17 @@ class LongTermMemoryManager:
         return lowered.startswith(("new_", "temp_"))
 
     def _register_temp_id(
-        self, placeholder: str | None, actual_id: str, temp_id_map: dict[str, str]
+        self,
+        placeholder: str | None,
+        actual_id: str,
+        temp_id_map: dict[str, str],
+        force: bool = False,
     ) -> None:
-        if actual_id and placeholder and self._is_placeholder_id(placeholder):
+        if not actual_id or not placeholder or not isinstance(placeholder, str):
+            return
+        if placeholder == actual_id:
+            return
+        if force or self._is_placeholder_id(placeholder):
             temp_id_map[placeholder] = actual_id
 
     def _resolve_id(self, raw_id: str | None, temp_id_map: dict[str, str]) -> str | None:
@@ -578,22 +586,36 @@ class LongTermMemoryManager:
         return {k: self._resolve_value(v, temp_id_map) for k, v in params.items()}
 
     def _register_aliases_from_params(
-        self, params: dict[str, Any], actual_id: str, temp_id_map: dict[str, str]
+        self,
+        params: dict[str, Any],
+        actual_id: str,
+        temp_id_map: dict[str, str],
+        *,
+        extra_keywords: tuple[str, ...] = (),
+        force: bool = False,
     ) -> None:
-        alias_keywords = ("alias", "placeholder", "temp_id", "register_as")
+        alias_keywords = ("alias", "placeholder", "temp_id", "register_as") + tuple(
+            extra_keywords
+        )
         for key, value in params.items():
             if isinstance(value, str):
                 lower_key = key.lower()
                 if any(keyword in lower_key for keyword in alias_keywords):
-                    self._register_temp_id(value, actual_id, temp_id_map)
+                    self._register_temp_id(value, actual_id, temp_id_map, force=force)
             elif isinstance(value, list):
                 lower_key = key.lower()
                 if any(keyword in lower_key for keyword in alias_keywords):
                     for item in value:
                         if isinstance(item, str):
-                            self._register_temp_id(item, actual_id, temp_id_map)
+                            self._register_temp_id(item, actual_id, temp_id_map, force=force)
             elif isinstance(value, dict):
-                self._register_aliases_from_params(value, actual_id, temp_id_map)
+                self._register_aliases_from_params(
+                    value,
+                    actual_id,
+                    temp_id_map,
+                    extra_keywords=extra_keywords,
+                    force=force,
+                )
 
     async def _execute_create_memory(
         self,
@@ -620,7 +642,13 @@ class LongTermMemoryManager:
 
             logger.info(f"✅ 创建长期记忆: {memory.id} (来自短期记忆 {source_stm.id})")
             self._register_temp_id(op.target_id, memory.id, temp_id_map)
-            self._register_aliases_from_params(op.parameters, memory.id, temp_id_map)
+            self._register_aliases_from_params(
+                op.parameters,
+                memory.id,
+                temp_id_map,
+                extra_keywords=("memory_id", "memory_alias", "memory_placeholder"),
+                force=True,
+            )
         else:
             logger.error(f"创建长期记忆失败: {op}")
 
@@ -722,7 +750,13 @@ class LongTermMemoryManager:
             asyncio.create_task(self._generate_node_embedding(node_id, content))
             logger.info(f"✅ 创建节点: {content} ({node_type}) -> {memory_id}")
             self._register_temp_id(op.target_id, node_id, temp_id_map)
-            self._register_aliases_from_params(op.parameters, node_id, temp_id_map)
+            self._register_aliases_from_params(
+                op.parameters,
+                node_id,
+                temp_id_map,
+                extra_keywords=("node_id", "node_alias", "node_placeholder"),
+                force=True,
+            )
         else:
             logger.error(f"创建节点失败: {op}")
 

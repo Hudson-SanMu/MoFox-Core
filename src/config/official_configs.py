@@ -530,7 +530,7 @@ class ThreeTierMemoryConfig(ValidatedConfigBase):
     # 长期记忆层配置
     long_term_batch_size: int = Field(default=10, description="批量转移大小")
     long_term_decay_factor: float = Field(default=0.95, description="衰减因子")
-    long_term_auto_transfer_interval: int = Field(default=600, description="自动转移间隔（秒）")
+    long_term_auto_transfer_interval: int = Field(default=60, description="自动转移间隔（秒）")
 
     # Judge模型配置
     judge_model_name: str = Field(default="utils_small", description="用于决策的LLM模型")

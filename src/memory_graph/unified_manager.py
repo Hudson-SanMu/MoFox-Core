@@ -108,7 +108,8 @@ class UnifiedMemoryManager:
         self._initialized = False
         self._auto_transfer_task: asyncio.Task | None = None
         self._auto_transfer_interval = max(10.0, float(long_term_auto_transfer_interval))
-        self._max_transfer_delay = min(max(30.0, self._auto_transfer_interval), 300.0)
+        # 优化：降低最大延迟时间，加快转移节奏 (原为 300.0)
+        self._max_transfer_delay = min(max(30.0, self._auto_transfer_interval), 60.0)
         self._transfer_wakeup_event: asyncio.Event | None = None
 
         logger.info("统一记忆管理器已创建")
@@ -430,14 +431,15 @@ class UnifiedMemoryManager:
         max_memories = max(1, getattr(self.short_term_manager, "max_memories", 1))
         occupancy = len(self.short_term_manager.memories) / max_memories
 
-        if occupancy >= 0.9:
-            return max(5.0, base_interval * 0.1)
-        if occupancy >= 0.75:
-            return max(10.0, base_interval * 0.2)
+        # 优化：更激进的自适应间隔，加快高负载下的转移
+        if occupancy >= 0.8:
+            return max(2.0, base_interval * 0.1)
         if occupancy >= 0.5:
-            return max(15.0, base_interval * 0.4)
+            return max(5.0, base_interval * 0.2)
         if occupancy >= 0.3:
-            return max(20.0, base_interval * 0.6)
+            return max(10.0, base_interval * 0.4)
+        if occupancy >= 0.1:
+            return max(15.0, base_interval * 0.6)
 
         return base_interval
 
@@ -470,7 +472,7 @@ class UnifiedMemoryManager:
         if len(deduplicated) <= 1:
             return []
 
-        manual_queries: list[dict[str, float]] = []
+        manual_queries: list[dict[str, Any]] = []
         decay = 0.15
         for idx, text in enumerate(deduplicated):
             weight = max(0.3, 1.0 - idx * decay)
@@ -587,7 +589,7 @@ class UnifiedMemoryManager:
 
                 should_transfer = (
                     len(transfer_cache) >= cache_size_threshold
-                    or occupancy_ratio >= 0.85
+                    or occupancy_ratio >= 0.5  # 优化：降低触发阈值 (原为 0.85)
                     or (transfer_cache and time_since_last_transfer >= self._max_transfer_delay)
                     or len(self.short_term_manager.memories) >= self.short_term_manager.max_memories
                 )

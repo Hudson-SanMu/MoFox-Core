@@ -312,7 +312,7 @@ class ThreeTierMemoryFormatter:
 
             # 查找客体和属性
             objects = []
-            attributes = []
+            attributes = {}
 
             for edge in memory.edges:
                 edge_type = edge.edge_type.value if hasattr(edge.edge_type, 'value') else str(edge.edge_type)
@@ -329,17 +329,18 @@ class ThreeTierMemoryFormatter:
                     attr_node = memory.get_node_by_id(edge.target_id)
                     if attr_node:
                         attr_name = edge.relation if edge.relation else "属性"
-                        attributes.append(f"{attr_name}：{attr_node.content}")
+                        # 使用字典避免重复属性，后面的会覆盖前面的
+                        attributes[attr_name] = attr_node.content
 
-            # 检查节点中的属性
+            # 检查节点中的属性（处理 "key=value" 格式）
             for node in memory.nodes:
                 if hasattr(node, 'node_type') and str(node.node_type) == "属性":
                     # 处理 "key=value" 格式的属性
                     if "=" in node.content:
                         key, value = node.content.split("=", 1)
-                        attributes.append(f"{key.strip()}：{value.strip()}")
+                        attributes[key.strip()] = value.strip()
                     else:
-                        attributes.append(f"属性：{node.content}")
+                        attributes["属性"] = node.content
 
             # 构建最终格式
             result = f"[{type_label}] {subject}-{topic}"
@@ -348,7 +349,9 @@ class ThreeTierMemoryFormatter:
                 result += "-" + "-".join(objects)
 
             if attributes:
-                result += "（" + "，".join(attributes) + "）"
+                # 将属性字典格式化为简洁的字符串
+                attr_strs = [f"{key}：{value}" for key, value in attributes.items()]
+                result += "（" + "，".join(attr_strs) + "）"
 
             return result
 

@@ -566,12 +566,43 @@ class ShortTermMemoryManager:
         """
         获取需要转移到长期记忆的记忆
 
-        筛选条件：重要性 >= transfer_importance_threshold
-
-        Returns:
-            待转移的记忆列表
+        逻辑：
+        1. 优先选择重要性 >= 阈值的记忆
+        2. 如果剩余记忆数量仍超过 max_memories，直接清理最早的低重要性记忆直到低于上限
         """
-        return [mem for mem in self.memories if mem.importance >= self.transfer_importance_threshold]
+        # 1. 正常筛选：重要性达标的记忆
+        candidates = [mem for mem in self.memories if mem.importance >= self.transfer_importance_threshold]
+        candidate_ids = {mem.id for mem in candidates}
+        
+        # 2. 检查低重要性记忆是否积压
+        # 剩余的都是低重要性记忆
+        low_importance_memories = [mem for mem in self.memories if mem.id not in candidate_ids]
+        
+        # 如果低重要性记忆数量超过了上限（说明积压严重）
+        # 我们需要清理掉一部分，而不是转移它们
+        if len(low_importance_memories) > self.max_memories:
+            # 目标保留数量（降至上限的 90%）
+            target_keep_count = int(self.max_memories * 0.9)
+            num_to_remove = len(low_importance_memories) - target_keep_count
+            
+            if num_to_remove > 0:
+                # 按创建时间排序，删除最早的
+                low_importance_memories.sort(key=lambda x: x.created_at)
+                to_remove = low_importance_memories[:num_to_remove]
+                
+                for mem in to_remove:
+                    if mem in self.memories:
+                        self.memories.remove(mem)
+                        
+                logger.info(
+                    f"短期记忆清理: 移除了 {len(to_remove)} 条低重要性记忆 "
+                    f"(保留 {len(self.memories)} 条)"
+                )
+                
+                # 触发保存
+                asyncio.create_task(self._save_to_disk())
+            
+        return candidates
 
     async def clear_transferred_memories(self, memory_ids: list[str]) -> None:
         """
