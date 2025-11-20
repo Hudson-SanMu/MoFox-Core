@@ -183,11 +183,14 @@ class QueryBuilder(Generic[T]):
         self._use_cache = False
         return self
 
-    async def all(self) -> list[T]:
+    async def all(self, *, as_dict: bool = False) -> list[T] | list[dict[str, Any]]:
         """获取所有结果
 
+        Args:
+            as_dict: 为True时返回字典格式
+
         Returns:
-            模型实例列表
+            模型实例列表或字典列表
         """
         cache_key = ":".join(self._cache_key_parts) + ":all"
 
@@ -197,27 +200,33 @@ class QueryBuilder(Generic[T]):
             cached_dicts = await cache.get(cache_key)
             if cached_dicts is not None:
                 logger.debug(f"缓存命中: {cache_key}")
-                # 从字典列表恢复对象列表
-                return [_dict_to_model(self.model, d) for d in cached_dicts]
+                dict_rows = [dict(row) for row in cached_dicts]
+                if as_dict:
+                    return dict_rows
+                return [_dict_to_model(self.model, row) for row in dict_rows]
 
         # 从数据库查询
         async with get_db_session() as session:
             result = await session.execute(self._stmt)
             instances = list(result.scalars().all())
 
-            # ✅ 在 session 内部转换为字典列表，此时所有字段都可安全访问
+            # 在 session 内部转换为字典列表，此时所有字段都可安全访问
             instances_dicts = [_model_to_dict(inst) for inst in instances]
 
-            # 写入缓存
             if self._use_cache:
                 cache = await get_cache()
-                await cache.set(cache_key, instances_dicts)
+                cache_payload = [dict(row) for row in instances_dicts]
+                await cache.set(cache_key, cache_payload)
 
-            # 从字典列表重建对象列表返回（detached状态，所有字段已加载）
-            return [_dict_to_model(self.model, d) for d in instances_dicts]
+            if as_dict:
+                return instances_dicts
+            return [_dict_to_model(self.model, row) for row in instances_dicts]
 
-    async def first(self) -> T | None:
-        """获取第一个结果
+    async def first(self, *, as_dict: bool = False) -> T | dict[str, Any] | None:
+        """获取第一条结果
+
+        Args:
+            as_dict: 为True时返回字典格式
 
         Returns:
             模型实例或None
@@ -230,8 +239,10 @@ class QueryBuilder(Generic[T]):
             cached_dict = await cache.get(cache_key)
             if cached_dict is not None:
                 logger.debug(f"缓存命中: {cache_key}")
-                # 从字典恢复对象
-                return _dict_to_model(self.model, cached_dict)
+                row = dict(cached_dict)
+                if as_dict:
+                    return row
+                return _dict_to_model(self.model, row)
 
         # 从数据库查询
         async with get_db_session() as session:
@@ -239,15 +250,16 @@ class QueryBuilder(Generic[T]):
             instance = result.scalars().first()
 
             if instance is not None:
-                # ✅ 在 session 内部转换为字典，此时所有字段都可安全访问
+                # 在 session 内部转换为字典，此时所有字段都可安全访问
                 instance_dict = _model_to_dict(instance)
 
                 # 写入缓存
                 if self._use_cache:
                     cache = await get_cache()
-                    await cache.set(cache_key, instance_dict)
+                    await cache.set(cache_key, dict(instance_dict))
 
-                # 从字典重建对象返回（detached状态，所有字段已加载）
+                if as_dict:
+                    return instance_dict
                 return _dict_to_model(self.model, instance_dict)
 
             return None

@@ -1,13 +1,15 @@
 # 使用基于时间戳的文件处理器，简单的轮转份数限制
 
 import logging
+from logging.handlers import QueueHandler, QueueListener
 import tarfile
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from queue import SimpleQueue
 import orjson
 import structlog
 import tomlkit
@@ -26,6 +28,11 @@ _console_handler: logging.Handler | None = None
 # 动态 logger 元数据注册表 (name -> {alias:str|None, color:str|None})
 _LOGGER_META_LOCK = threading.Lock()
 _LOGGER_META: dict[str, dict[str, str | None]] = {}
+
+# 日志格式化器
+_log_queue: SimpleQueue[logging.LogRecord] | None = None
+_queue_handler: QueueHandler | None = None
+_queue_listener: QueueListener | None = None
 
 
 def _register_logger_meta(name: str, *, alias: str | None = None, color: str | None = None):
@@ -88,6 +95,44 @@ def get_console_handler():
         console_level = LOG_CONFIG.get("console_log_level", LOG_CONFIG.get("log_level", "INFO"))
         _console_handler.setLevel(getattr(logging, console_level.upper(), logging.INFO))
     return _console_handler
+
+
+def _start_queue_logging(handlers: Sequence[logging.Handler]) -> QueueHandler | None:
+    """为日志处理器启动异步队列；无处理器时返回 None"""
+    global _log_queue, _queue_handler, _queue_listener
+
+    if _queue_listener is not None:
+        _queue_listener.stop()
+        _queue_listener = None
+
+    if not handlers:
+        return None
+
+    _log_queue = SimpleQueue()
+    _queue_handler = StructlogQueueHandler(_log_queue)
+    _queue_listener = QueueListener(_log_queue, *handlers, respect_handler_level=True)
+    _queue_listener.start()
+    return _queue_handler
+
+
+def _stop_queue_logging():
+    """停止异步日志队列"""
+    global _log_queue, _queue_handler, _queue_listener
+
+    if _queue_listener is not None:
+        _queue_listener.stop()
+        _queue_listener = None
+
+    _log_queue = None
+    _queue_handler = None
+
+
+class StructlogQueueHandler(QueueHandler):
+    """Queue handler that keeps structlog event dicts intact."""
+
+    def prepare(self, record):
+        # Keep the original LogRecord so processor formatters can access the event dict.
+        return record
 
 
 class TimestampedFileHandler(logging.Handler):
@@ -220,6 +265,8 @@ class TimestampedFileHandler(logging.Handler):
 def close_handlers():
     """安全关闭所有handler"""
     global _file_handler, _console_handler
+
+    _stop_queue_logging()
 
     if _file_handler:
         _file_handler.close()
@@ -1037,15 +1084,17 @@ def _immediate_setup():
     # 使用单例handler避免重复创建
     file_handler_local = get_file_handler()
     console_handler_local = get_console_handler()
-
-    for h in (file_handler_local, console_handler_local):
-        if h is not None:
-            root_logger.addHandler(h)
+    active_handlers = [h for h in (file_handler_local, console_handler_local) if h is not None]
 
     # 设置格式化器
     if file_handler_local is not None:
         file_handler_local.setFormatter(file_formatter)
-    console_handler_local.setFormatter(console_formatter)
+    if console_handler_local is not None:
+        console_handler_local.setFormatter(console_formatter)
+
+    queue_handler = _start_queue_logging(active_handlers)
+    if queue_handler is not None:
+        root_logger.addHandler(queue_handler)
 
     # 清理重复的handler
     remove_duplicate_handlers()

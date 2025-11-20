@@ -13,6 +13,7 @@ from src.common.database.api import (
 from src.common.database.api import (
     store_action_info as new_store_action_info,
 )
+from src.common.database.api.crud import _model_to_dict as _crud_model_to_dict
 from src.common.database.core.models import (
     ActionRecords,
     AntiInjectionStats,
@@ -123,21 +124,19 @@ async def build_filters(model_class, filters: dict[str, Any]):
 
 
 def _model_to_dict(instance) -> dict[str, Any]:
-    """将模型实例转换为字典
+    """将数据库模型实例转换为字典（兼容旧API
 
     Args:
-        instance: 模型实例
+        instance: 数据库模型实例
 
     Returns:
         字典表示
     """
     if instance is None:
         return None
+    return _crud_model_to_dict(instance)
 
-    result = {}
-    for column in instance.__table__.columns:
-        result[column.name] = getattr(instance, column.name)
-    return result
+
 
 
 async def db_query(
@@ -211,11 +210,9 @@ async def db_query(
 
             # 执行查询
             if single_result:
-                result = await query_builder.first()
-                return _model_to_dict(result)
-            else:
-                results = await query_builder.all()
-                return [_model_to_dict(r) for r in results]
+                return await query_builder.first(as_dict=True)
+
+            return await query_builder.all(as_dict=True)
 
         elif query_type == "create":
             if not data:
