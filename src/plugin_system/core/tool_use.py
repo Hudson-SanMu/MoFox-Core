@@ -20,7 +20,6 @@ logger = get_logger("tool_use")
 @dataclass
 class ToolExecutionConfig:
     """工具执行配置"""
-    enable_parallel: bool = True  # 是否启用并行执行
     max_concurrent_tools: int = 5  # 最大并发工具数量
     tool_timeout: float = 60.0  # 单个工具超时时间（秒）
     enable_dependency_check: bool = True  # 是否启用依赖检查
@@ -131,8 +130,6 @@ class ToolExecutor:
         tool_cfg = getattr(global_config, "tool", None)
         if not tool_cfg:
             return
-        if hasattr(tool_cfg, "force_parallel_execution"):
-            self.execution_config.enable_parallel = bool(tool_cfg.force_parallel_execution)
         max_invocations = getattr(tool_cfg, "max_parallel_invocations", None)
         if max_invocations:
             self.execution_config.max_concurrent_tools = max(1, max_invocations)
@@ -270,15 +267,10 @@ class ToolExecutor:
             return [], []
 
         if func_names:
-            logger.info(f"{self.log_prefix}开始执行工具调用: {func_names} (模式: {'并发' if self.execution_config.enable_parallel else '串行'})")
+            logger.info(f"{self.log_prefix}开始执行工具调用: {func_names} (并发执行)")
 
-        # 选择执行模式
-        if self.execution_config.enable_parallel and len(valid_tool_calls) > 1:
-            # 并发执行模式
-            execution_results = await self._execute_tools_concurrently(valid_tool_calls)
-        else:
-            # 串行执行模式（保持原有逻辑）
-            execution_results = await self._execute_tools_sequentially(valid_tool_calls)
+        # 并行执行所有工具
+        execution_results = await self._execute_tools_concurrently(valid_tool_calls)
 
         # 处理执行结果，保持原始顺序
         execution_results.sort(key=lambda x: x.original_index)
@@ -410,24 +402,7 @@ class ToolExecutor:
                 for i, tool_call in enumerate(tool_calls)
             ]
 
-    async def _execute_tools_sequentially(self, tool_calls: list[ToolCall]) -> list[ToolExecutionResult]:
-        """串行执行多个工具调用（保持原有逻辑）
-
-        Args:
-            tool_calls: 工具调用列表
-
-        Returns:
-            List[ToolExecutionResult]: 执行结果列表
-        """
-        logger.info(f"{self.log_prefix}启动串行执行，工具数量: {len(tool_calls)}")
-
-        results = []
-        for i, tool_call in enumerate(tool_calls):
-            result = await self._execute_single_tool_with_timeout(tool_call, i)
-            results.append(result)
-
-        return results
-
+  
     async def _execute_single_tool_with_timeout(self, tool_call: ToolCall, index: int) -> ToolExecutionResult:
         """执行单个工具调用，支持超时控制
 
@@ -731,24 +706,7 @@ class ToolExecutor:
             config: 新的执行配置
         """
         self.execution_config = config
-        logger.info(f"{self.log_prefix}工具执行配置已更新: 并发={config.enable_parallel}, 最大并发数={config.max_concurrent_tools}, 超时={config.tool_timeout}s")
-
-    def enable_parallel_execution(self, max_concurrent_tools: int = 5, timeout: float = 60.0) -> None:
-        """启用并发执行
-
-        Args:
-            max_concurrent_tools: 最大并发工具数量
-            timeout: 单个工具超时时间（秒）
-        """
-        self.execution_config.enable_parallel = True
-        self.execution_config.max_concurrent_tools = max_concurrent_tools
-        self.execution_config.tool_timeout = timeout
-        logger.info(f"{self.log_prefix}已启用并发执行: 最大并发数={max_concurrent_tools}, 超时={timeout}s")
-
-    def disable_parallel_execution(self) -> None:
-        """禁用并发执行，使用串行模式"""
-        self.execution_config.enable_parallel = False
-        logger.info(f"{self.log_prefix}已禁用并发执行，使用串行模式")
+        logger.info(f"{self.log_prefix}工具执行配置已更新: 最大并发数={config.max_concurrent_tools}, 超时={config.tool_timeout}s")
 
     @classmethod
     def create_with_parallel_config(
@@ -770,7 +728,6 @@ class ToolExecutor:
             配置好并发执行的ToolExecutor实例
         """
         config = ToolExecutionConfig(
-            enable_parallel=True,
             max_concurrent_tools=max_concurrent_tools,
             tool_timeout=tool_timeout,
             enable_dependency_check=enable_dependency_check
@@ -795,9 +752,6 @@ parallel_executor = ToolExecutor.create_with_parallel_config(
     max_concurrent_tools=3,  # 最大3个工具并发
     tool_timeout=30.0  # 单个工具30秒超时
 )
-
-# 或者动态配置并发执行
-executor.enable_parallel_execution(max_concurrent_tools=5, timeout=60.0)
 
 # 3. 并发执行多个工具 - 当LLM返回多个工具调用时自动并发执行
 results, used_tools, _ = await parallel_executor.execute_from_chat_message(
@@ -837,7 +791,6 @@ await executor.execute_from_chat_message(
 
 # 7. 配置管理
 config = ToolExecutionConfig(
-    enable_parallel=True,
     max_concurrent_tools=10,
     tool_timeout=120.0,
     enable_dependency_check=True
@@ -848,9 +801,6 @@ executor.set_execution_config(config)
 history = executor.get_tool_history()  # 获取历史记录
 stats = executor.get_tool_stats()  # 获取执行统计信息
 executor.clear_tool_history()  # 清除历史记录
-
-# 9. 禁用并发执行（如需要串行执行）
-executor.disable_parallel_execution()
 
 并发执行优势：
 - 🚀 性能提升：多个工具同时执行，减少总体等待时间
