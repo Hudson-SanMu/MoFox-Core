@@ -857,6 +857,23 @@ class ComponentRegistry:
         info = self.get_component_info(command_name, ComponentType.PLUS_COMMAND)
         return info if isinstance(info, PlusCommandInfo) else None
 
+    def get_available_plus_commands_info(self, stream_id: str | None = None) -> dict[str, PlusCommandInfo]:
+        """获取在指定上下文中所有可用的PlusCommand信息
+
+        Args:
+            stream_id: 可选的流ID，用于检查局部组件状态
+
+        Returns:
+            一个字典，键是命令名，值是 PlusCommandInfo 对象
+        """
+        all_plus_commands = self.get_components_by_type(ComponentType.PLUS_COMMAND)
+        available_commands = {
+            name: info
+            for name, info in all_plus_commands.items()
+            if self.is_component_available(name, ComponentType.PLUS_COMMAND, stream_id)
+        }
+        return cast(dict[str, PlusCommandInfo], available_commands)
+
     # === EventHandler 特定查询方法 ===
 
     def get_event_handler_registry(self) -> dict[str, type[BaseEventHandler]]:

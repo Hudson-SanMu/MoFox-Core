@@ -14,7 +14,7 @@ from src.common.data_models.database_data_model import DatabaseMessages
 from src.common.logger import get_logger
 from src.config.config import global_config
 from src.mood.mood_manager import mood_manager  # 导入情绪管理器
-from src.plugin_system.base import BaseCommand, EventType
+from src.plugin_system.base import BaseCommand, EventType, ComponentType
 from src.plugin_system.core import component_registry, event_manager, global_announcement_manager
 
 # 获取项目根目录（假设本文件在src/chat/message_receive/下，根目录为上上上级目录）
@@ -118,20 +118,18 @@ class ChatBot:
             args_text = parts[1] if len(parts) > 1 else ""
 
             # 查找匹配的PlusCommand
-            plus_command_registry = component_registry.get_plus_command_registry()
+            available_commands_info = component_registry.get_available_plus_commands_info(chat.stream_id)
             matching_commands = []
 
-            for plus_command_name, plus_command_class in plus_command_registry.items():
-                plus_command_info = component_registry.get_registered_plus_command_info(plus_command_name)
-                if not plus_command_info:
-                    continue
-
+            for plus_command_name, plus_command_info in available_commands_info.items():
                 # 检查命令名是否匹配（命令名和别名）
-                all_commands = [plus_command_name.lower()] + [
+                all_aliases = [plus_command_name.lower()] + [
                     alias.lower() for alias in plus_command_info.command_aliases
                 ]
-                if command_word in all_commands:
-                    matching_commands.append((plus_command_class, plus_command_info, plus_command_name))
+                if command_word in all_aliases:
+                    plus_command_class = component_registry.get_component_class(plus_command_name, ComponentType.PLUS_COMMAND)
+                    if plus_command_class:
+                        matching_commands.append((plus_command_class, plus_command_info, plus_command_name))
 
             if not matching_commands:
                 return False, None, True  # 没有找到匹配的PlusCommand，继续处理
@@ -144,16 +142,6 @@ class ChatBot:
                 )
 
             plus_command_class, plus_command_info, plus_command_name = matching_commands[0]
-
-            # 检查命令是否被禁用
-            if (
-                chat
-                and chat.stream_id
-                and plus_command_name
-                in global_announcement_manager.get_disabled_chat_commands(chat.stream_id)
-            ):
-                logger.info("用户禁用的PlusCommand，跳过处理")
-                return False, None, True
 
             message.is_command = True
 
