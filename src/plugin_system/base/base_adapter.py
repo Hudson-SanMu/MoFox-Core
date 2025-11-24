@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from mofox_bus import AdapterBase as MoFoxAdapterBase, CoreMessageSink, MessageEnvelope
+from mofox_bus import AdapterBase as MoFoxAdapterBase, CoreSink, MessageEnvelope
 
 if TYPE_CHECKING:
     from src.plugin_system.base.base_plugin import BasePlugin
@@ -47,7 +47,7 @@ class BaseAdapter(MoFoxAdapterBase, ABC):
 
     def __init__(
         self,
-        core_sink: CoreMessageSink,
+        core_sink: CoreSink,
         plugin: Optional[BasePlugin] = None,
         **kwargs
     ):
@@ -227,7 +227,7 @@ class BaseAdapter(MoFoxAdapterBase, ABC):
         )
 
     @abstractmethod
-    def from_platform_message(self, raw: Any) -> MessageEnvelope:
+    async def from_platform_message(self, raw: Any) -> MessageEnvelope:
         """
         将平台原始消息转换为 MessageEnvelope
         

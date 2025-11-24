@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
+import multiprocessing as mp
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Awaitable, Callable, Protocol
 
@@ -11,11 +13,32 @@ import websockets
 
 from .types import MessageEnvelope
 
+logger = logging.getLogger("mofox_bus.adapter")
+
+
+OutgoingHandler = Callable[[MessageEnvelope], Awaitable[None]]
+
 
 class CoreMessageSink(Protocol):
     async def send(self, message: MessageEnvelope) -> None: ...
 
     async def send_many(self, messages: list[MessageEnvelope]) -> None: ...  # pragma: no cover - optional
+
+
+class CoreSink(CoreMessageSink, Protocol):
+    """
+    双向 CoreSink 协议：
+    - send/send_many: 适配器 → 核心（incoming）
+    - push_outgoing: 核心 → 适配器（outgoing）
+    """
+
+    def set_outgoing_handler(self, handler: OutgoingHandler | None) -> None: ...
+
+    def remove_outgoing_handler(self, handler: OutgoingHandler) -> None: ...
+
+    async def push_outgoing(self, envelope: MessageEnvelope) -> None: ...
+
+    async def close(self) -> None: ...  # pragma: no cover - lifecycle hook
 
 
 class WebSocketLike(Protocol):
@@ -56,7 +79,7 @@ class AdapterBase:
 
     platform: str = "unknown"
 
-    def __init__(self, core_sink: CoreMessageSink, transport: AdapterTransportOptions = None):
+    def __init__(self, core_sink: CoreSink, transport: AdapterTransportOptions = None):
         """
         Args:
             core_sink: 核心消息入口，通常是 InProcessCoreSink 或自定义客户端。
@@ -70,14 +93,31 @@ class AdapterBase:
         self._http_site: aiohttp_web.BaseSite | None = None
 
     async def start(self) -> None:
-        """根据配置自动启动 WS/HTTP 监听。"""
+        """启动适配器的传输层监听（如果配置了传输选项）。"""
+        if hasattr(self.core_sink, "set_outgoing_handler"):
+            try:
+                self.core_sink.set_outgoing_handler(self._on_outgoing_from_core)
+            except Exception:
+                logger.exception("Failed to register outgoing handler on core sink")
         if isinstance(self._transport_config, WebSocketAdapterOptions):
             await self._start_ws_transport(self._transport_config)
         elif isinstance(self._transport_config, HttpAdapterOptions):
             await self._start_http_transport(self._transport_config)
 
+
     async def stop(self) -> None:
-        """停止自动管理的传输层。"""
+        """停止适配器的传输层监听（如果配置了传输选项）。"""
+        remove = getattr(self.core_sink, "remove_outgoing_handler", None)
+        if callable(remove):
+            try:
+                remove(self._on_outgoing_from_core)
+            except Exception:
+                logger.exception("Failed to detach outgoing handler on core sink")
+        elif hasattr(self.core_sink, "set_outgoing_handler"):
+            try:
+                self.core_sink.set_outgoing_handler(None)  # type: ignore[arg-type]
+            except Exception:
+                logger.exception("Failed to detach outgoing handler on core sink")
         if self._ws_task:
             self._ws_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -95,12 +135,12 @@ class AdapterBase:
 
     async def on_platform_message(self, raw: Any) -> None:
         """处理平台下发的单条消息并交给核心。"""
-        envelope = self.from_platform_message(raw)
+        envelope = await _maybe_await(self.from_platform_message(raw))
         await self.core_sink.send(envelope)
 
     async def on_platform_messages(self, raw_messages: list[Any]) -> None:
         """批量推送入口，内部自动批量或逐条送入核心。"""
-        envelopes = [self.from_platform_message(raw) for raw in raw_messages]
+        envelopes = [await _maybe_await(self.from_platform_message(raw)) for raw in raw_messages]
         await _send_many(self.core_sink, envelopes)
 
     async def send_to_platform(self, envelope: MessageEnvelope) -> None:
@@ -112,7 +152,14 @@ class AdapterBase:
         for env in envelopes:
             await self._send_platform_message(env)
 
-    def from_platform_message(self, raw: Any) -> MessageEnvelope:
+    async def _on_outgoing_from_core(self, envelope: MessageEnvelope) -> None:
+        """核心生成 outgoing envelope 时的内部处理逻辑"""
+        platform = envelope.get("platform") or envelope.get("message_info", {}).get("platform")
+        if platform and platform != getattr(self, "platform", None):
+            return
+        await self._send_platform_message(envelope)
+
+    def from_platform_message(self, raw: Any) -> MessageEnvelope | Awaitable[MessageEnvelope]:
         """子类必须实现：将平台原始结构转换为统一 MessageEnvelope。"""
         raise NotImplementedError
 
@@ -175,13 +222,22 @@ class AdapterBase:
         return orjson.dumps({"type": "send", "payload": envelope})
 
 
-class InProcessCoreSink:
+class InProcessCoreSink(CoreSink):
     """
-    简单的进程内 sink，实现 CoreMessageSink 协议。
+    进程内核心消息 sink，实现 CoreSink 协议。
     """
 
     def __init__(self, handler: Callable[[MessageEnvelope], Awaitable[None]]):
         self._handler = handler
+        self._outgoing_handlers: set[OutgoingHandler] = set()
+
+    def set_outgoing_handler(self, handler: OutgoingHandler | None) -> None:
+        if handler is None:
+            return
+        self._outgoing_handlers.add(handler)
+
+    def remove_outgoing_handler(self, handler: OutgoingHandler) -> None:
+        self._outgoing_handlers.discard(handler)
 
     async def send(self, message: MessageEnvelope) -> None:
         await self._handler(message)
@@ -190,6 +246,140 @@ class InProcessCoreSink:
         for message in messages:
             await self._handler(message)
 
+    async def push_outgoing(self, envelope: MessageEnvelope) -> None:
+        if not self._outgoing_handlers:
+            logger.debug("Outgoing envelope dropped: no handler registered")
+            return
+        for callback in list(self._outgoing_handlers):
+            await callback(envelope)
+
+    async def close(self) -> None:  # pragma: no cover - symmetry
+        self._outgoing_handlers.clear()
+
+
+class ProcessCoreSink(CoreSink):
+    """
+    进程间核心消息 sink，实现 CoreSink 协议，使用 multiprocessing.Queue 初始化
+    """
+
+    _CONTROL_STOP = {"__core_sink_control__": "stop"}
+
+    def __init__(self, *, to_core_queue: mp.Queue, from_core_queue: mp.Queue) -> None:
+        self._to_core_queue = to_core_queue
+        self._from_core_queue = from_core_queue
+        self._outgoing_handler: OutgoingHandler | None = None
+        self._closed = False
+        self._listener_task: asyncio.Task | None = None
+        self._loop = asyncio.get_event_loop()
+
+    def set_outgoing_handler(self, handler: OutgoingHandler | None) -> None:
+        self._outgoing_handler = handler
+        if handler is not None and (self._listener_task is None or self._listener_task.done()):
+            self._listener_task = self._loop.create_task(self._listen_from_core())
+
+    def remove_outgoing_handler(self, handler: OutgoingHandler) -> None:
+        if self._outgoing_handler is handler:
+            self._outgoing_handler = None
+            if self._listener_task and not self._listener_task.done():
+                self._listener_task.cancel()
+
+    async def send(self, message: MessageEnvelope) -> None:
+        await asyncio.to_thread(self._to_core_queue.put, {"kind": "incoming", "payload": message})
+
+    async def send_many(self, messages: list[MessageEnvelope]) -> None:
+        for message in messages:
+            await self.send(message)
+
+    async def push_outgoing(self, envelope: MessageEnvelope) -> None:
+        logger.debug("ProcessCoreSink.push_outgoing called in child; ignored")
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        await asyncio.to_thread(self._from_core_queue.put, self._CONTROL_STOP)
+        if self._listener_task:
+            self._listener_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._listener_task
+            self._listener_task = None
+
+    async def _listen_from_core(self) -> None:
+        while not self._closed:
+            try:
+                item = await asyncio.to_thread(self._from_core_queue.get)
+            except asyncio.CancelledError:
+                break
+            if item == self._CONTROL_STOP:
+                break
+            if isinstance(item, dict) and item.get("kind") == "outgoing":
+                envelope = item.get("payload")
+                if self._outgoing_handler:
+                    try:
+                        await self._outgoing_handler(envelope)
+                    except Exception:  # pragma: no cover
+                        logger.exception("Failed to handle outgoing envelope in ProcessCoreSink")
+            else:
+                logger.debug("ProcessCoreSink received unknown payload: %r", item)
+
+
+class ProcessCoreSinkServer:
+    """
+    进程间核心消息 sink 服务器，实现 CoreSink 协议，使用 multiprocessing.Queue 初始化。
+    - 将传入的 incoming 消息转发给指定的 handler
+    - 将接收到的 outgoing 消息放入 outgoing 队列
+    """
+
+    def __init__(
+        self,
+        *,
+        incoming_queue: mp.Queue,
+        outgoing_queue: mp.Queue,
+        core_handler: Callable[[MessageEnvelope], Awaitable[None]],
+        name: str | None = None,
+    ) -> None:
+        self._incoming_queue = incoming_queue
+        self._outgoing_queue = outgoing_queue
+        self._core_handler = core_handler
+        self._task: asyncio.Task | None = None
+        self._closed = False
+        self._name = name or "adapter"
+
+    def start(self) -> None:
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._consume_incoming())
+
+    async def _consume_incoming(self) -> None:
+        while not self._closed:
+            try:
+                item = await asyncio.to_thread(self._incoming_queue.get)
+            except asyncio.CancelledError:
+                break
+            if isinstance(item, dict) and item.get("__core_sink_control__") == "stop":
+                break
+            if isinstance(item, dict) and item.get("kind") == "incoming":
+                envelope = item.get("payload")
+                try:
+                    await self._core_handler(envelope)
+                except Exception:  # pragma: no cover
+                    logger.exception("Failed to dispatch incoming envelope from %s", self._name)
+            else:
+                logger.debug("ProcessCoreSinkServer ignored unknown payload from %s: %r", self._name, item)
+
+    async def push_outgoing(self, envelope: MessageEnvelope) -> None:
+        await asyncio.to_thread(self._outgoing_queue.put, {"kind": "outgoing", "payload": envelope})
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        await asyncio.to_thread(self._incoming_queue.put, {"__core_sink_control__": "stop"})
+        await asyncio.to_thread(self._outgoing_queue.put, ProcessCoreSink._CONTROL_STOP)
+        if self._task:
+            self._task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._task
+            self._task = None
 
 async def _send_many(sink: CoreMessageSink, envelopes: list[MessageEnvelope]) -> None:
     send_many = getattr(sink, "send_many", None)
@@ -200,10 +390,18 @@ async def _send_many(sink: CoreMessageSink, envelopes: list[MessageEnvelope]) ->
         await sink.send(env)
 
 
+async def _maybe_await(result: Any) -> Any:
+    if asyncio.iscoroutine(result) or isinstance(result, asyncio.Future):
+        return await result
+    return result
+
+
 class BatchDispatcher:
     """
-    将 send 操作合并为批量发送，适合网络 IO 密集场景。
+    批量消息分发器，负责将消息批量发送到核心 sink。
     """
+
+    _STOP = object()
 
     def __init__(
         self,
@@ -215,56 +413,79 @@ class BatchDispatcher:
         self._sink = sink
         self._max_batch_size = max_batch_size
         self._flush_interval = flush_interval
-        self._buffer: list[MessageEnvelope] = []
-        self._lock = asyncio.Lock()
-        self._flush_task: asyncio.Task | None = None
+        self._queue: asyncio.Queue[MessageEnvelope | object] = asyncio.Queue()
+        self._worker: asyncio.Task | None = None
         self._closed = False
 
     async def add(self, message: MessageEnvelope) -> None:
-        async with self._lock:
-            if self._closed:
-                raise RuntimeError("Dispatcher closed")
-            self._buffer.append(message)
-            self._ensure_timer()
-            if len(self._buffer) >= self._max_batch_size:
-                await self._flush_locked()
+        if self._closed:
+            raise RuntimeError("Dispatcher closed")
+        self._ensure_worker()
+        await self._queue.put(message)
 
     async def close(self) -> None:
-        async with self._lock:
-            self._closed = True
-            await self._flush_locked()
-            if self._flush_task:
-                self._flush_task.cancel()
-                self._flush_task = None
-
-    def _ensure_timer(self) -> None:
-        if self._flush_task is not None and not self._flush_task.done():
+        if self._closed:
             return
-        loop = asyncio.get_running_loop()
-        self._flush_task = loop.create_task(self._flush_loop())
+        self._closed = True
+        self._ensure_worker()
+        await self._queue.put(self._STOP)
+        if self._worker:
+            await self._worker
+            self._worker = None
 
-    async def _flush_loop(self) -> None:
+    def _ensure_worker(self) -> None:
+        if self._worker is not None and not self._worker.done():
+            return
+        self._worker = asyncio.create_task(self._worker_loop())
+
+    async def _worker_loop(self) -> None:
+        buffer: list[MessageEnvelope] = []
         try:
-            await asyncio.sleep(self._flush_interval)
-            async with self._lock:
-                await self._flush_locked()
-        except asyncio.CancelledError:  # pragma: no cover - timer cancellation
-            pass
+            while True:
+                try:
+                    item = await asyncio.wait_for(self._queue.get(), timeout=self._flush_interval)
+                except asyncio.TimeoutError:
+                    item = None
 
-    async def _flush_locked(self) -> None:
-        if not self._buffer:
+                if item is self._STOP:
+                    await self._flush_buffer(buffer)
+                    return
+                if item is not None:
+                    buffer.append(item)  # type: ignore[arg-type]
+
+                while len(buffer) < self._max_batch_size:
+                    try:
+                        item = self._queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                    if item is self._STOP:
+                        await self._flush_buffer(buffer)
+                        return
+                    buffer.append(item)  # type: ignore[arg-type]
+
+                if buffer and (len(buffer) >= self._max_batch_size or item is None):
+                    await self._flush_buffer(buffer)
+        except asyncio.CancelledError:  # pragma: no cover - worker cancellation
+            if buffer:
+                await self._flush_buffer(buffer)
+
+    async def _flush_buffer(self, buffer: list[MessageEnvelope]) -> None:
+        if not buffer:
             return
-        payload = list(self._buffer)
-        self._buffer.clear()
-        await self._sink.send_many(payload)
-
+        payload = list(buffer)
+        buffer.clear()
+        await _send_many(self._sink, payload)
 
 __all__ = [
     "AdapterTransportOptions",
     "AdapterBase",
     "BatchDispatcher",
+    "CoreSink",
     "CoreMessageSink",
     "HttpAdapterOptions",
     "InProcessCoreSink",
+    "ProcessCoreSink",
+    "ProcessCoreSinkServer",
+    "WebSocketLike",
     "WebSocketAdapterOptions",
 ]

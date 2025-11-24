@@ -7,130 +7,152 @@ Adapter 管理器
 from __future__ import annotations
 
 import asyncio
-import subprocess
-import sys
-from pathlib import Path
+import importlib
+import multiprocessing as mp
 from typing import TYPE_CHECKING, Dict, Optional
 
 if TYPE_CHECKING:
     from src.plugin_system.base.base_adapter import BaseAdapter
 
+from mofox_bus import ProcessCoreSinkServer
+from src.common.core_sink import get_core_sink
 from src.common.logger import get_logger
 
 logger = get_logger("adapter_manager")
 
 
-class AdapterProcess:
-    """适配器子进程包装器"""
 
-    def __init__(
-        self,
-        adapter_name: str,
-        entry_path: Path,
-        python_executable: Optional[str] = None,
-    ):
-        self.adapter_name = adapter_name
-        self.entry_path = entry_path
-        self.python_executable = python_executable or sys.executable
-        self.process: Optional[subprocess.Popen] = None
-        self._monitor_task: Optional[asyncio.Task] = None
+
+def _load_class(module_name: str, class_name: str):
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
+
+
+def _adapter_process_entry(
+    adapter_path: tuple[str, str],
+    plugin_info: dict | None,
+    incoming_queue: mp.Queue,
+    outgoing_queue: mp.Queue,
+):
+    import asyncio
+    import contextlib
+    from mofox_bus import ProcessCoreSink
+
+    async def _run() -> None:
+        adapter_cls = _load_class(*adapter_path)
+        plugin_instance = None
+        if plugin_info:
+            plugin_cls = _load_class(plugin_info["module"], plugin_info["class"])
+            plugin_instance = plugin_cls(plugin_info["plugin_dir"], plugin_info["metadata"])
+        core_sink = ProcessCoreSink(to_core_queue=incoming_queue, from_core_queue=outgoing_queue)
+        adapter = adapter_cls(core_sink, plugin=plugin_instance)
+        await adapter.start()
+        try:
+            while not getattr(core_sink, "_closed", False):
+                await asyncio.sleep(0.2)
+        finally:
+            with contextlib.suppress(Exception):
+                await adapter.stop()
+            with contextlib.suppress(Exception):
+                await core_sink.close()
+
+    asyncio.run(_run())
+
+
+
+class AdapterProcess:
+    """适配器子进程包装器，负责适配器子进程的启动和生命周期管理"""
+
+    def __init__(self, adapter: "BaseAdapter", core_sink) -> None:
+        self.adapter = adapter
+        self.adapter_name = adapter.adapter_name
+        self.process: mp.Process | None = None
+        self._ctx = mp.get_context("spawn")
+        self._incoming_queue: mp.Queue = self._ctx.Queue()
+        self._outgoing_queue: mp.Queue = self._ctx.Queue()
+        self._bridge: ProcessCoreSinkServer | None = None
+        self._core_sink = core_sink
+        self._adapter_path: tuple[str, str] = (adapter.__class__.__module__, adapter.__class__.__name__)
+        self._plugin_info = self._extract_plugin_info(adapter)
+        self._outgoing_handler = None
+
+    @staticmethod
+    def _extract_plugin_info(adapter: "BaseAdapter") -> dict | None:
+        plugin = getattr(adapter, "plugin", None)
+        if plugin is None:
+            return None
+        return {
+            "module": plugin.__class__.__module__,
+            "class": plugin.__class__.__name__,
+            "plugin_dir": getattr(plugin, "plugin_dir", ""),
+            "metadata": getattr(plugin, "plugin_meta", None),
+        }
+
+    def _make_outgoing_handler(self):
+        async def _handler(envelope):
+            if self._bridge:
+                await self._bridge.push_outgoing(envelope)
+        return _handler
 
     async def start(self) -> bool:
         """启动适配器子进程"""
         try:
             logger.info(f"启动适配器子进程: {self.adapter_name}")
-            logger.debug(f"Python: {self.python_executable}")
-            logger.debug(f"Entry: {self.entry_path}")
-
-            # 启动子进程
-            self.process = subprocess.Popen(
-                [self.python_executable, str(self.entry_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
+            self._bridge = ProcessCoreSinkServer(
+                incoming_queue=self._incoming_queue,
+                outgoing_queue=self._outgoing_queue,
+                core_handler=self._core_sink.send,
+                name=self.adapter_name,
             )
-
-            # 启动监控任务
-            self._monitor_task = asyncio.create_task(self._monitor_process())
-
-            logger.info(f"适配器 {self.adapter_name} 子进程已启动 (PID: {self.process.pid})")
+            self._bridge.start()
+            if hasattr(self._core_sink, "set_outgoing_handler"):
+                self._outgoing_handler = self._make_outgoing_handler()
+                try:
+                    self._core_sink.set_outgoing_handler(self._outgoing_handler)
+                except Exception:
+                    logger.exception("Failed to register outgoing bridge for %s", self.adapter_name)
+            self.process = self._ctx.Process(
+                target=_adapter_process_entry,
+                args=(self._adapter_path, self._plugin_info, self._incoming_queue, self._outgoing_queue),
+                name=f"{self.adapter_name}-proc",
+            )
+            self.process.start()
+            logger.info(f"启动适配器子进程 {self.adapter_name} (PID: {self.process.pid})")
             return True
-
         except Exception as e:
-            logger.error(f"启动适配器 {self.adapter_name} 子进程失败: {e}", exc_info=True)
+            logger.error(f"启动适配器子进程 {self.adapter_name} 失败: {e}", exc_info=True)
             return False
 
     async def stop(self) -> None:
         """停止适配器子进程"""
         if not self.process:
             return
-
         logger.info(f"停止适配器子进程: {self.adapter_name} (PID: {self.process.pid})")
-
         try:
-            # 取消监控任务
-            if self._monitor_task and not self._monitor_task.done():
-                self._monitor_task.cancel()
+            remover = getattr(self._core_sink, "remove_outgoing_handler", None)
+            if callable(remover) and self._outgoing_handler:
                 try:
-                    await self._monitor_task
-                except asyncio.CancelledError:
-                    pass
-
-            # 终止进程
-            self.process.terminate()
-
-            # 等待进程退出（最多等待5秒）
-            try:
-                await asyncio.wait_for(
-                    asyncio.to_thread(self.process.wait),
-                    timeout=5.0
-                )
-            except asyncio.TimeoutError:
-                logger.warning(f"适配器 {self.adapter_name} 未能在5秒内退出，强制终止")
-                self.process.kill()
-                await asyncio.to_thread(self.process.wait)
-
-            logger.info(f"适配器 {self.adapter_name} 子进程已停止")
-
+                    remover(self._outgoing_handler)
+                except Exception:
+                    logger.exception(f"移除 {self.adapter_name} 的 outgoing bridge 失败")
+            if self._bridge:
+                await self._bridge.close()
+            if self.process.is_alive():
+                self.process.join(timeout=5.0)
+            if self.process.is_alive():
+                logger.warning(f"适配器 {self.adapter_name} 未能及时停止，强制终止中")
+                self.process.terminate()
+                self.process.join()
         except Exception as e:
-            logger.error(f"停止适配器 {self.adapter_name} 子进程时出错: {e}", exc_info=True)
+            logger.error(f"停止适配器子进程 {self.adapter_name} 时发生错误: {e}", exc_info=True)
         finally:
             self.process = None
 
-    async def _monitor_process(self) -> None:
-        """监控子进程状态"""
-        if not self.process:
-            return
-
-        try:
-            # 在后台线程中等待进程退出
-            return_code = await asyncio.to_thread(self.process.wait)
-
-            if return_code != 0:
-                logger.error(
-                    f"适配器 {self.adapter_name} 子进程异常退出 (返回码: {return_code})"
-                )
-
-                # 读取 stderr 输出
-                if self.process.stderr:
-                    stderr = self.process.stderr.read()
-                    if stderr:
-                        logger.error(f"错误输出:\n{stderr}")
-            else:
-                logger.info(f"适配器 {self.adapter_name} 子进程正常退出")
-
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.error(f"监控适配器 {self.adapter_name} 子进程时出错: {e}", exc_info=True)
-
     def is_running(self) -> bool:
-        """检查进程是否正在运行"""
+        """适配器是否正在运行"""
         if not self.process:
             return False
-        return self.process.poll() is None
-
+        return self.process.is_alive()
 
 class AdapterManager:
     """适配器管理器"""
@@ -176,20 +198,17 @@ class AdapterManager:
         else:
             return await self._start_adapter_in_process(adapter)
 
-    async def _start_adapter_subprocess(self, adapter: BaseAdapter) -> bool:
-        """在子进程中启动适配器"""
-        adapter_name = adapter.adapter_name
 
-        # 获取子进程入口脚本
-        entry_path = adapter.get_subprocess_entry_path()
-        if not entry_path:
-            logger.error(
-                f"适配器 {adapter_name} 配置为子进程运行，但未提供有效的入口脚本"
-            )
+    async def _start_adapter_subprocess(self, adapter: BaseAdapter) -> bool:
+        """启动适配器子进程"""
+        adapter_name = adapter.adapter_name
+        try:
+            core_sink = get_core_sink()
+        except Exception as e:
+            logger.error(f"无法获取 core_sink，启动适配器子进程 {adapter_name} 失败: {e}", exc_info=True)
             return False
 
-        # 创建并启动子进程
-        adapter_process = AdapterProcess(adapter_name, entry_path)
+        adapter_process = AdapterProcess(adapter, core_sink)
         success = await adapter_process.start()
 
         if success:

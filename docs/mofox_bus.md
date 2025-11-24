@@ -32,11 +32,11 @@ MoFox Bus 是 MoFox Bot 自研的统一消息中台，替换第三方 `maim_mess
 
 ## 3. 消息模型
 
-### 3.1 Envelope TypedDict（`types.py`）
+### 3.1 Envelope TypedDict��`types.py`��
 
-- `MessageEnvelope`：核心字段包括 `id`、`direction`、`platform`、`timestamp_ms`、`channel`、`sender`、`content` 等，一律使用毫秒时间戳，保留 `raw_platform_message` 与 `metadata` 便于调试 / 扩展。
-- `Content` 联合类型支持文本、图片、音频、文件、视频、事件、命令、系统消息，后续可扩展更多 literal。
-- `SenderInfo` / `ChannelInfo` / `MessageDirection` / `Role` 等均以 `Literal` 控制取值，方便 IDE 静态检查。
+- `MessageEnvelope` ��ȫ��Ƶ� maim_message �ṹ�����ĵ������� `message_info` + `message_segment` (SegPayload)��`direction`��`schema_version` �� raw �����ֶβ��������ˣ���Ժ����� `channel`��`sender`��`content` �� v0 �ֶΪ��ѡ��
+- `SegPayload` / `MessageInfoPayload` / `UserInfoPayload` / `GroupInfoPayload` / `FormatInfoPayload` / `TemplateInfoPayload` �� maim_message dataclass �Դ�TypedDict ��Ӧ���ʺ�ֱ�� JSON ����
+- `Content` / `SenderInfo` / `ChannelInfo` �Ȳ�Ȼ�����ڣ����ܻ��� IDE ע�⣬Ҳ�Ƕ� v0 content ģ�͵Ļ�֧
 
 ### 3.2 dataclass 消息段（`message_models.py`）
 
@@ -62,15 +62,14 @@ TypedDict 更适合网络传输和依赖注入；dataclass 版 MessageBase 则�
 ## 5. 运行时调度（`runtime.py`）
 
 - `MessageRuntime`：
-  - `add_route(predicate, handler)` 或 `@runtime.route(...)` 装饰器注册消息处理器。
-  - `register_before_hook` / `register_after_hook` / `register_error_hook` 注入监控、埋点、Trace。
-  - `set_batch_handler` 支持一次处理整批消息（例如批量落库）。
-- `MessageProcessingError` 在 handler 抛出异常时封装上下文，便于日志追踪。
+  - `add_route(predicate, handler)` 和 `@runtime.route(...)` 装饰器注册消息处理器
+  - `register_before_hook` / `register_after_hook` / `register_error_hook` 注册前置、后置、Trace 处理
+  - `set_batch_handler` 支持一次处理一批消息（可用于 batch IO 优化）
+- `MessageProcessingError` 在 handler 抛出异常时包装原因，方便日志追踪。
 
 运行时内部使用 `RLock` 保护路由表，适合多协程并发读写，`_maybe_await` 自动兼容同步/异步 handler。
 
 ---
-
 ## 6. 传输层封装（`transport/`）
 
 ### 6.1 HTTP
@@ -126,9 +125,9 @@ from mofox_bus.transport import HttpMessageServer
 
 runtime = MessageRuntime()
 
-@runtime.route(lambda env: env["content"]["type"] == "text")
+@runtime.route(lambda env: (env.get("message_segment") or {}).get("type") == "text")
 async def handle_text(env: types.MessageEnvelope):
-    print("收到文本：", env["content"]["text"])
+    print("收到文本", env["message_segment"]["data"])
 
 async def http_handler(messages: list[types.MessageEnvelope]):
     await runtime.handle_batch(messages)

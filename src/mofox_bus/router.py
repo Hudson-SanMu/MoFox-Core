@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from typing import Callable, Dict, Optional
 
 from .api import MessageClient
-from .message_models import MessageBase
+from .types import MessageEnvelope
 
 logger = logging.getLogger("mofox_bus.router")
 
@@ -55,7 +55,7 @@ class Router:
         self.handlers: list[Callable[[Dict], None]] = []
         self._running = False
         self._client_tasks: Dict[str, asyncio.Task] = {}
-        self._monitor_task: asyncio.Task | None = None
+        self._stop_event: asyncio.Event | None = None
 
     async def connect(self, platform: str) -> None:
         if platform not in self.config.route_config:
@@ -65,6 +65,7 @@ class Router:
         if mode != "ws":
             raise NotImplementedError("TCP mode is not implemented yet")
         client = MessageClient(mode="ws")
+        client.set_disconnect_callback(self._handle_client_disconnect)
         await client.connect(
             url=target.url,
             platform=platform,
@@ -75,7 +76,7 @@ class Router:
             client.register_message_handler(handler)
         self.clients[platform] = client
         if self._running:
-            self._client_tasks[platform] = asyncio.create_task(client.run())
+            self._start_client_task(platform, client)
 
     def register_class_handler(self, handler: Callable[[Dict], None]) -> None:
         self.handlers.append(handler)
@@ -84,35 +85,17 @@ class Router:
 
     async def run(self) -> None:
         self._running = True
+        self._stop_event = asyncio.Event()
         for platform in self.config.route_config:
             if platform not in self.clients:
                 await self.connect(platform)
         for platform, client in self.clients.items():
             if platform not in self._client_tasks:
-                self._client_tasks[platform] = asyncio.create_task(client.run())
-        self._monitor_task = asyncio.create_task(self._monitor_connections())
+                self._start_client_task(platform, client)
         try:
-            while self._running:
-                await asyncio.sleep(1)
+            await self._stop_event.wait()
         except asyncio.CancelledError:  # pragma: no cover
             raise
-
-    async def _monitor_connections(self) -> None:
-        await asyncio.sleep(3)
-        while self._running:
-            for platform in list(self.clients.keys()):
-                client = self.clients.get(platform)
-                if client is None:
-                    continue
-                if not client.is_connected():
-                    logger.info("Detected disconnect from %s, attempting reconnect", platform)
-                    await self._reconnect_platform(platform)
-            await asyncio.sleep(5)
-
-    async def _reconnect_platform(self, platform: str) -> None:
-        await self.remove_platform(platform)
-        if platform in self.config.route_config:
-            await self.connect(platform)
 
     async def remove_platform(self, platform: str) -> None:
         if platform in self._client_tasks:
@@ -124,32 +107,55 @@ class Router:
         if client:
             await client.stop()
 
+    async def _handle_client_disconnect(self, platform: str, reason: str) -> None:
+        logger.info("Client for %s disconnected: %s (auto-reconnect handled by client)", platform, reason)
+        task = self._client_tasks.get(platform)
+        if task is not None and not task.done():
+            return
+        client = self.clients.get(platform)
+        if client and self._running:
+            self._start_client_task(platform, client)
+
     async def stop(self) -> None:
         self._running = False
-        if self._monitor_task:
-            self._monitor_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._monitor_task
-            self._monitor_task = None
+        if self._stop_event:
+            self._stop_event.set()
         for platform in list(self.clients.keys()):
             await self.remove_platform(platform)
         self.clients.clear()
 
-    def get_target_url(self, message: MessageBase) -> Optional[str]:
-        platform = message.message_info.platform
+    def _start_client_task(self, platform: str, client: MessageClient) -> None:
+        task = asyncio.create_task(client.run())
+        task.add_done_callback(lambda t, plat=platform: asyncio.create_task(self._restart_if_needed(plat, t)))
+        self._client_tasks[platform] = task
+
+    async def _restart_if_needed(self, platform: str, task: asyncio.Task) -> None:
+        if not self._running:
+            return
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.warning("Client task for %s ended with exception: %s", platform, exc)
+        client = self.clients.get(platform)
+        if client:
+            self._start_client_task(platform, client)
+
+    def get_target_url(self, message: MessageEnvelope) -> Optional[str]:
+        platform = message.get("message_info", {}).get("platform")
         if not platform:
             return None
         target = self.config.route_config.get(platform)
         return target.url if target else None
 
-    async def send_message(self, message: MessageBase):
-        platform = message.message_info.platform
+    async def send_message(self, message: MessageEnvelope):
+        platform = message.get("message_info", {}).get("platform")
         if not platform:
             raise ValueError("message_info.platform is required")
         client = self.clients.get(platform)
         if client is None:
             raise RuntimeError(f"No client connected for platform {platform}")
-        return await client.send_message(message.to_dict())
+        return await client.send_message(message)
 
     async def update_config(self, config_data: Dict[str, Dict[str, str | None]]) -> None:
         new_config = RouteConfig.from_dict(config_data)

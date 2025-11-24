@@ -3,160 +3,91 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, NotRequired, TypedDict
 
 MessageDirection = Literal["incoming", "outgoing"]
-Role = Literal["user", "assistant", "system", "tool", "platform"]
-ContentType = Literal[
-    "text",
-    "image",
-    "audio",
-    "file",
-    "video",
-    "event",
-    "command",
-    "system",
-]
 
-EventType = Literal[
-    "message_created",
-    "message_updated",
-    "message_deleted",
-    "member_join",
-    "member_leave",
-    "typing",
-    "reaction_add",
-    "reaction_remove",
-]
+# ----------------------------
+# maim_message 风格的 TypedDict
+# ----------------------------
 
 
-class TextContent(TypedDict, total=False):
-    type: Literal["text"]
-    text: str
-    markdown: NotRequired[bool]
-    entities: NotRequired[List[Dict[str, Any]]]
+class SegPayload(TypedDict, total=False):
+    """
+    对齐 maim_message.Seg 的片段定义，使用纯 dict 便于 JSON 传输。
+    """
+
+    type: str
+    data: str | List["SegPayload"]
+    translated_data: NotRequired[str | List["SegPayload"]]
 
 
-class ImageContent(TypedDict, total=False):
-    type: Literal["image"]
-    url: str
-    mime_type: NotRequired[str]
-    width: NotRequired[int]
-    height: NotRequired[int]
-    file_id: NotRequired[str]
+class UserInfoPayload(TypedDict, total=False):
+    platform: NotRequired[str]
+    user_id: NotRequired[str]
+    user_nickname: NotRequired[str]
+    user_cardname: NotRequired[str]
+    user_avatar: NotRequired[str]
 
 
-class FileContent(TypedDict, total=False):
-    type: Literal["file"]
-    url: str
-    mime_type: NotRequired[str]
-    file_name: NotRequired[str]
-    file_size: NotRequired[int]
-    file_id: NotRequired[str]
+class GroupInfoPayload(TypedDict, total=False):
+    platform: NotRequired[str]
+    group_id: NotRequired[str]
+    group_name: NotRequired[str]
 
 
-class AudioContent(TypedDict, total=False):
-    type: Literal["audio"]
-    url: str
-    mime_type: NotRequired[str]
-    duration_ms: NotRequired[int]
-    file_id: NotRequired[str]
+class FormatInfoPayload(TypedDict, total=False):
+    content_format: NotRequired[List[str]]
+    accept_format: NotRequired[List[str]]
 
 
-class VideoContent(TypedDict, total=False):
-    type: Literal["video"]
-    url: str
-    mime_type: NotRequired[str]
-    duration_ms: NotRequired[int]
-    width: NotRequired[int]
-    height: NotRequired[int]
-    file_id: NotRequired[str]
+class TemplateInfoPayload(TypedDict, total=False):
+    template_items: NotRequired[Dict[str, str]]
+    template_name: NotRequired[Dict[str, str]]
+    template_default: NotRequired[bool]
 
 
-class EventContent(TypedDict):
-    type: Literal["event"]
-    event_type: EventType
-    raw: Dict[str, Any]
+class MessageInfoPayload(TypedDict, total=False):
+    platform: NotRequired[str]
+    message_id: NotRequired[str]
+    time: NotRequired[float]
+    group_info: NotRequired[GroupInfoPayload]
+    user_info: NotRequired[UserInfoPayload]
+    format_info: NotRequired[FormatInfoPayload]
+    template_info: NotRequired[TemplateInfoPayload]
+    additional_config: NotRequired[Dict[str, Any]]
 
-
-class CommandContent(TypedDict, total=False):
-    type: Literal["command"]
-    name: str
-    args: Dict[str, Any]
-
-
-class SystemContent(TypedDict):
-    type: Literal["system"]
-    text: str
-
-
-Content = (
-    TextContent
-    | ImageContent
-    | FileContent
-    | AudioContent
-    | VideoContent
-    | EventContent
-    | CommandContent
-    | SystemContent
-)
-
-
-class SenderInfo(TypedDict, total=False):
-    user_id: str
-    role: Role
-    display_name: NotRequired[str]
-    avatar_url: NotRequired[str]
-    raw: NotRequired[Dict[str, Any]]
-
-
-class ChannelInfo(TypedDict, total=False):
-    channel_id: str
-    channel_type: Literal[
-        "private",
-        "group",
-        "supergroup",
-        "channel",
-        "dm",
-        "room",
-        "thread",
-    ]
-    title: NotRequired[str]
-    workspace_id: NotRequired[str]
-    raw: NotRequired[Dict[str, Any]]
+# ----------------------------
+# MessageEnvelope
+# ----------------------------
 
 
 class MessageEnvelope(TypedDict, total=False):
-    id: str
-    direction: MessageDirection
-    platform: str
-    timestamp_ms: int
-    channel: ChannelInfo
-    sender: SenderInfo
-    content: Content
-    conversation_id: str
-    thread_id: NotRequired[str]
-    reply_to_message_id: NotRequired[str]
-    correlation_id: NotRequired[str]
-    is_edited: NotRequired[bool]
-    is_ephemeral: NotRequired[bool]
-    raw_platform_message: NotRequired[Dict[str, Any]]
-    metadata: NotRequired[Dict[str, Any]]
-    schema_version: NotRequired[int]
+    """
+    mofox-bus 传输层统一使用的消息信封。
 
+    - 采用 maim_message 风格：message_info + message_segment。
+    """
+
+    direction: MessageDirection
+    message_info: MessageInfoPayload
+    message_segment: SegPayload | List[SegPayload]
+    raw_message: NotRequired[Any]
+    raw_bytes: NotRequired[bytes]
+    message_chain: NotRequired[List[SegPayload]]  # seglist 的直观别名
+    platform: NotRequired[str]  # 快捷访问，等价于 message_info.platform
+    message_id: NotRequired[str]  # 快捷访问，等价于 message_info.message_id
+    timestamp_ms: NotRequired[int]
+    correlation_id: NotRequired[str]
+    schema_version: NotRequired[int]
+    metadata: NotRequired[Dict[str, Any]]
 
 __all__ = [
-    "AudioContent",
-    "ChannelInfo",
-    "CommandContent",
-    "Content",
-    "ContentType",
-    "EventContent",
-    "EventType",
-    "FileContent",
-    "ImageContent",
+    # maim_message style payloads
+    "SegPayload",
+    "UserInfoPayload",
+    "GroupInfoPayload",
+    "FormatInfoPayload",
+    "TemplateInfoPayload",
+    "MessageInfoPayload",
+    # legacy content style
     "MessageDirection",
     "MessageEnvelope",
-    "Role",
-    "SenderInfo",
-    "SystemContent",
-    "TextContent",
-    "VideoContent",
 ]

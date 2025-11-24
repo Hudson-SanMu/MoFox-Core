@@ -27,23 +27,22 @@ def _loads(data: bytes) -> Dict[str, Any]:
 
 def dumps_message(msg: MessageEnvelope) -> bytes:
     """
-    将单条 MessageEnvelope 序列化为 JSON bytes。
+    将单条消息序列化为 JSON bytes。
     """
-    if "schema_version" not in msg:
-        msg["schema_version"] = DEFAULT_SCHEMA_VERSION
-    return _dumps(msg)
-
+    sanitized = _strip_raw_bytes(msg)
+    if "schema_version" not in sanitized:
+        sanitized["schema_version"] = DEFAULT_SCHEMA_VERSION
+    return _dumps(sanitized)
 
 def dumps_messages(messages: Iterable[MessageEnvelope]) -> bytes:
     """
-    将多条消息批量序列化，以提升吞吐。
+    将批量消息序列化为 JSON bytes。
     """
     payload = {
         "schema_version": DEFAULT_SCHEMA_VERSION,
-        "items": list(messages),
+        "items": [_strip_raw_bytes(msg) for msg in messages],
     }
     return _dumps(payload)
-
 
 def loads_message(data: bytes | str) -> MessageEnvelope:
     """
@@ -77,6 +76,14 @@ def _upgrade_schema_if_needed(obj: Dict[str, Any]) -> MessageEnvelope:
         return obj  # type: ignore[return-value]
     raise ValueError(f"Unsupported schema_version={version}")
 
+
+
+def _strip_raw_bytes(msg: MessageEnvelope) -> MessageEnvelope:
+    if isinstance(msg, dict) and "raw_bytes" in msg:
+        new_msg = dict(msg)
+        new_msg.pop("raw_bytes", None)
+        return new_msg  # type: ignore[return-value]
+    return msg
 
 __all__ = [
     "DEFAULT_SCHEMA_VERSION",
