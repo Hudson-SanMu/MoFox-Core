@@ -3,8 +3,8 @@ import re
 import traceback
 from typing import Any
 
-from mofox_bus import UserInfo
-
+from mofox_bus.runtime import MessageRuntime
+from mofox_bus import MessageEnvelope
 from src.chat.message_manager import message_manager
 from src.chat.message_receive.chat_stream import ChatStream, get_chat_manager
 from src.chat.message_receive.storage import MessageStorage
@@ -63,13 +63,13 @@ def _check_ban_regex(text: str, chat: ChatStream, userinfo: UserInfo) -> bool:
             return True
     return False
 
+runtime = MessageRuntime()  # 获取mofox-bus运行时环境
 
 class ChatBot:
     def __init__(self):
         self.bot = None  # bot 实例引用
         self._started = False
-        self.mood_manager = mood_manager  # 获取情绪管理器单例
-
+        self.mood_manager = mood_manager  # 获取情绪管理器单例      
         # 启动消息管理器
         self._message_manager_started = False
 
@@ -303,204 +303,185 @@ class ChatBot:
 
         except Exception as e:
             logger.error(f"处理适配器响应时出错: {e}")
-
-    async def message_process(self, message_data: dict[str, Any]) -> None:
+    
+    @runtime.on_message
+    async def message_process(self, envelope: MessageEnvelope) -> None:
         """处理转化后的统一格式消息"""
-        try:
-            # 首先处理可能的切片消息重组
-            from src.utils.message_chunker import reassembler
+        # 控制握手等消息可能缺少 message_info，这里直接跳过避免 KeyError
+        message_info = envelope.get("message_info")
+        if not isinstance(message_info, dict):
+            logger.debug(
+                "收到缺少 message_info 的消息，已跳过。可用字段: %s",
+                ", ".join(envelope.keys()),
+            )
+            return
 
-            # 尝试重组切片消息
-            reassembled_message = await reassembler.process_chunk(message_data)
-            if reassembled_message is None:
-                # 这是一个切片，但还未完整，等待更多切片
-                logger.debug("等待更多切片，跳过此次处理")
-                return
-            elif reassembled_message != message_data:
-                # 消息已被重组，使用重组后的消息
-                logger.info("使用重组后的完整消息进行处理")
-                message_data = reassembled_message
-
-            # 确保所有任务已启动
-            await self._ensure_started()
-
-            # 控制握手等消息可能缺少 message_info，这里直接跳过避免 KeyError
-            message_info = message_data.get("message_info")
-            if not isinstance(message_info, dict):
-                logger.debug(
-                    "收到缺少 message_info 的消息，已跳过。可用字段: %s",
-                    ", ".join(message_data.keys()),
-                )
-                return
-
-            if message_info.get("group_info") is not None:
-                message_info["group_info"]["group_id"] = str(
-                    message_info["group_info"]["group_id"]
-                )
-            if message_info.get("user_info") is not None:
-                message_info["user_info"]["user_id"] = str(
-                    message_info["user_info"]["user_id"]
-                )
-            # print(message_data)
-            # logger.debug(str(message_data))
-
-            # 优先处理adapter_response消息（在echo检查之前！）
-            message_segment = message_data.get("message_segment")
-            if message_segment and isinstance(message_segment, dict):
-                if message_segment.get("type") == "adapter_response":
-                    logger.info("[DEBUG bot.py message_process] 检测到adapter_response，立即处理")
-                    await self._handle_adapter_response_from_dict(message_segment.get("data"))
-                    return
-
-            # 先提取基础信息检查是否是自身消息上报
-            from mofox_bus import BaseMessageInfo
-            temp_message_info = BaseMessageInfo.from_dict(message_data.get("message_info", {}))
-            if temp_message_info.additional_config:
-                sent_message = temp_message_info.additional_config.get("echo", False)
-                if sent_message:  # 这一段只是为了在一切处理前劫持上报的自身消息，用于更新message_id，需要ada支持上报事件，实际测试中不会对正常使用造成任何问题
-                    # 直接使用消息字典更新，不再需要创建 MessageRecv
-                    await MessageStorage.update_message(message_data)
-                    return
-
-            message_segment = message_data.get("message_segment")
-            group_info = temp_message_info.group_info
-            user_info = temp_message_info.user_info
-
-            # 获取或创建聊天流
-            chat = await get_chat_manager().get_or_create_stream(
-                platform=temp_message_info.platform,  # type: ignore
-                user_info=user_info,  # type: ignore
-                group_info=group_info,
+        if message_info.get("group_info") is not None:
+            message_info["group_info"]["group_id"] = str( # type: ignore
+                message_info["group_info"]["group_id"] # type: ignore
+            ) 
+        if message_info.get("user_info") is not None:
+            message_info["user_info"]["user_id"] = str( # type: ignore
+                message_info["user_info"]["user_id"] # type: ignore
             )
 
-            # 使用新的消息处理器直接生成 DatabaseMessages
-            from src.chat.message_receive.message_processor import process_message_from_dict
-            message = await process_message_from_dict(
-                message_dict=message_data,
-                stream_id=chat.stream_id,
-                platform=chat.platform
-            )
-
-            # 填充聊天流时间信息
-            message.chat_info.create_time = chat.create_time
-            message.chat_info.last_active_time = chat.last_active_time
-
-            # 注册消息到聊天管理器
-            get_chat_manager().register_message(message)
-
-            # 检测是否提及机器人
-            message.is_mentioned, _ = is_mentioned_bot_in_message(message)
-
-            # 在这里打印[所见]日志，确保在所有处理和过滤之前记录
-            chat_name = chat.group_info.group_name if chat.group_info else "私聊"
-            user_nickname = message.user_info.user_nickname if message.user_info else "未知用户"
-            logger.info(
-                f"[{chat_name}]{user_nickname}:{message.processed_plain_text}\u001b[0m"
-            )
-
-            # 在此添加硬编码过滤，防止回复图片处理失败的消息
-            failure_keywords = ["[表情包(描述生成失败)]", "[图片(描述生成失败)]"]
-            processed_text = message.processed_plain_text or ""
-            if any(keyword in processed_text for keyword in failure_keywords):
-                logger.info(f"[硬编码过滤] 检测到媒体内容处理失败（{processed_text}），消息被静默处理。")
+        # 优先处理adapter_response消息（在echo检查之前！）
+        message_segment = envelope.get("message_segment")
+        if message_segment and isinstance(message_segment, dict):
+            if message_segment.get("type") == "adapter_response":
+                logger.info("[DEBUG bot.py message_process] 检测到adapter_response，立即处理")
+                await self._handle_adapter_response_from_dict(message_segment.get("data"))
                 return
 
-            # 过滤检查
-            # DatabaseMessages 使用 display_message 作为原始消息表示
-            raw_text = message.display_message or message.processed_plain_text or ""
-            if _check_ban_words(message.processed_plain_text, chat, user_info) or _check_ban_regex(  # type: ignore
-                raw_text,
-                chat,
-                user_info,  # type: ignore
-            ):
+        # 先提取基础信息检查是否是自身消息上报
+        from mofox_bus import BaseMessageInfo
+        temp_message_info = BaseMessageInfo.from_dict(message_data.get("message_info", {}))
+        if temp_message_info.additional_config:
+            sent_message = temp_message_info.additional_config.get("echo", False)
+            if sent_message:  # 这一段只是为了在一切处理前劫持上报的自身消息，用于更新message_id，需要ada支持上报事件，实际测试中不会对正常使用造成任何问题
+                # 直接使用消息字典更新，不再需要创建 MessageRecv
+                await MessageStorage.update_message(message_data)
                 return
 
-            # 命令处理 - 首先尝试PlusCommand独立处理
-            is_plus_command, plus_cmd_result, plus_continue_process = await self._process_plus_commands(message, chat)
+        message_segment = envelope.get("message_segment")
+        group_info = temp_message_info.group_info
+        user_info = temp_message_info.user_info
 
-            # 如果是PlusCommand且不需要继续处理，则直接返回
-            if is_plus_command and not plus_continue_process:
+        # 获取或创建聊天流
+        chat = await get_chat_manager().get_or_create_stream(
+            platform=temp_message_info.platform,  # type: ignore
+            user_info=user_info,  # type: ignore
+            group_info=group_info,
+        )
+
+        # 使用新的消息处理器直接生成 DatabaseMessages
+        from src.chat.message_receive.message_processor import process_message_from_dict
+        message = await process_message_from_dict(
+            message_dict=envelope,
+            stream_id=chat.stream_id,
+            platform=chat.platform
+        )
+
+        # 填充聊天流时间信息
+        message.chat_info.create_time = chat.create_time
+        message.chat_info.last_active_time = chat.last_active_time
+
+        # 注册消息到聊天管理器
+        get_chat_manager().register_message(message)
+
+        # 检测是否提及机器人
+        message.is_mentioned, _ = is_mentioned_bot_in_message(message)
+
+        # 在这里打印[所见]日志，确保在所有处理和过滤之前记录
+        chat_name = chat.group_info.group_name if chat.group_info else "私聊"
+        user_nickname = message.user_info.user_nickname if message.user_info else "未知用户"
+        logger.info(
+            f"[{chat_name}]{user_nickname}:{message.processed_plain_text}\u001b[0m"
+        )
+
+        # 在此添加硬编码过滤，防止回复图片处理失败的消息
+        failure_keywords = ["[表情包(描述生成失败)]", "[图片(描述生成失败)]"]
+        processed_text = message.processed_plain_text or ""
+        if any(keyword in processed_text for keyword in failure_keywords):
+            logger.info(f"[硬编码过滤] 检测到媒体内容处理失败（{processed_text}），消息被静默处理。")
+            return
+
+        # 过滤检查
+        # DatabaseMessages 使用 display_message 作为原始消息表示
+        raw_text = message.display_message or message.processed_plain_text or ""
+        if _check_ban_words(message.processed_plain_text, chat, user_info) or _check_ban_regex(  # type: ignore
+            raw_text,
+            chat,
+            user_info,  # type: ignore
+        ):
+            return
+
+        # 命令处理 - 首先尝试PlusCommand独立处理
+        is_plus_command, plus_cmd_result, plus_continue_process = await self._process_plus_commands(message, chat)
+
+        # 如果是PlusCommand且不需要继续处理，则直接返回
+        if is_plus_command and not plus_continue_process:
+            await MessageStorage.store_message(message, chat)
+            logger.info(f"PlusCommand处理完成，跳过后续消息处理: {plus_cmd_result}")
+            return
+
+        # 如果不是PlusCommand，尝试传统的BaseCommand处理
+        if not is_plus_command:
+            is_command, cmd_result, continue_process = await self._process_commands_with_new_system(message, chat)
+
+            # 如果是命令且不需要继续处理，则直接返回
+            if is_command and not continue_process:
                 await MessageStorage.store_message(message, chat)
-                logger.info(f"PlusCommand处理完成，跳过后续消息处理: {plus_cmd_result}")
+                logger.info(f"命令处理完成，跳过后续消息处理: {cmd_result}")
                 return
 
-            # 如果不是PlusCommand，尝试传统的BaseCommand处理
-            if not is_plus_command:
-                is_command, cmd_result, continue_process = await self._process_commands_with_new_system(message, chat)
+        result = await event_manager.trigger_event(EventType.ON_MESSAGE, permission_group="SYSTEM", message=message)
+        if result and not result.all_continue_process():
+            raise UserWarning(f"插件{result.get_summary().get('stopped_handlers', '')}于消息到达时取消了消息处理")
 
-                # 如果是命令且不需要继续处理，则直接返回
-                if is_command and not continue_process:
-                    await MessageStorage.store_message(message, chat)
-                    logger.info(f"命令处理完成，跳过后续消息处理: {cmd_result}")
-                    return
+        # TODO:暂不可用 - DatabaseMessages 不再有 message_info.template_info
+        # 确认从接口发来的message是否有自定义的prompt模板信息
+        # 这个功能需要在 adapter 层通过 additional_config 传递
+        template_group_name = None
 
-            result = await event_manager.trigger_event(EventType.ON_MESSAGE, permission_group="SYSTEM", message=message)
-            if result and not result.all_continue_process():
-                raise UserWarning(f"插件{result.get_summary().get('stopped_handlers', '')}于消息到达时取消了消息处理")
+        async def preprocess():
+            # message 已经是 DatabaseMessages，直接使用
+            group_info = chat.group_info
 
-            # TODO:暂不可用 - DatabaseMessages 不再有 message_info.template_info
-            # 确认从接口发来的message是否有自定义的prompt模板信息
-            # 这个功能需要在 adapter 层通过 additional_config 传递
-            template_group_name = None
+            # 先交给消息管理器处理，计算兴趣度等衍生数据
+            try:
+                # 在将消息添加到管理器之前进行最终的静默检查
+                should_process_in_manager = True
+                if group_info and str(group_info.group_id) in global_config.message_receive.mute_group_list:
+                    # 检查消息是否为图片或表情包
+                    is_image_or_emoji = message.is_picid or message.is_emoji
+                    if not message.is_mentioned and not is_image_or_emoji:
+                        logger.debug(f"群组 {group_info.group_id} 在静默列表中，且消息不是@、回复或图片/表情包，跳过消息管理器处理")
+                        should_process_in_manager = False
+                    elif is_image_or_emoji:
+                        logger.debug(f"群组 {group_info.group_id} 在静默列表中，但消息是图片/表情包，静默处理")
+                        should_process_in_manager = False
 
-            async def preprocess():
-                # message 已经是 DatabaseMessages，直接使用
-                group_info = chat.group_info
+                if should_process_in_manager:
+                    await message_manager.add_message(chat.stream_id, message)
+                    logger.debug(f"消息已添加到消息管理器: {chat.stream_id}")
 
-                # 先交给消息管理器处理，计算兴趣度等衍生数据
-                try:
-                    # 在将消息添加到管理器之前进行最终的静默检查
-                    should_process_in_manager = True
-                    if group_info and str(group_info.group_id) in global_config.message_receive.mute_group_list:
-                        # 检查消息是否为图片或表情包
-                        is_image_or_emoji = message.is_picid or message.is_emoji
-                        if not message.is_mentioned and not is_image_or_emoji:
-                            logger.debug(f"群组 {group_info.group_id} 在静默列表中，且消息不是@、回复或图片/表情包，跳过消息管理器处理")
-                            should_process_in_manager = False
-                        elif is_image_or_emoji:
-                            logger.debug(f"群组 {group_info.group_id} 在静默列表中，但消息是图片/表情包，静默处理")
-                            should_process_in_manager = False
+            except Exception as e:
+                logger.error(f"消息添加到消息管理器失败: {e}")
 
-                    if should_process_in_manager:
-                        await message_manager.add_message(chat.stream_id, message)
-                        logger.debug(f"消息已添加到消息管理器: {chat.stream_id}")
+            # 存储消息到数据库，只进行一次写入
+            try:
+                await MessageStorage.store_message(message, chat)
+            except Exception as e:
+                logger.error(f"存储消息到数据库失败: {e}")
+                traceback.print_exc()
 
-                except Exception as e:
-                    logger.error(f"消息添加到消息管理器失败: {e}")
+            # 情绪系统更新 - 在消息存储后触发情绪更新
+            try:
+                if global_config.mood.enable_mood:
+                    # 获取兴趣度用于情绪更新
+                    interest_rate = message.interest_value
+                    if interest_rate is None:
+                        interest_rate = 0.0
+                    logger.debug(f"开始更新情绪状态，兴趣度: {interest_rate:.2f}")
 
-                # 存储消息到数据库，只进行一次写入
-                try:
-                    await MessageStorage.store_message(message, chat)
-                except Exception as e:
-                    logger.error(f"存储消息到数据库失败: {e}")
-                    traceback.print_exc()
+                    # 获取当前聊天的情绪对象并更新情绪状态
+                    chat_mood = mood_manager.get_mood_by_chat_id(chat.stream_id)
+                    await chat_mood.update_mood_by_message(message, interest_rate)
+                    logger.debug("情绪状态更新完成")
+            except Exception as e:
+                logger.error(f"更新情绪状态失败: {e}")
+                traceback.print_exc()
 
-                # 情绪系统更新 - 在消息存储后触发情绪更新
-                try:
-                    if global_config.mood.enable_mood:
-                        # 获取兴趣度用于情绪更新
-                        interest_rate = message.interest_value
-                        if interest_rate is None:
-                            interest_rate = 0.0
-                        logger.debug(f"开始更新情绪状态，兴趣度: {interest_rate:.2f}")
-
-                        # 获取当前聊天的情绪对象并更新情绪状态
-                        chat_mood = mood_manager.get_mood_by_chat_id(chat.stream_id)
-                        await chat_mood.update_mood_by_message(message, interest_rate)
-                        logger.debug("情绪状态更新完成")
-                except Exception as e:
-                    logger.error(f"更新情绪状态失败: {e}")
-                    traceback.print_exc()
-
-            if template_group_name:
-                async with global_prompt_manager.async_message_scope(template_group_name):
-                    await preprocess()
-            else:
+        if template_group_name:
+            async with global_prompt_manager.async_message_scope(template_group_name):
                 await preprocess()
+        else:
+            await preprocess()
 
-        except Exception as e:
-            logger.error(f"预处理消息失败: {e}")
-            traceback.print_exc()
+    except Exception as e:
+        logger.error(f"预处理消息失败: {e}")
+        traceback.print_exc()
 
 
 # 创建全局ChatBot实例

@@ -18,7 +18,6 @@ from src.chat.message_receive.bot import chat_bot
 from src.chat.message_receive.chat_stream import get_chat_manager
 from src.chat.utils.statistic import OnlineTimeRecordTask, StatisticOutputTask
 from src.common.logger import get_logger
-from src.common.message.envelope_converter import EnvelopeConverter
 
 # 全局背景任务集合
 _background_tasks = set()
@@ -77,7 +76,7 @@ class MainSystem:
         self.individuality: Individuality = get_individuality()
 
         # 创建核心消息接收器
-        self.core_sink: InProcessCoreSink = InProcessCoreSink(self._handle_message_envelope)
+        self.core_sink: InProcessCoreSink = InProcessCoreSink(self._message_process_wrapper)
         
         # 使用服务器
         self.server: Server = get_global_server()
@@ -353,19 +352,18 @@ class MainSystem:
         except Exception as e:
             logger.error(f"同步清理资源时出错: {e}")
 
-    async def _message_process_wrapper(self, message_data: dict[str, Any]) -> None:
+    async def _message_process_wrapper(self, envelope: MessageEnvelope) -> None:
         """并行处理消息的包装器"""
         try:
             start_time = time.time()
-            message_id = message_data.get("message_info", {}).get("message_id", "UNKNOWN")
-
+            message_id = envelope.get("message_info", {}).get("message_id", "UNKNOWN")
             # 检查系统是否正在关闭
             if self._shutting_down:
                 logger.warning(f"系统正在关闭，拒绝处理消息 {message_id}")
                 return
 
             # 创建后台任务
-            task = asyncio.create_task(chat_bot.message_process(message_data))
+            task = asyncio.create_task(chat_bot.message_process(envelope))
             logger.debug(f"已为消息 {message_id} 创建后台处理任务 (ID: {id(task)})")
 
             # 添加一个回调函数，当任务完成时，它会被调用
@@ -374,22 +372,6 @@ class MainSystem:
             logger.error("在创建消息处理任务时发生严重错误:")
             logger.error(traceback.format_exc())
 
-    async def _handle_message_envelope(self, envelope: MessageEnvelope) -> None:
-        """
-        处理来自适配器的 MessageEnvelope
-        
-        Args:
-            envelope: 统一的消息信封
-        """
-        try:
-            # 转换为旧版格式
-            message_data = EnvelopeConverter.to_legacy_dict(envelope)
-            
-            # 使用现有的消息处理流程
-            await self._message_process_wrapper(message_data)
-            
-        except Exception as e:
-            logger.error(f"处理 MessageEnvelope 时出错: {e}", exc_info=True)
 
     async def initialize(self) -> None:
         """初始化系统组件"""

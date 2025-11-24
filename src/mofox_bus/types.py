@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, NotRequired, TypedDict
+from typing import Any, Dict, List, Literal, NotRequired, TypedDict, Required
 
 MessageDirection = Literal["incoming", "outgoing"]
 
@@ -14,14 +14,14 @@ class SegPayload(TypedDict, total=False):
     对齐 maim_message.Seg 的片段定义，使用纯 dict 便于 JSON 传输。
     """
 
-    type: str
-    data: str | List["SegPayload"]
+    type: Required[str]
+    data: Required[str | List["SegPayload"]]
     translated_data: NotRequired[str | List["SegPayload"]]
 
 
 class UserInfoPayload(TypedDict, total=False):
     platform: NotRequired[str]
-    user_id: NotRequired[str]
+    user_id: Required[str]
     user_nickname: NotRequired[str]
     user_cardname: NotRequired[str]
     user_avatar: NotRequired[str]
@@ -29,7 +29,7 @@ class UserInfoPayload(TypedDict, total=False):
 
 class GroupInfoPayload(TypedDict, total=False):
     platform: NotRequired[str]
-    group_id: NotRequired[str]
+    group_id: Required[str]
     group_name: NotRequired[str]
 
 
@@ -45,8 +45,8 @@ class TemplateInfoPayload(TypedDict, total=False):
 
 
 class MessageInfoPayload(TypedDict, total=False):
-    platform: NotRequired[str]
-    message_id: NotRequired[str]
+    platform: Required[str]
+    message_id: Required[str]
     time: NotRequired[float]
     group_info: NotRequired[GroupInfoPayload]
     user_info: NotRequired[UserInfoPayload]
@@ -67,8 +67,8 @@ class MessageEnvelope(TypedDict, total=False):
     """
 
     direction: MessageDirection
-    message_info: MessageInfoPayload
-    message_segment: SegPayload | List[SegPayload]
+    message_info: Required[MessageInfoPayload]
+    message_segment: Required[SegPayload] | List[SegPayload]
     raw_message: NotRequired[Any]
     raw_bytes: NotRequired[bytes]
     message_chain: NotRequired[List[SegPayload]]  # seglist 的直观别名
