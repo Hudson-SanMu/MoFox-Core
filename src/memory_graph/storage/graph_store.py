@@ -876,8 +876,6 @@ class GraphStore:
             logger.exception("同步图边到记忆.edges 失败")
 
         store._rebuild_node_edge_index()
-
-        logger.info(f"从字典加载图: {store.get_statistics()}")
         return store
 
     def _sync_memory_edges_from_graph(self) -> None:
@@ -942,8 +940,6 @@ class GraphStore:
 
                 mem.edges.append(mem_edge)
                 existing_edges.setdefault(mid, set()).add(mem_edge.id)
-
-        logger.info("已将图中的边同步到 Memory.edges（保证 graph 与 memory 对象一致）")
         self._rebuild_node_edge_index()
 
     def remove_memory(self, memory_id: str, cleanup_orphans: bool = True) -> bool:

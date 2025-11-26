@@ -97,7 +97,7 @@ class AffinityChatter(BaseChatter):
                     **execution_result,
                 }
 
-                logger.info(
+                logger.debug(
                     f"聊天流 {self.stream_id} StreamContext处理成功: 动作数={result['actions_count']}, 未读消息={result['unread_messages_processed']}"
                 )
 
