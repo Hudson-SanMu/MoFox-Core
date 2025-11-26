@@ -78,6 +78,6 @@ class ReadFeedAction(BaseAction):
                 return False, error_message
 
         except Exception as e:
-            logger.error(f"执行阅读说说动作时发生未知异常: {e}", exc_info=True)
+            logger.error(f"执行阅读说说动作时发生未知异常: {e}")
             await self.send_text("糟糕，在看说说的过程中网络好像出问题了...")
             return False, "动作执行异常"

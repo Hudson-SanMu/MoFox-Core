@@ -96,7 +96,7 @@ class NodeMerger:
             return similar_nodes
 
         except Exception as e:
-            logger.error(f"查找相似节点失败: {e}", exc_info=True)
+            logger.error(f"查找相似节点失败: {e}")
             return []
 
     async def should_merge(
@@ -244,7 +244,7 @@ class NodeMerger:
             return True
 
         except Exception as e:
-            logger.error(f"节点合并失败: {e}", exc_info=True)
+            logger.error(f"节点合并失败: {e}")
             return False
 
     def _update_memory_references(self, old_node_id: str, new_node_id: str) -> None:
@@ -325,7 +325,7 @@ class NodeMerger:
                     progress_callback(i + 1, stats["total"], stats)
 
             except Exception as e:
-                logger.error(f"处理节点 {node.id} 时失败: {e}", exc_info=True)
+                logger.error(f"处理节点 {node.id} 时失败: {e}")
                 stats["skipped"] += 1
 
         logger.info(

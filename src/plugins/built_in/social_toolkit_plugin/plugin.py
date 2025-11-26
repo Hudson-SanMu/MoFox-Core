@@ -103,7 +103,7 @@ class ReminderTask(AsyncTask):
             logger.info(f"提醒任务 {self.task_name} 成功完成。")
 
         except Exception as e:
-            logger.error(f"执行提醒任务 {self.task_name} 时出错: {e}", exc_info=True)
+            logger.error(f"执行提醒任务 {self.task_name} 时出错: {e}")
 
 
 # =============================== Actions ===============================
@@ -347,7 +347,7 @@ class SetEmojiLikeAction(BaseAction):
                 return False, "设置表情回应失败"
 
         except Exception as e:
-            logger.error(f"设置表情回应时发生异常: {e}", exc_info=True)
+            logger.error(f"设置表情回应时发生异常: {e}")
             await self.store_action_info(action_prompt_display=f"贴表情失败: {e}", action_done=False)
             return False, f"设置表情回应失败: {e}"
 
@@ -438,7 +438,7 @@ class RemindAction(BaseAction):
                 target_time = parse_datetime(converted_time_str, fuzzy=False)
 
         except Exception as e:
-            logger.error(f"[ReminderPlugin] 无法解析或转换时间字符串 '{remind_time_str}': {e}", exc_info=True)
+            logger.error(f"[ReminderPlugin] 无法解析或转换时间字符串 '{remind_time_str}': {e}")
             await self.send_text(f"抱歉，我无法理解您说的时间 '{remind_time_str}'，提醒设置失败。")
             return False, f"无法解析时间 '{remind_time_str}'"
 
@@ -541,7 +541,7 @@ class RemindAction(BaseAction):
 
             return True, "提醒设置成功"
         except Exception as e:
-            logger.error(f"[ReminderPlugin] 创建提醒任务时出错: {e}", exc_info=True)
+            logger.error(f"[ReminderPlugin] 创建提醒任务时出错: {e}")
             await self.send_text("抱歉，设置提醒时发生了一点内部错误。")
             return False, "设置提醒时发生内部错误"
 

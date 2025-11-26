@@ -598,7 +598,7 @@ class MultiLevelCache:
         except asyncio.TimeoutError:
             logger.warning("内存限制检查超时，跳过本次检查")
         except Exception as e:
-            logger.error(f"内存限制检查失败: {e}", exc_info=True)
+            logger.error(f"内存限制检查失败: {e}")
 
     async def start_cleanup_task(self, interval: float = 60) -> None:
         """启动定期清理任务
@@ -641,7 +641,7 @@ class MultiLevelCache:
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
-                    logger.error(f"清理任务异常: {e}", exc_info=True)
+                    logger.error(f"清理任务异常: {e}")
 
         self._cleanup_task = asyncio.create_task(cleanup_loop())
         logger.info(f"缓存清理任务已启动，间隔{interval}秒")
@@ -706,7 +706,7 @@ class MultiLevelCache:
                     logger.debug(f"缓存清理任务 {'L1' if i == 0 else 'L2'} 完成")
 
         except Exception as e:
-            logger.error(f"清理过期条目失败: {e}", exc_info=True)
+            logger.error(f"清理过期条目失败: {e}")
 
     async def _clean_cache_layer_expired(self, cache_layer, current_time: float, layer_name: str) -> int:
         """清理单个缓存层的过期条目（避免锁嵌套）"""

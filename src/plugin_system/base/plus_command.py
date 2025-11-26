@@ -384,7 +384,7 @@ def create_plus_command_adapter(plus_command_class):
             try:
                 return await self.plus_command.execute(command_args)
             except Exception as e:
-                logger.error(f"执行命令时出错: {e}", exc_info=True)
+                logger.error(f"执行命令时出错: {e}")
                 return False, f"命令执行出错: {e!s}", self.intercept_message
 
     return AdapterClass
@@ -443,7 +443,7 @@ def create_legacy_command_adapter(legacy_command_class):
                 # 旧的execute不接收args参数
                 return await self.legacy_command.execute()
             except Exception as e:
-                logger.error(f"执行旧版命令 '{self.command_name}' 时出错: {e}", exc_info=True)
+                logger.error(f"执行旧版命令 '{self.command_name}' 时出错: {e}")
                 return False, f"命令执行出错: {e!s}", self.intercept_message
 
     return LegacyAdapter

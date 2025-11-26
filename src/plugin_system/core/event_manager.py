@@ -342,7 +342,7 @@ class EventManager:
                 # 使用 create_task 异步执行，避免死锁
                 asyncio.create_task(self._scheduler_callback(event_name, params))
             except Exception as e:
-                logger.error(f"调用 scheduler 回调时出错: {e}", exc_info=True)
+                logger.error(f"调用 scheduler 回调时出错: {e}")
 
         timeout = handler_timeout if handler_timeout is not None else self._default_handler_timeout
         concurrency = max_concurrency if max_concurrency is not None else self._default_handler_concurrency

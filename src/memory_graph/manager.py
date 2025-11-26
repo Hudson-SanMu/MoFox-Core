@@ -95,7 +95,7 @@ class MemoryManager:
             return
 
         try:
-            logger.info("开始初始化记忆管理器...")
+            logger.debug("开始初始化记忆管理器...")
 
             # 1. 初始化存储层
             self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -153,21 +153,6 @@ class MemoryManager:
             search_min_importance = getattr(self.config, "search_min_importance", 0.3)
             search_similarity_threshold = getattr(self.config, "search_similarity_threshold", 0.5)
 
-            logger.info(
-                f"📊 配置检查: expand_depth={expand_depth}, "
-                f"expand_semantic_threshold={expand_semantic_threshold}, "
-                f"search_top_k={search_top_k}"
-            )
-            logger.info(
-                f"📊 权重配置: vector={search_vector_weight}, "
-                f"importance={search_importance_weight}, "
-                f"recency={search_recency_weight}"
-            )
-            logger.info(
-                f"📊 阈值过滤: min_importance={search_min_importance}, "
-                f"similarity_threshold={search_similarity_threshold}"
-            )
-
             self.tools = MemoryTools(
                 vector_store=self.vector_store,
                 graph_store=self.graph_store,
@@ -190,7 +175,7 @@ class MemoryManager:
             self._start_maintenance_task()
 
         except Exception as e:
-            logger.error(f"记忆管理器初始化失败: {e}", exc_info=True)
+            logger.error(f"记忆管理器初始化失败: {e}")
             raise
 
     async def shutdown(self) -> None:
@@ -226,7 +211,7 @@ class MemoryManager:
             logger.info("✅ 记忆管理器已关闭")
 
         except Exception as e:
-            logger.error(f"关闭记忆管理器失败: {e}", exc_info=True)
+            logger.error(f"关闭记忆管理器失败: {e}")
 
     # ==================== 记忆 CRUD 操作 ====================
 
@@ -279,7 +264,7 @@ class MemoryManager:
                 return None
 
         except Exception as e:
-            logger.error(f"创建记忆时发生异常: {e}", exc_info=True)
+            logger.error(f"创建记忆时发生异常: {e}")
             return None
 
     async def get_memory(self, memory_id: str) -> Memory | None:
@@ -336,7 +321,7 @@ class MemoryManager:
             return True
 
         except Exception as e:
-            logger.error(f"更新记忆失败: {e}", exc_info=True)
+            logger.error(f"更新记忆失败: {e}")
             return False
 
     async def delete_memory(self, memory_id: str) -> bool:
@@ -376,7 +361,7 @@ class MemoryManager:
             return True
 
         except Exception as e:
-            logger.error(f"删除记忆失败: {e}", exc_info=True)
+            logger.error(f"删除记忆失败: {e}")
             return False
 
     # ==================== 记忆检索操作 ====================
@@ -487,7 +472,7 @@ class MemoryManager:
             return filtered_memories[:top_k]
 
         except Exception as e:
-            logger.error(f"搜索记忆失败: {e}", exc_info=True)
+            logger.error(f"搜索记忆失败: {e}")
             return []
 
     async def link_memories(
@@ -531,7 +516,7 @@ class MemoryManager:
                 return False
 
         except Exception as e:
-            logger.error(f"关联记忆失败: {e}", exc_info=True)
+            logger.error(f"关联记忆失败: {e}")
             return False
 
     # ==================== 记忆生命周期管理 ====================
@@ -608,7 +593,7 @@ class MemoryManager:
             return True
 
         except Exception as e:
-            logger.error(f"激活记忆失败: {e}", exc_info=True)
+            logger.error(f"激活记忆失败: {e}")
             return False
 
     async def _auto_activate_searched_memories(self, memories: list[Memory]) -> None:
@@ -938,7 +923,7 @@ class MemoryManager:
                 return False
 
         except Exception as e:
-            logger.error(f"遗忘记忆失败: {e}", exc_info=True)
+            logger.error(f"遗忘记忆失败: {e}")
             return False
 
     async def auto_forget_memories(self, threshold: float = 0.1) -> int:
@@ -1037,7 +1022,7 @@ class MemoryManager:
             return forgotten_count
 
         except Exception as e:
-            logger.error(f"自动遗忘失败: {e}", exc_info=True)
+            logger.error(f"自动遗忘失败: {e}")
             return 0
 
     async def _cleanup_orphan_nodes_and_edges(self) -> tuple[int, int]:
@@ -1098,7 +1083,7 @@ class MemoryManager:
             return orphan_nodes_count, orphan_edges_count
 
         except Exception as e:
-            logger.error(f"清理孤立节点和边失败: {e}", exc_info=True)
+            logger.error(f"清理孤立节点和边失败: {e}")
             return 0, 0
 
     # ==================== 统计与维护 ====================
@@ -1185,7 +1170,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger.error(f"记忆整理失败: {e}", exc_info=True)
+            logger.error(f"记忆整理失败: {e}")
             return {"error": str(e), "forgotten_count": 0}
 
     async def _consolidate_memories_background(
@@ -1322,7 +1307,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger.error(f"❌ 维护失败: {e}", exc_info=True)
+            logger.error(f"❌ 维护失败: {e}")
             return {"error": str(e), "total_time": 0}
 
     async def _lightweight_auto_link_memories(  # 已废弃
@@ -1394,7 +1379,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger.error(f"启动维护后台任务失败: {e}", exc_info=True)
+            logger.error(f"启动维护后台任务失败: {e}")
 
     async def _stop_maintenance_task(self) -> None:
         """
@@ -1416,7 +1401,7 @@ class MemoryManager:
             self._maintenance_task = None
 
         except Exception as e:
-            logger.error(f"停止维护后台任务失败: {e}", exc_info=True)
+            logger.error(f"停止维护后台任务失败: {e}")
 
     async def _maintenance_loop(self) -> None:
         """
@@ -1447,7 +1432,7 @@ class MemoryManager:
                     try:
                         await self.maintenance()
                     except Exception as e:
-                        logger.error(f"维护任务执行失败: {e}", exc_info=True)
+                        logger.error(f"维护任务执行失败: {e}")
 
                     # 后续执行使用相同间隔
                     initial_delay = self._maintenance_interval_hours * 3600
@@ -1456,7 +1441,7 @@ class MemoryManager:
                     logger.debug("维护循环被取消")
                     break
                 except Exception as e:
-                    logger.error(f"维护循环发生异常: {e}", exc_info=True)
+                    logger.error(f"维护循环发生异常: {e}")
                     # 异常后等待较短时间再重试
                     try:
                         await asyncio.sleep(300)  # 5分钟后重试
@@ -1466,7 +1451,7 @@ class MemoryManager:
         except asyncio.CancelledError:
             logger.debug("维护循环完全退出")
         except Exception as e:
-            logger.error(f"维护循环意外结束: {e}", exc_info=True)
+            logger.error(f"维护循环意外结束: {e}")
         finally:
             self._maintenance_running = False
             logger.debug("维护循环已清理完毕")
@@ -1493,5 +1478,5 @@ class MemoryManager:
             await self.persistence.save_graph_store(self.graph_store)
             logger.debug(f"异步保存图数据成功: {operation_name}")
         except Exception as e:
-            logger.error(f"异步保存图数据失败 ({operation_name}): {e}", exc_info=True)
+            logger.error(f"异步保存图数据失败 ({operation_name}): {e}")
             # 可以考虑添加重试机制或者通知机制

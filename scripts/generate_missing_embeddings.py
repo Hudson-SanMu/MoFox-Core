@@ -183,7 +183,7 @@ async def generate_missing_embeddings(
 
         except Exception as e:
             failed_count += len(batch)
-            logger.error(f"批次 {batch_num} 处理失败", exc_info=True)
+            logger.error(f"批次 {batch_num} 处理失败")
             print(f"  ❌ 批次处理失败: {e}")
 
         # 显示进度
@@ -197,7 +197,7 @@ async def generate_missing_embeddings(
         await manager.persistence.save_graph_store(manager.graph_store)
         print("✅ 图数据已保存\n")
     except Exception as e:
-        logger.error("保存图数据失败", exc_info=True)
+        logger.error("保存图数据失败")
         print(f"❌ 保存失败: {e}\n")
 
     # 5. 验证结果

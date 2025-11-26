@@ -674,14 +674,14 @@ class PersonInfoManager:
                         continue
             except Exception as e_query:
                 logger.error(
-                    f"数据库查询失败 (specific_value_list for {f_name}): {e_query!s}", exc_info=True
+                    f"数据库查询失败 (specific_value_list for {f_name}): {e_query!s}"
                 )
             return found_results
 
         try:
             return await _db_get_specific_async(field_name)
         except Exception as e:
-            logger.error(f"执行 get_specific_value_list 时出错: {e!s}", exc_info=True)
+            logger.error(f"执行 get_specific_value_list 时出错: {e!s}")
             return {}
 
     async def get_or_create_person(

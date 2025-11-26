@@ -179,7 +179,7 @@ class BaseAdapter(MoFoxAdapterBase, ABC):
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"适配器 {self.adapter_name} 健康检查异常: {e}", exc_info=True)
+                logger.error(f"适配器 {self.adapter_name} 健康检查异常: {e}")
 
     async def health_check(self) -> bool:
         """
@@ -204,7 +204,7 @@ class BaseAdapter(MoFoxAdapterBase, ABC):
             await asyncio.sleep(2)  # 等待一段时间再重连
             await self.start()
         except Exception as e:
-            logger.error(f"适配器 {self.adapter_name} 重连失败: {e}", exc_info=True)
+            logger.error(f"适配器 {self.adapter_name} 重连失败: {e}")
 
     def get_subprocess_entry_path(self) -> Optional[Path]:
         """

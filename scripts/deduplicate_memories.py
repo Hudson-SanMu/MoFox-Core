@@ -235,7 +235,7 @@ class MemoryDeduplicator:
             return True
 
         except Exception as e:
-            logger.error(f"  ❌ 删除失败: {e}", exc_info=True)
+            logger.error(f"  ❌ 删除失败: {e}")
             self.stats["errors"] += 1
             return False
 
@@ -389,7 +389,7 @@ async def main():
     except KeyboardInterrupt:
         print("\n\n⚠️ 用户中断操作")
     except Exception as e:
-        logger.error(f"执行失败: {e}", exc_info=True)
+        logger.error(f"执行失败: {e}")
         print(f"\n❌ 执行失败: {e}")
         return 1
     finally:

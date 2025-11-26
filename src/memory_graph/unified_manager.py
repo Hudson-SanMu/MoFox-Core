@@ -122,7 +122,7 @@ class UnifiedMemoryManager:
             return
 
         try:
-            logger.info("开始初始化统一记忆管理器...")
+            logger.debug("开始初始化统一记忆管理器...")
 
             # 初始化底层 MemoryManager（长期记忆）
             if self.memory_manager is None:
@@ -132,7 +132,7 @@ class UnifiedMemoryManager:
                 self.memory_manager = MemoryManager(data_dir=self.data_dir)
                 await self.memory_manager.initialize()
             else:
-                logger.info("使用外部提供的 MemoryManager")
+                logger.debug("使用外部提供的 MemoryManager")
                 # 确保外部 MemoryManager 已初始化
                 if not getattr(self.memory_manager, "_initialized", False):
                     await self.memory_manager.initialize()
@@ -165,7 +165,7 @@ class UnifiedMemoryManager:
             self._start_auto_transfer_task()
 
         except Exception as e:
-            logger.error(f"统一记忆管理器初始化失败: {e}", exc_info=True)
+            logger.error(f"统一记忆管理器初始化失败: {e}")
             raise
 
     async def add_message(self, message: dict[str, Any]) -> MemoryBlock | None:
@@ -244,7 +244,7 @@ class UnifiedMemoryManager:
             ]
 
             if blocks_to_transfer:
-                logger.info(
+                logger.debug(
                     f"检测到 {len(blocks_to_transfer)} 个感知记忆需要转移，已交由后台后处理任务执行"
                 )
                 for block in blocks_to_transfer:
@@ -253,11 +253,6 @@ class UnifiedMemoryManager:
 
             result["perceptual_blocks"] = perceptual_blocks
             result["short_term_memories"] = short_term_memories
-
-            logger.info(
-                f"初步检索: 感知记忆 {len(perceptual_blocks)} 块, "
-                f"短期记忆 {len(short_term_memories)} 条"
-            )
 
             # 步骤2: 裁判模型评估
             if use_judge:
@@ -291,7 +286,7 @@ class UnifiedMemoryManager:
             return result
 
         except Exception as e:
-            logger.error(f"智能检索失败: {e}", exc_info=True)
+            logger.error(f"智能检索失败: {e}")
             return {
                 "perceptual_blocks": [],
                 "short_term_memories": [],
@@ -396,11 +391,10 @@ class UnifiedMemoryManager:
                 missing_aspects=data.get("missing_aspects", []),
             )
 
-            logger.info(f"裁判决策: {decision}")
             return decision
 
         except Exception as e:
-            logger.error(f"裁判模型评估失败: {e}", exc_info=True)
+            logger.error(f"裁判模型评估失败: {e}")
             # 默认判定为不充足，需要检索长期记忆
             return JudgeDecision(
                 is_sufficient=False,
@@ -428,7 +422,7 @@ class UnifiedMemoryManager:
             except asyncio.CancelledError:
                 logger.info(f"{task_name} 后台任务已取消")
             except Exception as exc:
-                logger.error(f"{task_name} 后台任务失败: {exc}", exc_info=True)
+                logger.error(f"{task_name} 后台任务失败: {exc}")
 
         task.add_done_callback(_callback)
 
@@ -460,7 +454,7 @@ class UnifiedMemoryManager:
 
     async def _transfer_blocks_to_short_term(self, blocks: list[MemoryBlock]) -> None:
         """实际转换逻辑在后台执行"""
-        logger.info(f"正在后台处理 {len(blocks)} 个感知记忆块")
+        logger.debug(f"正在后台处理 {len(blocks)} 个感知记忆块")
         for block in blocks:
             try:
                 stm = await self.short_term_manager.add_from_block(block)
@@ -469,9 +463,9 @@ class UnifiedMemoryManager:
 
                 await self.perceptual_manager.remove_block(block.id)
                 self._trigger_transfer_wakeup()
-                logger.info(f"✓ 记忆块 {block.id} 已被转移到短期记忆 {stm.id}")
+                logger.debug(f"✓ 记忆块 {block.id} 已被转移到短期记忆 {stm.id}")
             except Exception as exc:
-                logger.error(f"后台转移失败，记忆块 {block.id}: {exc}", exc_info=True)
+                logger.error(f"后台转移失败，记忆块 {block.id}: {exc}")
 
     def _build_manual_multi_queries(self, queries: list[str]) -> list[dict[str, float]]:
         """去重裁判查询并附加权重以进行多查询搜索"""
@@ -522,9 +516,6 @@ class UnifiedMemoryManager:
         unique_memories = self._deduplicate_memories(memories)
 
         query_count = len(manual_queries) if manual_queries else 1
-        logger.info(
-            f"Long-term retrieval done: {len(unique_memories)} hits (queries fused={query_count})"
-        )
         return unique_memories
 
     def _deduplicate_memories(self, memories: list[Any]) -> list[Any]:
@@ -556,7 +547,7 @@ class UnifiedMemoryManager:
             self._transfer_wakeup_event.clear()
 
         self._auto_transfer_task = asyncio.create_task(self._auto_transfer_loop())
-        logger.info("自动转移任务已启动")
+        logger.debug("自动转移任务已启动")
 
     async def _auto_transfer_loop(self) -> None:
         """自动转移循环（批量缓存模式）"""
@@ -594,7 +585,7 @@ class UnifiedMemoryManager:
                         added += 1
 
                     if added:
-                        logger.info(
+                        logger.debug(
                             f"自动转移缓存: 新增{added}条, 当前缓存{len(transfer_cache)}/{cache_size_threshold}"
                         )
 
@@ -610,7 +601,7 @@ class UnifiedMemoryManager:
                 )
 
                 if should_transfer and transfer_cache:
-                    logger.info(
+                    logger.debug(
                         f"准备批量转移: {len(transfer_cache)}条短期记忆到长期记忆 (占用率 {occupancy_ratio:.0%})"
                     )
 
@@ -629,13 +620,13 @@ class UnifiedMemoryManager:
                         cached_ids.difference_update(transferred_ids)
 
                     last_transfer_time = time.monotonic()
-                    logger.info(f"✅ 批量转移完成: {result}")
+                    logger.debug(f"✅ 批量转移完成: {result}")
 
             except asyncio.CancelledError:
-                logger.info("自动转移循环被取消")
+                logger.debug("自动转移循环被取消")
                 break
             except Exception as e:
-                logger.error(f"自动转移循环异常: {e}", exc_info=True)
+                logger.error(f"自动转移循环异常: {e}")
 
     async def manual_transfer(self) -> dict[str, Any]:
         """
@@ -651,7 +642,6 @@ class UnifiedMemoryManager:
             memories_to_transfer = self.short_term_manager.get_memories_for_transfer()
 
             if not memories_to_transfer:
-                logger.info("没有需要转移的短期记忆")
                 return {"message": "没有需要转移的记忆", "transferred_count": 0}
 
             # 执行转移
@@ -667,7 +657,7 @@ class UnifiedMemoryManager:
             return result
 
         except Exception as e:
-            logger.error(f"手动转移失败: {e}", exc_info=True)
+            logger.error(f"手动转移失败: {e}")
             return {"error": str(e), "transferred_count": 0}
 
     def get_statistics(self) -> dict[str, Any]:
@@ -719,4 +709,4 @@ class UnifiedMemoryManager:
             logger.info("✅ 统一记忆管理器已关闭")
 
         except Exception as e:
-            logger.error(f"关闭统一记忆管理器失败: {e}", exc_info=True)
+            logger.error(f"关闭统一记忆管理器失败: {e}")

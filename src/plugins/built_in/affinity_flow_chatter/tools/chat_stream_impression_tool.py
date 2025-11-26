@@ -131,7 +131,7 @@ class ChatStreamImpressionTool(BaseTool):
             return {"type": "chat_stream_impression_update", "id": stream_id, "content": result_text}
 
         except Exception as e:
-            logger.error(f"聊天流印象更新失败: {e}", exc_info=True)
+            logger.error(f"聊天流印象更新失败: {e}")
             return {
                 "type": "error",
                 "id": function_args.get("stream_id", "unknown"),
@@ -222,7 +222,7 @@ class ChatStreamImpressionTool(BaseTool):
                 raise ValueError(error_msg)
 
         except Exception as e:
-            logger.error(f"更新聊天流印象到数据库失败: {e}", exc_info=True)
+            logger.error(f"更新聊天流印象到数据库失败: {e}")
             raise
 
 

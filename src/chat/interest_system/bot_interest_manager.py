@@ -44,7 +44,7 @@ class BotInterestManager:
     async def initialize(self, personality_description: str, personality_id: str = "default"):
         """初始化兴趣标签系统"""
         try:
-            logger.info("机器人兴趣系统开始初始化...")
+            logger.debug("机器人兴趣系统开始初始化...")
 
             # 初始化embedding模型
             await self._initialize_embedding_model()
@@ -61,8 +61,8 @@ class BotInterestManager:
             # 检查是否成功获取兴趣标签
             if self.current_interests and len(self.current_interests.get_active_tags()) > 0:
                 active_tags_count = len(self.current_interests.get_active_tags())
-                logger.info("机器人兴趣系统初始化完成！")
-                logger.info(f"当前已激活 {active_tags_count} 个兴趣标签, Embedding缓存 {len(self.embedding_cache)} 个")
+                logger.debug("机器人兴趣系统初始化完成！")
+                logger.debug(f"当前已激活 {active_tags_count} 个兴趣标签, Embedding缓存 {len(self.embedding_cache)} 个")
             else:
                 raise RuntimeError("未能成功加载或生成兴趣标签")
 
@@ -83,10 +83,8 @@ class BotInterestManager:
 
         self.embedding_config = model_config.model_task_config.embedding
 
-        if self.embedding_dimension:
-            logger.info(f"📐 配置的embedding维度: {self.embedding_dimension}")
-        else:
-            logger.info("📐 未在配置中检测到embedding维度，将根据首次返回的向量自动识别")
+        if not self.embedding_dimension:
+            logger.debug("未在配置中检测到embedding维度，将根据首次返回的向量自动识别")
 
         # 创建LLMRequest实例用于embedding
         self.embedding_request = LLMRequest(model_set=self.embedding_config, request_type="interest_embedding")
@@ -107,7 +105,7 @@ class BotInterestManager:
             await self._generate_embeddings_for_tags(loaded_interests)
         else:
             # 生成新的兴趣标签
-            logger.info("数据库中未找到兴趣标签，开始生成...")
+            logger.debug("数据库中未找到兴趣标签，开始生成...")
             generated_interests = await self._generate_interests_from_personality(
                 personality_description, personality_id
             )
@@ -115,15 +113,15 @@ class BotInterestManager:
             if generated_interests:
                 self.current_interests = generated_interests
                 active_count = len(generated_interests.get_active_tags())
-                logger.info(f"成功生成 {active_count} 个新兴趣标签。")
+                logger.debug(f"成功生成 {active_count} 个新兴趣标签。")
                 tags_info = [
                     f"  - '{tag.tag_name}' (权重: {tag.weight:.2f})" for tag in generated_interests.get_active_tags()
                 ]
                 tags_str = "\n".join(tags_info)
-                logger.info(f"当前兴趣标签:\n{tags_str}")
+                logger.debug(f"当前兴趣标签:\n{tags_str}")
 
                 # 保存到数据库
-                logger.info("正在保存至数据库...")
+                logger.debug("正在保存至数据库...")
                 await self._save_interests_to_database(generated_interests)
             else:
                 raise RuntimeError("❌ 兴趣标签生成失败")
@@ -133,8 +131,7 @@ class BotInterestManager:
     ) -> BotPersonalityInterests | None:
         """根据人设生成兴趣标签"""
         try:
-            logger.info("🎨 开始根据人设生成兴趣标签...")
-            logger.info(f"📝 人设长度: {len(personality_description)} 字符")
+            logger.debug("开始根据人设生成兴趣标签...")
 
             # 检查embedding客户端是否可用
             if not hasattr(self, "embedding_request"):
@@ -211,7 +208,7 @@ class BotInterestManager:
 
             # 解析生成的兴趣标签
             interests_list = interests_data.get("interests", [])
-            logger.info(f"📋 解析到 {len(interests_list)} 个兴趣标签")
+            logger.debug(f"📋 解析到 {len(interests_list)} 个兴趣标签")
 
             for i, tag_data in enumerate(interests_list):
                 tag_name = tag_data.get("name", f"标签_{i}")
@@ -234,10 +231,10 @@ class BotInterestManager:
                 bot_interests.interest_tags.append(tag)
 
             # 为所有标签生成embedding
-            logger.info("🧠 开始为兴趣标签生成embedding向量...")
+            logger.debug("开始为兴趣标签生成embedding向量...")
             await self._generate_embeddings_for_tags(bot_interests)
 
-            logger.info("✅ 兴趣标签生成完成")
+            logger.debug("兴趣标签生成完成")
             return bot_interests
 
         except Exception as e:
@@ -248,7 +245,7 @@ class BotInterestManager:
     async def _call_llm_for_interest_generation(self, prompt: str) -> str | None:
         """调用LLM生成兴趣标签"""
         try:
-            logger.info("🔧 配置LLM客户端...")
+            logger.debug("配置LLM客户端...")
 
             # 使用llm_api来处理请求
             from src.config.config import model_config

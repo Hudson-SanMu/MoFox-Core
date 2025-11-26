@@ -159,7 +159,7 @@ class MemoryBuilder:
             return memory
 
         except Exception as e:
-            logger.error(f"记忆构建失败: {e}", exc_info=True)
+            logger.error(f"记忆构建失败: {e}")
             raise RuntimeError(f"记忆构建失败: {e}")
 
     async def _create_or_reuse_node(
@@ -551,7 +551,7 @@ class MemoryBuilder:
             return edge
 
         except Exception as e:
-            logger.error(f"记忆关联失败: {e}", exc_info=True)
+            logger.error(f"记忆关联失败: {e}")
             raise RuntimeError(f"记忆关联失败: {e}")
 
     def _find_topic_node(self, memory: Memory) -> MemoryNode | None:

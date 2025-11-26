@@ -127,7 +127,7 @@ class GraphStore:
             logger.debug(f"添加记忆到图: {memory}")
 
         except Exception as e:
-            logger.error(f"添加记忆失败: {e}", exc_info=True)
+            logger.error(f"添加记忆失败: {e}")
             raise
 
     def add_node(
@@ -208,7 +208,7 @@ class GraphStore:
             return True
 
         except Exception as e:
-            logger.error(f"添加节点失败: {e}", exc_info=True)
+            logger.error(f"添加节点失败: {e}")
             return False
 
     def update_node(
@@ -257,7 +257,7 @@ class GraphStore:
             
             return True
         except Exception as e:
-            logger.error(f"更新节点失败: {e}", exc_info=True)
+            logger.error(f"更新节点失败: {e}")
             return False
 
     def add_edge(
@@ -341,7 +341,7 @@ class GraphStore:
             return edge_id
 
         except Exception as e:
-            logger.error(f"添加边失败: {e}", exc_info=True)
+            logger.error(f"添加边失败: {e}")
             return None
 
     def update_edge(
@@ -405,7 +405,7 @@ class GraphStore:
             
             return True
         except Exception as e:
-            logger.error(f"更新边失败: {e}", exc_info=True)
+            logger.error(f"更新边失败: {e}")
             return False
 
     def remove_edge(self, edge_id: str) -> bool:
@@ -455,7 +455,7 @@ class GraphStore:
 
             return True
         except Exception as e:
-            logger.error(f"删除边失败: {e}", exc_info=True)
+            logger.error(f"删除边失败: {e}")
             return False
 
     def merge_memories(self, target_memory_id: str, source_memory_ids: list[str]) -> bool:
@@ -511,7 +511,7 @@ class GraphStore:
             return True
 
         except Exception as e:
-            logger.error(f"合并记忆失败: {e}", exc_info=True)
+            logger.error(f"合并记忆失败: {e}")
             return False
 
     def get_memory_by_id(self, memory_id: str) -> Memory | None:
@@ -697,7 +697,7 @@ class GraphStore:
         except nx.NetworkXNoPath:
             return None
         except Exception as e:
-            logger.error(f"查找路径失败: {e}", exc_info=True)
+            logger.error(f"查找路径失败: {e}")
             return None
 
     def bfs_expand(
@@ -787,7 +787,7 @@ class GraphStore:
             logger.info(f"节点合并: {source_id} → {target_id}")
 
         except Exception as e:
-            logger.error(f"合并节点失败: {e}", exc_info=True)
+            logger.error(f"合并节点失败: {e}")
             raise
 
     def get_node_degree(self, node_id: str) -> tuple[int, int]:
@@ -985,7 +985,7 @@ class GraphStore:
             return True
 
         except Exception as e:
-            logger.error(f"删除记忆失败 {memory_id}: {e}", exc_info=True)
+            logger.error(f"删除记忆失败 {memory_id}: {e}")
             return False
 
     def clear(self) -> None:

@@ -126,7 +126,7 @@ class PathScoreExpansion:
         self._neighbor_cache: dict[str, list[Any]] = {}
         self._node_score_cache: dict[str, float] = {}
 
-        logger.info(
+        logger.debug(
             f"PathScoreExpansion 初始化: max_hops={self.config.max_hops}, "
             f"damping={self.config.damping_factor}, "
             f"merge_strategy={self.config.path_merge_strategy}"
@@ -164,7 +164,7 @@ class PathScoreExpansion:
         # 保存偏好类型
         self.prefer_node_types = prefer_node_types or []
         if self.prefer_node_types:
-            logger.info(f"🎯 偏好节点类型: {self.prefer_node_types}")
+            logger.debug(f"偏好节点类型: {self.prefer_node_types}")
 
         # 1. 初始化路径
         active_paths = []
@@ -175,7 +175,7 @@ class PathScoreExpansion:
             active_paths.append(path)
             best_score_to_node[node_id] = score
 
-        logger.info(f"🚀 路径扩展开始: {len(active_paths)} 条初始路径")
+        logger.debug(f"路径扩展开始: {len(active_paths)} 条初始路径")
 
         # 2. 多跳扩展
         hop_stats = []  # 每跳统计信息
@@ -284,8 +284,8 @@ class PathScoreExpansion:
             if self.config.enable_early_stop and prev_path_count > 0:
                 growth_rate = (len(active_paths) - prev_path_count) / prev_path_count
                 if growth_rate < self.config.early_stop_growth_threshold:
-                    logger.info(
-                        f"⏸️  早停触发: 路径增长率 {growth_rate:.2%} < {self.config.early_stop_growth_threshold:.0%}, "
+                    logger.debug(
+                        f"早停触发: 路径增长率 {growth_rate:.2%} < {self.config.early_stop_growth_threshold:.0%}, "
                         f"在第 {hop+1}/{self.config.max_hops} 跳停止"
                     )
                     hop_time = time.time() - hop_start
@@ -325,16 +325,16 @@ class PathScoreExpansion:
 
             # 早停：如果没有新路径
             if not active_paths:
-                logger.info(f"⏹️  提前停止：第 {hop+1} 跳无新路径")
+                logger.debug(f"提前停止：第 {hop+1} 跳无新路径")
                 break
 
         # 3. 提取叶子路径（最小子路径）
         leaf_paths = self._extract_leaf_paths(active_paths)
-        logger.info(f"📊 提取 {len(leaf_paths)} 条叶子路径")
+        logger.debug(f"提取 {len(leaf_paths)} 条叶子路径")
 
         # 4. 路径到记忆的映射
         memory_paths = await self._map_paths_to_memories(leaf_paths)
-        logger.info(f"🔗 映射到 {len(memory_paths)} 条候选记忆")
+        logger.debug(f"映射到 {len(memory_paths)} 条候选记忆")
 
         # 🚀 4.5. 粗排过滤：在详细评分前过滤掉低质量记忆
         if len(memory_paths) > self.config.max_candidate_memories:
@@ -357,8 +357,8 @@ class PathScoreExpansion:
                 if mem_id in retained_mem_ids
             }
 
-            logger.info(
-                f"⚡ 粗排过滤: {len(memory_scores_rough)} → {len(memory_paths)} 条候选记忆"
+            logger.debug(
+                f"粗排过滤: {len(memory_scores_rough)} → {len(memory_paths)} 条候选记忆"
             )
 
         # 5. 最终评分
@@ -369,8 +369,8 @@ class PathScoreExpansion:
         result = scored_memories[:top_k]
 
         elapsed = time.time() - start_time
-        logger.info(
-            f"✅ 路径扩展完成: {len(initial_nodes)} 个初始节点 → "
+        logger.debug(
+            f"路径扩展完成: {len(initial_nodes)} 个初始节点 → "
             f"{len(result)} 条记忆 (耗时 {elapsed:.3f}s)"
         )
 

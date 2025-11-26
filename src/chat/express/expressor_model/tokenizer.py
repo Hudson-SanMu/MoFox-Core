@@ -24,7 +24,7 @@ class Tokenizer:
                 import rjieba  # noqa: F401
 
                 # rjieba 会自动初始化，无需手动调用
-                logger.info("RJieba分词器初始化成功")
+                logger.debug("RJieba分词器初始化成功")
             except ImportError:
                 logger.warning("RJieba未安装，将使用字符级分词")
                 self.use_jieba = False

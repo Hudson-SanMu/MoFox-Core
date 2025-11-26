@@ -90,7 +90,7 @@ async def _set_cached(section: str, key: str, data: Any) -> None:
         try:
             _save_cache_to_disk_locked()
         except Exception:
-            logger.debug("Write napcat cache failed", exc_info=True)
+            logger.debug("Write napcat cache failed")
 
 
 def _get_adapter(adapter: "NapcatAdapter | None" = None) -> "NapcatAdapter":

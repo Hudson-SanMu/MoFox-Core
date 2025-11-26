@@ -132,7 +132,7 @@ async def rebuild_metadata_index():
         print("\n✅ 元数据索引重建完成！")
 
     except Exception as e:
-        logger.error(f"重建索引失败: {e}", exc_info=True)
+        logger.error(f"重建索引失败: {e}")
         print(f"❌ 重建索引失败: {e}")
 
 

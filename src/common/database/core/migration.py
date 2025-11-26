@@ -69,7 +69,7 @@ async def check_and_migrate_database(existing_engine=None):
                 # 提交表创建事务
                 await connection.commit()
             except Exception as e:
-                logger.error(f"创建表时失败: {e}", exc_info=True)
+                logger.error(f"创建表时失败: {e}")
                 await connection.rollback()
 
         # 2. 然后处理现有表的列和索引的添加
@@ -182,7 +182,7 @@ async def check_and_migrate_database(existing_engine=None):
                     logger.debug(f"表 '{table_name}' 的索引一致。")
 
             except Exception as e:
-                logger.error(f"在处理表 '{table_name}' 时发生意外错误: {e}", exc_info=True)
+                logger.error(f"在处理表 '{table_name}' 时发生意外错误: {e}")
                 await connection.rollback()
                 continue
 

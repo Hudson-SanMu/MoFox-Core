@@ -41,7 +41,7 @@ class TTSService:
             else:
                 logger.warning("TTS风格配置为空，请检查配置文件")
         except Exception as e:
-            logger.error(f"TTS服务配置加载失败: {e}", exc_info=True)
+            logger.error(f"TTS服务配置加载失败: {e}")
 
     def _load_tts_styles(self) -> dict[str, dict[str, Any]]:
         """加载 TTS 风格配置"""
@@ -176,7 +176,7 @@ class TTSService:
                             else:
                                 logger.info(f"成功切换 {weight_type} 模型为: {weights_path}")
                 except Exception as e:
-                    logger.error(f"请求切换 {weight_type} 模型时发生网络异常: {e}", exc_info=True)
+                    logger.error(f"请求切换 {weight_type} 模型时发生网络异常: {e}")
 
             await switch_model_weights(kwargs.get("gpt_weights"), "gpt")
             await switch_model_weights(kwargs.get("sovits_weights"), "sovits")
@@ -218,7 +218,7 @@ class TTSService:
             logger.error("TTS服务请求超时")
             return None
         except Exception as e:
-            logger.error(f"TTS API调用异常: {e}", exc_info=True)
+            logger.error(f"TTS API调用异常: {e}")
             return None
 
     async def _apply_spatial_audio_effect(self, audio_data: bytes) -> bytes | None:
@@ -278,7 +278,7 @@ class TTSService:
             return processed_audio_data
 
         except Exception as e:
-            logger.error(f"应用空间效果时出错: {e}", exc_info=True)
+            logger.error(f"应用空间效果时出错: {e}")
             return audio_data  # 如果出错，返回原始音频
 
     async def generate_voice(self, text: str, style_hint: str = "default", language_hint: str | None = None) -> str | None:

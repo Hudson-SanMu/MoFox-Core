@@ -328,5 +328,5 @@ class EmojiAction(BaseAction):
             return True, f"发送表情包: {emoji_description}"
 
         except Exception as e:
-            logger.error(f"{self.log_prefix} 表情动作执行失败: {e}", exc_info=True)
+            logger.error(f"{self.log_prefix} 表情动作执行失败: {e}")
             return False, f"表情发送失败: {e!s}"

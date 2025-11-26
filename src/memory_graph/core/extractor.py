@@ -83,7 +83,7 @@ class MemoryExtractor:
             return extracted
 
         except Exception as e:
-            logger.error(f"记忆提取失败: {e}", exc_info=True)
+            logger.error(f"记忆提取失败: {e}")
             raise ValueError(f"记忆提取失败: {e}")
 
     def _validate_required_params(self, params: dict[str, Any]) -> None:
@@ -260,7 +260,7 @@ class MemoryExtractor:
             return extracted
 
         except Exception as e:
-            logger.error(f"关联参数提取失败: {e}", exc_info=True)
+            logger.error(f"关联参数提取失败: {e}")
             raise ValueError(f"关联参数提取失败: {e}")
 
     def validate_relation_type(self, relation_type: str) -> str:

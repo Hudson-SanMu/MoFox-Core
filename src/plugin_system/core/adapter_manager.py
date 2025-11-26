@@ -28,8 +28,32 @@ logger = get_logger("adapter_manager")
 
 
 def _load_class(module_name: str, class_name: str):
+    """
+    从模块加载类。
+
+    有时插件加载器会将适配器类注册到包名下（例如 ``src.plugins.built_in.napcat_adapter``），
+    而实际的类定义在 ``plugin.py`` 中。当子进程仅导入包时，该属性缺失会引发 AttributeError。
+    该辅助函数现在回退到 ``<module>.plugin`` 以支持这种布局。
+    """
     module = importlib.import_module(module_name)
-    return getattr(module, class_name)
+    if hasattr(module, class_name):
+        return getattr(module, class_name)
+
+    # Fallback for packages that keep implementations in plugin.py
+    try:
+        plugin_module = importlib.import_module(f"{module_name}.plugin")
+        if hasattr(plugin_module, class_name):
+            return getattr(plugin_module, class_name)
+    except ModuleNotFoundError:
+        pass
+    except Exception:
+        logger.error(
+            f"Failed to load class {class_name} from fallback module {module_name}.plugin",
+            exc_info=True,
+        )
+
+    # If we reach here, the class is truly missing
+    raise AttributeError(f"module '{module_name}' has no attribute '{class_name}'")
 
 
 def _adapter_process_entry(
@@ -127,7 +151,7 @@ class AdapterProcess:
             return True
             
         except Exception as e:
-            logger.error(f"启动适配器子进程 {self.adapter_name} 失败: {e}", exc_info=True)
+            logger.error(f"启动适配器子进程 {self.adapter_name} 失败: {e}")
             return False
 
     async def stop(self) -> None:
@@ -154,7 +178,7 @@ class AdapterProcess:
                 self.process.join()
                 
         except Exception as e:
-            logger.error(f"停止适配器子进程 {self.adapter_name} 时发生错误: {e}", exc_info=True)
+            logger.error(f"停止适配器子进程 {self.adapter_name} 时发生错误: {e}")
         finally:
             self.process = None
             self._incoming_queue = None
@@ -258,7 +282,7 @@ class AdapterManager:
             return True
             
         except Exception as e:
-            logger.error(f"启动适配器 {adapter_name} 失败: {e}", exc_info=True)
+            logger.error(f"启动适配器 {adapter_name} 失败: {e}")
             return False
 
     async def stop_adapter(self, adapter_name: str) -> None:
@@ -280,7 +304,7 @@ class AdapterManager:
                 await adapter.stop()
                 logger.info(f"适配器 {adapter_name} 已从主进程中停止")
             except Exception as e:
-                logger.error(f"停止适配器 {adapter_name} 时出错: {e}", exc_info=True)
+                logger.error(f"停止适配器 {adapter_name} 时出错: {e}")
 
     async def start_all_adapters(self) -> None:
         """启动所有已注册的适配器"""

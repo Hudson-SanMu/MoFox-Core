@@ -179,7 +179,7 @@ class PluginManager:
             error_msg = f"未知错误: {e!s}"
             self.failed_plugins[plugin_name] = error_msg
             logger.error(f"❌ 插件加载失败: {plugin_name} - {error_msg}")
-            logger.debug("详细错误信息: ", exc_info=True)
+            logger.debug("详细错误信息: ")
             return False, 1
 
     async def _register_adapter_components(self, plugin_name: str, plugin_instance: PluginBase) -> None:
@@ -238,7 +238,7 @@ class PluginManager:
                     )
         
         except Exception as e:
-            logger.error(f"处理插件 '{plugin_name}' 的适配器组件时出错: {e}", exc_info=True)
+            logger.error(f"处理插件 '{plugin_name}' 的适配器组件时出错: {e}")
 
     async def remove_registered_plugin(self, plugin_name: str) -> bool:
         """
@@ -682,7 +682,7 @@ class PluginManager:
                     asyncio.run(component_registry.unregister_plugin(plugin_name))
             except Exception as e:  # 捕获并记录卸载阶段协程调用错误
                 logger.debug(
-                    f"卸载插件时调用 component_registry.unregister_plugin 失败: {e}", exc_info=True
+                    f"卸载插件时调用 component_registry.unregister_plugin 失败: {e}"
                 )
 
             # 从已加载插件中移除
@@ -700,7 +700,7 @@ class PluginManager:
             return True
 
         except Exception as e:
-            logger.error(f"❌ 插件卸载失败: {plugin_name} - {e!s}", exc_info=True)
+            logger.error(f"❌ 插件卸载失败: {plugin_name} - {e!s}")
             return False
 
 

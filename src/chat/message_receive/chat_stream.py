@@ -198,7 +198,7 @@ class ChatStream:
                 raise RuntimeError("没有可用的兴趣值计算组件")
 
         except Exception as e:
-            logger.error(f"计算消息兴趣值失败: {e}", exc_info=True)
+            logger.error(f"计算消息兴趣值失败: {e}")
             # 异常情况下使用默认值
             if hasattr(db_message, "interest_value"):
                 db_message.interest_value = 0.3
@@ -259,7 +259,7 @@ class ChatStream:
             return energy
 
         except Exception as e:
-            logger.error(f"获取focus_energy失败: {e}", exc_info=True)
+            logger.error(f"获取focus_energy失败: {e}")
             # 返回缓存的值或默认值
             if hasattr(self, "_focus_energy"):
                 return self._focus_energy
@@ -325,7 +325,7 @@ class ChatManager:
         """异步初始化"""
         try:
             await self.load_all_streams()
-            logger.info(f"聊天管理器已启动，已加载 {len(self.streams)} 个聊天流")
+            logger.debug(f"聊天管理器已启动，已加载 {len(self.streams)} 个聊天流")
         except Exception as e:
             logger.error(f"聊天管理器启动失败: {e!s}")
 
@@ -335,7 +335,7 @@ class ChatManager:
             await asyncio.sleep(300)  # 每5分钟保存一次
             try:
                 await self._save_all_streams()
-                logger.info("聊天流自动保存完成")
+                logger.debug("聊天流自动保存完成")
             except Exception as e:
                 logger.error(f"聊天流自动保存失败: {e!s}")
 
@@ -461,7 +461,7 @@ class ChatManager:
                         group_info=group_info,
                     )
         except Exception as e:
-            logger.error(f"获取或创建聊天流失败: {e}", exc_info=True)
+            logger.error(f"获取或创建聊天流失败: {e}")
             raise e
 
         if stream_id in self.last_messages and isinstance(self.last_messages[stream_id], DatabaseMessages):
@@ -645,7 +645,7 @@ class ChatManager:
 
     async def load_all_streams(self):
         """从数据库加载所有聊天流"""
-        logger.info("正在从数据库加载所有聊天流")
+        logger.debug("正在从数据库加载所有聊天流")
 
         async def _db_load_all_streams_async():
             loaded_streams_data = []
@@ -703,7 +703,7 @@ class ChatManager:
                 #     await stream.set_context(self.last_messages[stream.stream_id])
 
         except Exception as e:
-            logger.error(f"从数据库加载所有聊天流失败 (SQLAlchemy): {e}", exc_info=True)
+            logger.error(f"从数据库加载所有聊天流失败 (SQLAlchemy): {e}")
 
 
 chat_manager = None

@@ -249,7 +249,7 @@ class ShutdownManager:
             return success
 
         except Exception as e:
-            logger.error(f"麦麦关闭失败: {e}", exc_info=True)
+            logger.error(f"麦麦关闭失败: {e}")
             return False
 
 

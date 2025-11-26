@@ -126,7 +126,7 @@ class URLParserTool(BaseTool):
             logger.warning(f"本地解析URL '{url}' 失败 (HTTP {e.response.status_code})")
             return {"error": f"请求失败，状态码: {e.response.status_code}"}
         except Exception as e:
-            logger.error(f"本地解析或总结URL '{url}' 时发生未知异常: {e}", exc_info=True)
+            logger.error(f"本地解析或总结URL '{url}' 时发生未知异常: {e}")
             return {"error": f"发生未知错误: {e!s}"}
 
     async def execute(self, function_args: dict[str, Any]) -> dict[str, Any]:
@@ -183,7 +183,7 @@ class URLParserTool(BaseTool):
                     func = functools.partial(exa_client.get_contents, urls, **exa_params)
                     contents_response = await loop.run_in_executor(None, func)
             except Exception as e:
-                logger.error(f"执行 Exa URL解析时发生严重异常: {e}", exc_info=True)
+                logger.error(f"执行 Exa URL解析时发生严重异常: {e}")
                 contents_response = None  # 确保异常后为None
 
         # 步骤 2: 处理Exa的响应

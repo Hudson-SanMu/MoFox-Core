@@ -143,7 +143,7 @@ class WebSurfingTool(BaseTool):
             }
 
         except Exception as e:
-            logger.error(f"执行并行网络搜索时发生异常: {e}", exc_info=True)
+            logger.error(f"执行并行网络搜索时发生异常: {e}")
             return {"error": f"执行网络搜索时发生严重错误: {e!s}"}
 
     async def _execute_fallback_search(

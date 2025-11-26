@@ -130,7 +130,7 @@ class MessageStorageBatcher:
             )
 
         except Exception as e:
-            logger.error(f"批量存储消息失败: {e}", exc_info=True)
+            logger.error(f"批量存储消息失败: {e}")
 
     async def _prepare_message_dict(self, message, chat_stream):
         """准备消息字典数据（用于批量INSERT）
@@ -534,7 +534,7 @@ class MessageStorage:
                     else:
                         logger.warning(f"无法为描述 '{description[:20]}...' 找到对应的picid，将保留原始标记")
             except Exception as e:
-                logger.error(f"替换图片描述时查询数据库失败: {e}", exc_info=True)
+                logger.error(f"替换图片描述时查询数据库失败: {e}")
 
             new_text.append(replacement)
             last_end = match.end()

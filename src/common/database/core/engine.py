@@ -130,7 +130,7 @@ async def get_engine() -> AsyncEngine:
             return _engine
 
         except Exception as e:
-            logger.error(f"❌ 数据库引擎初始化失败: {e}", exc_info=True)
+            logger.error(f"❌ 数据库引擎初始化失败: {e}")
             raise DatabaseInitializationError(f"引擎初始化失败: {e}") from e
 
 

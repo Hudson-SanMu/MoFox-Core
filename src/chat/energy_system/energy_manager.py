@@ -274,7 +274,7 @@ class EnergyManager:
                 self.thresholds["reply"] = max(self.thresholds["reply"], self.thresholds["non_reply"] + 0.1)
 
                 self.stats["last_threshold_update"] = time.time()
-                logger.info(f"加载AFC阈值: {self.thresholds}")
+
         except Exception as e:
             logger.warning(f"加载AFC阈值失败，使用默认值: {e}")
 
@@ -468,23 +468,22 @@ class EnergyManager:
         self.thresholds["reply"] = max(self.thresholds["reply"], self.thresholds["non_reply"] + 0.1)
 
         self.stats["last_threshold_update"] = time.time()
-        logger.info(f"更新AFC阈值: {self.thresholds}")
 
     def add_calculator(self, calculator: EnergyCalculator) -> None:
         """添加计算器"""
         self.calculators.append(calculator)
-        logger.info(f"添加能量计算器: {calculator.__class__.__name__}")
+        logger.debug(f"添加能量计算器: {calculator.__class__.__name__}")
 
     def remove_calculator(self, calculator: EnergyCalculator) -> None:
         """移除计算器"""
         if calculator in self.calculators:
             self.calculators.remove(calculator)
-            logger.info(f"移除能量计算器: {calculator.__class__.__name__}")
+            logger.debug(f"移除能量计算器: {calculator.__class__.__name__}")
 
     def clear_cache(self) -> None:
         """清空缓存"""
         self.energy_cache.clear()
-        logger.info("清空能量缓存")
+        logger.debug("清空能量缓存")
 
     def get_cache_hit_rate(self) -> float:
         """获取缓存命中率"""

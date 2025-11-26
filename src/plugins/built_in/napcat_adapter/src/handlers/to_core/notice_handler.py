@@ -9,7 +9,7 @@ from src.common.logger import get_logger
 if TYPE_CHECKING:
     from ...plugin import NapcatAdapter
 
-logger = get_logger("napcat_adapter.notice_handler")
+logger = get_logger("napcat_adapter")
 
 
 class NoticeHandler:

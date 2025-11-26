@@ -68,7 +68,7 @@ class MetasoClient:
                 logger.error(f"HTTP error occurred while searching with Metaso Chat: {e.response.text}")
                 return []
             except Exception as e:
-                logger.error(f"An error occurred while searching with Metaso Chat: {e}", exc_info=True)
+                logger.error(f"An error occurred while searching with Metaso Chat: {e}")
                 return []
 
 
@@ -103,5 +103,5 @@ class MetasoSearchEngine(BaseSearchEngine):
 
             return await metaso_client.search(query)
         except Exception as e:
-            logger.error(f"Metaso search failed: {e}", exc_info=True)
+            logger.error(f"Metaso search failed: {e}")
             return []

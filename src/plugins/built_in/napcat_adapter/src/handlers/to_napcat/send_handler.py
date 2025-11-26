@@ -13,7 +13,7 @@ from src.plugin_system.apis import config_api
 from ...event_models import CommandType
 from ..utils import convert_image_to_gif, get_image_format
 
-logger = get_logger("napcat_adapter.send_handler")
+logger = get_logger("napcat_adapter")
 
 if TYPE_CHECKING:
     from ....plugin import NapcatAdapter
@@ -59,7 +59,6 @@ class SendHandler:
                 logger.info("收到adapter_response消息，此消息应该由Bot端处理，跳过")
                 return None
 
-        logger.info("处理普通消息")
         return await self.send_normal_message(envelope)
 
     async def send_normal_message(self, envelope: MessageEnvelope) -> None:
@@ -104,7 +103,6 @@ class SendHandler:
         else:
             logger.error("无法识别的消息类型")
             return
-        logger.info("尝试发送到napcat")
         logger.debug(
             f"准备发送到napcat的消息体: action='{action}', {id_name}='{target_id}', message='{processed_message}'"
         )
@@ -124,7 +122,7 @@ class SendHandler:
         """
         处理命令类
         """
-        logger.info("处理命令中")
+        logger.debug("处理命令中")
         message_info: Dict[str, Any] = envelope.get("message_info", {})
         group_info: Optional[Dict[str, Any]] = message_info.get("group_info")
         segment: SegPayload = envelope.get("message_segment", {})  # type: ignore[assignment]
@@ -164,9 +162,9 @@ class SendHandler:
             logger.error("命令或参数缺失")
             return None
 
-        logger.info(f"准备向 Napcat 发送命令: command='{command}', args_dict='{args_dict}'")
+        logger.debug(f"准备向 Napcat 发送命令: command='{command}', args_dict='{args_dict}'")
         response = await self.send_message_to_napcat(command, args_dict)
-        logger.info(f"收到 Napcat 的命令响应: {response}")
+        logger.debug(f"收到 Napcat 的命令响应: {response}")
 
         if response.get("status") == "ok":
             logger.info(f"命令 {command_name} 执行成功")
@@ -191,7 +189,7 @@ class SendHandler:
                 logger.error("适配器命令缺少action参数")
                 return
 
-            logger.info(f"执行适配器命令: {action}")
+            logger.debug(f"执行适配器命令: {action}")
 
             if action == "get_cookies":
                 response = await self.send_message_to_napcat(action, params, timeout=40.0)
@@ -241,7 +239,6 @@ class SendHandler:
             target_id = str(target_id)
             if target_id == "notice":
                 return payload
-            logger.info(target_id if isinstance(target_id, str) else "")
             new_payload = self.build_payload(payload, await self.handle_reply_message(target_id, user_info), True)
         elif seg_type == "text":
             text = seg.get("data")
@@ -324,22 +321,22 @@ class SendHandler:
 
             if not replied_user_id:
                 logger.warning(f"无法获取消息 {message_id} 的发送者信息，跳过 @")
-                logger.info(f"最终返回的回复段: {reply_seg}")
+                logger.debug(f"最终返回的回复段: {reply_seg}")
                 return reply_seg
 
             if random.random() < config_api.get_plugin_config(self.plugin_config, "features.reply_at_rate", 0.5):
                 at_seg = {"type": "at", "data": {"qq": str(replied_user_id)}}
                 text_seg = {"type": "text", "data": {"text": " "}}
                 result_seg = [reply_seg, at_seg, text_seg]
-                logger.info(f"最终返回的回复段: {result_seg}")
+                logger.debug(f"最终返回的回复段: {result_seg}")
                 return result_seg
 
         except Exception as e:
             logger.error(f"处理引用回复并尝试@时出错: {e}")
-            logger.info(f"最终返回的回复段: {reply_seg}")
+            logger.debug(f"最终返回的回复段: {reply_seg}")
             return reply_seg
 
-        logger.info(f"最终返回的回复段: {reply_seg}")
+        logger.debug(f"最终返回的回复段: {reply_seg}")
         return reply_seg
 
     def handle_text_message(self, message: str) -> dict:

@@ -38,7 +38,7 @@ class ExpressorModel:
         self._candidates: dict[str, str] = {}  # cid -> text (style)
         self._situations: dict[str, str] = {}  # cid -> situation (不参与计算)
 
-        logger.info(
+        logger.debug(
             f"ExpressorModel初始化完成 (alpha={alpha}, beta={beta}, gamma={gamma}, vocab_size={vocab_size}, use_jieba={use_jieba})"
         )
 
@@ -199,8 +199,6 @@ class ExpressorModel:
         with open(path, "wb") as f:
             pickle.dump(data, f)
 
-        logger.info(f"模型已保存到 {path}")
-
     def load(self, path: str):
         """
         从文件加载模型
@@ -230,7 +228,7 @@ class ExpressorModel:
         for cid, tc in data["nb_token_counts"].items():
             self.nb.token_counts[cid] = defaultdict(float, tc)
 
-        logger.info(f"模型已从 {path} 加载")
+        logger.debug(f"模型已从 {path} 加载")
 
     def get_stats(self) -> dict:
         """获取模型统计信息"""

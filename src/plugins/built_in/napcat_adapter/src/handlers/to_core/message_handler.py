@@ -25,7 +25,7 @@ from ..utils import *
 if TYPE_CHECKING:
     from ....plugin import NapcatAdapter
 
-logger = get_logger("napcat_adapter.message_handler")
+logger = get_logger("napcat_adapter")
 
 
 class MessageHandler:
@@ -234,27 +234,29 @@ class MessageHandler:
             return {"type": "text", "data": "[无法获取被引用的消息]"}
 
         # 递归处理被引用的消息
-        reply_segments = []
+        reply_segments: List[SegPayload] = []
         for reply_seg in message_detail.get("message", []):
             if isinstance(reply_seg, dict):
                 reply_result = await self.handle_single_segment(reply_seg, raw_message, in_reply=True)
                 if reply_result:
                     reply_segments.append(reply_result)
 
-        if not reply_segments:
-            reply_text = "[无法获取被引用的消息]"
-        else:
-            # 简化处理，只取第一个segment的data
-            reply_text = reply_segments[0].get("data", "") if reply_segments else ""
-
         sender_info = message_detail.get("sender", {})
-        sender_nickname = sender_info.get("nickname", "未知用户")
+        sender_nickname = sender_info.get("nickname") or "未知用户"
         sender_id = sender_info.get("user_id")
 
-        if sender_id:
-            return {"type": "text", "data": f"[回复<{sender_nickname}({sender_id})>：{reply_text}]，说："}
-        else:
-            return {"type": "text", "data": f"[回复<{sender_nickname}>：{reply_text}]，说："}
+        prefix_text = f"[回复<{sender_nickname}({sender_id})>：" if sender_id else f"[回复<{sender_nickname}>："
+        suffix_text = "]，说："
+
+        # 将被引用的消息段落转换为可读的文本占位，避免嵌套的 base64 污染
+        brief_segments = [
+            {"type": seg.get("type", "text"), "data": seg.get("data", "")} for seg in reply_segments
+        ] or [{"type": "text", "data": "[无法获取被引用的消息]"}]
+
+        return {
+            "type": "seglist",
+            "data": [{"type": "text", "data": prefix_text}, *brief_segments, {"type": "text", "data": suffix_text}],
+        }
 
     async def _handle_record_message(self, segment: dict) -> SegPayload | None:
         """处理语音消息"""

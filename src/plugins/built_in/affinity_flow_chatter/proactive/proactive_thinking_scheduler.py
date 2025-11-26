@@ -216,7 +216,7 @@ class ProactiveThinkingScheduler:
                 return 0.5
 
         except Exception as e:
-            logger.error(f"[调度器] ❌ 获取聊天流 {stream_id} 的 focus_energy 失败: {e}", exc_info=True)
+            logger.error(f"[调度器] ❌ 获取聊天流 {stream_id} 的 focus_energy 失败: {e}")
             return 0.5
 
     async def schedule_proactive_thinking(self, stream_id: str) -> bool:
@@ -280,7 +280,7 @@ class ProactiveThinkingScheduler:
                 return True
 
         except Exception as e:
-            logger.error(f"❌ 创建主动思考任务失败 {stream_id}: {e}", exc_info=True)
+            logger.error(f"❌ 创建主动思考任务失败 {stream_id}: {e}")
             return False
 
     async def pause_proactive_thinking(self, stream_id: str, reason: str = "抛出话题") -> bool:
@@ -340,7 +340,7 @@ class ProactiveThinkingScheduler:
                 return success
 
         except Exception as e:
-            logger.error(f"❌ 恢复主动思考失败 {stream_id}: {e}", exc_info=True)
+            logger.error(f"❌ 恢复主动思考失败 {stream_id}: {e}")
             return False
 
     async def cancel_proactive_thinking(self, stream_id: str) -> bool:
@@ -366,7 +366,7 @@ class ProactiveThinkingScheduler:
                 return success
 
         except Exception as e:
-            logger.error(f"❌ 取消主动思考失败 {stream_id}: {e}", exc_info=True)
+            logger.error(f"❌ 取消主动思考失败 {stream_id}: {e}")
             return False
 
     async def is_paused(self, stream_id: str) -> bool:

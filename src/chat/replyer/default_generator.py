@@ -636,7 +636,7 @@ class DefaultReplyer:
             return ""
 
         except Exception as e:
-            logger.error(f"[三层记忆] 检索失败: {e}", exc_info=True)
+            logger.error(f"[三层记忆] 检索失败: {e}")
             return ""
 
     def _build_memory_query_text(
@@ -819,7 +819,7 @@ class DefaultReplyer:
                     pass
 
         except Exception as e:
-            logger.error(f"关键词检测与反应时发生异常: {e!s}", exc_info=True)
+            logger.error(f"关键词检测与反应时发生异常: {e!s}")
 
         return reaction_prompt
 
@@ -868,7 +868,7 @@ class DefaultReplyer:
                 return ""
 
         except Exception as e:
-            logger.error(f"构建notice块失败，chat_id={chat_id}: {e}", exc_info=True)
+            logger.error(f"构建notice块失败，chat_id={chat_id}: {e}")
             return ""
 
     async def _time_and_run_task(self, coroutine, name: str) -> tuple[str, Any, float]:

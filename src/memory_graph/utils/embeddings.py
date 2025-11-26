@@ -101,7 +101,7 @@ class EmbeddingGenerator:
             return None
 
         except Exception as e:
-            logger.error(f"❌ 嵌入生成异常: {e}", exc_info=True)
+            logger.error(f"❌ 嵌入生成异常: {e}")
             return None
 
     async def _generate_with_api(self, text: str) -> np.ndarray | None:
@@ -171,7 +171,7 @@ class EmbeddingGenerator:
             return results
 
         except Exception as e:
-            logger.error(f"批量生成嵌入失败: {e}", exc_info=True)
+            logger.error(f"批量生成嵌入失败: {e}")
             return [None for _ in texts]
 
     async def _generate_batch_with_api(self, texts: list[str]) -> list[np.ndarray | None] | None:

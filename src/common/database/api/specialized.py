@@ -104,7 +104,7 @@ async def store_action_info(
             return None
 
     except Exception as e:
-        logger.error(f"存储动作信息时发生错误: {e}", exc_info=True)
+        logger.error(f"存储动作信息时发生错误: {e}")
         return None
 
 
@@ -246,7 +246,7 @@ async def update_person_affinity(
         return True
 
     except Exception as e:
-        logger.error(f"更新好感度失败: {e}", exc_info=True)
+        logger.error(f"更新好感度失败: {e}")
         return False
 
 
@@ -480,5 +480,5 @@ async def update_relationship_affinity(
         return True
 
     except Exception as e:
-        logger.error(f"更新关系好感度失败: {e}", exc_info=True)
+        logger.error(f"更新关系好感度失败: {e}")
         return False

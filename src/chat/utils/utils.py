@@ -839,7 +839,7 @@ async def get_chat_type_and_target_info(chat_id: str) -> tuple[bool, dict | None
         else:
             logger.warning(f"无法获取 chat_stream for {chat_id} in utils")
     except Exception as e:
-        logger.error(f"获取聊天类型和目标信息时出错 for {chat_id}: {e}", exc_info=True)
+        logger.error(f"获取聊天类型和目标信息时出错 for {chat_id}: {e}")
         # Keep defaults on error
 
     return is_group_chat, chat_target_info

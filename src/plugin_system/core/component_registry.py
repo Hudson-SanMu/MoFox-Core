@@ -428,7 +428,7 @@ class ComponentRegistry:
             return True
 
         except Exception as e:
-            logger.error(f"注册路由组件 '{router_info.name}' 时出错: {e}", exc_info=True)
+            logger.error(f"注册路由组件 '{router_info.name}' 时出错: {e}")
             return False
 
     def _register_adapter_component(self, adapter_info: AdapterInfo, adapter_class: type[BaseAdapter]) -> bool:

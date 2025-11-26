@@ -118,7 +118,7 @@ class MainSystem:
     async def _initialize_interest_calculator(self) -> None:
         """初始化兴趣值计算组件 - 通过插件系统自动发现和加载"""
         try:
-            logger.info("开始自动发现兴趣值计算组件...")
+            logger.debug("开始自动发现兴趣值计算组件...")
 
             # 使用组件注册表自动发现兴趣计算器组件
             interest_calculators = {}
@@ -127,7 +127,7 @@ class MainSystem:
                 from src.plugin_system.base.component_types import ComponentType
 
                 interest_calculators = get_components_info_by_type(ComponentType.INTEREST_CALCULATOR)
-                logger.info(f"通过组件注册表发现 {len(interest_calculators)} 个兴趣计算器组件")
+                logger.debug(f"通过组件注册表发现 {len(interest_calculators)} 个兴趣计算器组件")
             except Exception as e:
                 logger.error(f"从组件注册表获取兴趣计算器失败: {e}")
 
@@ -187,7 +187,7 @@ class MainSystem:
                         logger.error(f"兴趣计算器 {calc_name} 注册失败")
 
                 except Exception as e:
-                    logger.error(f"处理兴趣计算器 {calc_name} 时出错: {e}", exc_info=True)
+                    logger.error(f"处理兴趣计算器 {calc_name} 时出错: {e}")
 
             if registered_calculators:
                 logger.info(f"成功注册了 {len(registered_calculators)} 个兴趣计算器")
@@ -197,7 +197,7 @@ class MainSystem:
                 logger.error("未能成功注册任何兴趣计算器")
 
         except Exception as e:
-            logger.error(f"初始化兴趣度计算器失败: {e}", exc_info=True)
+            logger.error(f"初始化兴趣度计算器失败: {e}")
 
     async def _async_cleanup(self) -> None:
         """异步清理资源"""
@@ -490,7 +490,7 @@ MoFox_Bot(第三方修改版)
             else:
                 logger.debug("三层记忆系统未启用（配置中禁用）")
         except Exception as e:
-            logger.error(f"三层记忆系统初始化失败: {e}", exc_info=True)
+            logger.error(f"三层记忆系统初始化失败: {e}")
 
         # 初始化消息兴趣值计算组件
         await self._initialize_interest_calculator()
@@ -561,7 +561,7 @@ MoFox_Bot(第三方修改版)
             await adapter_manager.start_all_adapters()
             logger.info("所有适配器已启动")
         except Exception as e:
-            logger.error(f"启动适配器失败: {e}", exc_info=True)
+            logger.error(f"启动适配器失败: {e}")
 
     async def _init_planning_components(self) -> None:
         """初始化计划相关组件"""

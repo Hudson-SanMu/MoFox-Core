@@ -92,7 +92,7 @@ class PluginStorage:
                 os.makedirs(directory)
                 logger.info(f"目录 '{directory}' 创建成功。")
         except Exception as e:
-            logger.error(f"创建存储目录时发生错误: {e}", exc_info=True)
+            logger.error(f"创建存储目录时发生错误: {e}")
             raise
 
     def _load_data(self) -> None:
@@ -130,7 +130,7 @@ class PluginStorage:
                 self._dirty = False  # 保存后重置标志
                 logger.debug(f"插件 '{self.name}' 的数据已成功保存到磁盘。")
             except Exception as e:
-                logger.error(f"向 '{self.file_path}' 保存数据时发生错误: {e}", exc_info=True)
+                logger.error(f"向 '{self.file_path}' 保存数据时发生错误: {e}")
                 raise
 
     def get(self, key: str, default: Any | None = None) -> Any:
@@ -203,5 +203,5 @@ def get_local_storage(name: str) -> "PluginStorage":
         storage_instance = PluginStorageManager.get_storage(name)
         return storage_instance
     except Exception as e:
-        logger.critical(f"为插件 '{name}' 提供本地存储实例时发生严重错误: {e}", exc_info=True)
+        logger.critical(f"为插件 '{name}' 提供本地存储实例时发生严重错误: {e}")
         raise

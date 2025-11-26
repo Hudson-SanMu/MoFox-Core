@@ -219,7 +219,7 @@ class DataPreloader:
                         logger.debug(f"发现关联数据: {related_key}")
 
         except Exception as e:
-            logger.error(f"预加载数据失败 {key}: {e}", exc_info=True)
+            logger.error(f"预加载数据失败 {key}: {e}")
 
     async def start_preload_batch(
         self,

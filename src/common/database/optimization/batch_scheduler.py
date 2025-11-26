@@ -218,7 +218,7 @@ class AdaptiveBatchScheduler:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"调度器循环异常: {e}", exc_info=True)
+                logger.error(f"调度器循环异常: {e}")
 
     async def _flush_all_queues(self) -> None:
         """刷新所有队列"""
@@ -292,7 +292,7 @@ class AdaptiveBatchScheduler:
             )
 
         except Exception as e:
-            logger.error(f"批量操作执行失败: {e}", exc_info=True)
+            logger.error(f"批量操作执行失败: {e}")
             self.stats.error_count += 1
 
             # 设置所有future的异常
@@ -320,7 +320,7 @@ class AdaptiveBatchScheduler:
                 raise ValueError(f"未知操作类型: {op_type}")
 
         except Exception as e:
-            logger.error(f"执行{op_type}操作组失败: {e}", exc_info=True)
+            logger.error(f"执行{op_type}操作组失败: {e}")
             for op in operations:
                 if op.future and not op.future.done():
                     op.future.set_exception(e)
@@ -362,7 +362,7 @@ class AdaptiveBatchScheduler:
                             logger.warning(f"回调执行失败: {e}")
 
                 except Exception as e:
-                    logger.error(f"查询失败: {e}", exc_info=True)
+                    logger.error(f"查询失败: {e}")
                     if op.future and not op.future.done():
                         op.future.set_exception(e)
 
@@ -395,7 +395,7 @@ class AdaptiveBatchScheduler:
                             logger.warning(f"回调执行失败: {e}")
 
             except Exception as e:
-                logger.error(f"批量插入失败: {e}", exc_info=True)
+                logger.error(f"批量插入失败: {e}")
                 await session.rollback()
                 for op in operations:
                     if op.future and not op.future.done():
@@ -439,7 +439,7 @@ class AdaptiveBatchScheduler:
                             logger.warning(f"回调执行失败: {e}")
 
             except Exception as e:
-                logger.error(f"批量更新失败: {e}", exc_info=True)
+                logger.error(f"批量更新失败: {e}")
                 await session.rollback()
                 # 所有操作都失败
                 for op in operations:
@@ -481,7 +481,7 @@ class AdaptiveBatchScheduler:
                             logger.warning(f"回调执行失败: {e}")
 
             except Exception as e:
-                logger.error(f"批量删除失败: {e}", exc_info=True)
+                logger.error(f"批量删除失败: {e}")
                 await session.rollback()
                 # 所有操作都失败
                 for op in operations:

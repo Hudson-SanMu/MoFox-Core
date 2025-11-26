@@ -58,7 +58,7 @@ async def send_envelope(
                     message=db_message or envelope,
                 )
         except Exception as event_error:
-            logger.error(f"触发 AFTER_SEND 事件时出错: {event_error}", exc_info=True)
+            logger.error(f"触发 AFTER_SEND 事件时出错: {event_error}")
 
         return True
 

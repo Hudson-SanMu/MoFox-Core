@@ -12,7 +12,7 @@ from ...event_models import MetaEventType
 if TYPE_CHECKING:
     from ....plugin import NapcatAdapter
 
-logger = get_logger("napcat_adapter.meta_event_handler")
+logger = get_logger("napcat_adapter")
 
 
 class MetaEventHandler:

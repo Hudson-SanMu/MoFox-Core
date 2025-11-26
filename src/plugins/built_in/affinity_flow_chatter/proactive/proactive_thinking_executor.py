@@ -255,7 +255,7 @@ class ProactiveThinkingPlanner:
             return context
 
         except Exception as e:
-            logger.error(f"搜集上下文信息失败: {e}", exc_info=True)
+            logger.error(f"搜集上下文信息失败: {e}")
             return None
 
     @cached(ttl=300, key_prefix="stream_impression")  # 缓存5分钟
@@ -352,7 +352,7 @@ class ProactiveThinkingPlanner:
 
             return decision
         except Exception as e:
-            logger.error(f"决策过程失败: {e}", exc_info=True)
+            logger.error(f"决策过程失败: {e}")
             return None
 
     async def generate_reply(
@@ -424,7 +424,7 @@ class ProactiveThinkingPlanner:
             return filtered_response
 
         except Exception as e:
-            logger.error(f"生成回复失败: {e}", exc_info=True)
+            logger.error(f"生成回复失败: {e}")
             return None
 
     async def _get_expression_habits(self, stream_id: str, chat_history: str) -> str:
@@ -707,4 +707,4 @@ async def execute_proactive_thinking(stream_id: str):
             logger.info(f"[主动思考] 聊天流 {stream_id} 的主动思考执行完成")
 
         except Exception as e:
-            logger.error(f"[主动思考] 执行主动思考失败: {e}", exc_info=True)
+            logger.error(f"[主动思考] 执行主动思考失败: {e}")

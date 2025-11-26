@@ -67,7 +67,7 @@ async def get_replyer(
             request_type=request_type,
         )
     except Exception as e:
-        logger.error(f"[GeneratorAPI] 获取回复器时发生意外错误: {e}", exc_info=True)
+        logger.error(f"[GeneratorAPI] 获取回复器时发生意外错误: {e}")
         traceback.print_exc()
         return None
 

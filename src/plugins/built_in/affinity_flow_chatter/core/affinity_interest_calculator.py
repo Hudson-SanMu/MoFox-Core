@@ -175,7 +175,7 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             )
 
         except Exception as e:
-            logger.error(f"Affinity兴趣值计算失败: {e}", exc_info=True)
+            logger.error(f"Affinity兴趣值计算失败: {e}")
             return InterestCalculationResult(
                 success=False, message_id=getattr(message, "message_id", ""), interest_value=0.0, error_message=str(e)
             )

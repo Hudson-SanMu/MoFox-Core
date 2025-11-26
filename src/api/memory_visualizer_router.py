@@ -495,7 +495,7 @@ async def list_files_api():
         )
     except Exception as e:
         # 增加日志记录
-        # logger.error(f"列出数据文件失败: {e}", exc_info=True)
+        # logger.error(f"列出数据文件失败: {e}")
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 

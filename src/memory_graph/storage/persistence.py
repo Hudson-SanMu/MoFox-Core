@@ -170,8 +170,6 @@ class PersistenceManager:
         self._running = False
         self._file_lock = asyncio.Lock()  # 文件操作锁
 
-        logger.info(f"初始化持久化管理器: data_dir={data_dir}")
-
     async def save_graph_store(self, graph_store: GraphStore) -> None:
         """
         保存图存储到文件
@@ -211,7 +209,7 @@ class PersistenceManager:
                 logger.debug(f"图数据已保存: {self.graph_file}, 大小: {len(json_data) / 1024:.2f} KB")
 
             except Exception as e:
-                logger.error(f"保存图数据失败: {e}", exc_info=True)
+                logger.error(f"保存图数据失败: {e}")
                 raise
 
     async def load_graph_store(self) -> GraphStore | None:
@@ -222,7 +220,7 @@ class PersistenceManager:
             GraphStore 对象，如果文件不存在则返回 None
         """
         if not self.graph_file.exists():
-            logger.info("图数据文件不存在，返回空图")
+            logger.debug("图数据文件不存在，返回空图")
             return None
 
         # 使用全局文件锁防止多个系统同时读写同一文件
@@ -249,18 +247,14 @@ class PersistenceManager:
                     logger.error("无法读取图数据文件")
                     return await self._load_from_backup()
 
-                # 检查版本（未来可能需要数据迁移）
-                version = data.get("metadata", {}).get("version", "unknown")
-                logger.info(f"加载图数据: version={version}")
-
                 # 恢复图存储
                 graph_store = GraphStore.from_dict(data)
 
-                logger.info(f"图数据加载完成: {graph_store.get_statistics()}")
+                logger.debug(f"图数据加载完成: {graph_store.get_statistics()}")
                 return graph_store
 
             except Exception as e:
-                logger.error(f"加载图数据失败: {e}", exc_info=True)
+                logger.error(f"加载图数据失败: {e}")
                 # 尝试加载备份
                 return await self._load_from_backup()
 
@@ -291,10 +285,8 @@ class PersistenceManager:
                 # 使用安全的原子写入
                 await safe_atomic_write(temp_file, self.staged_file)
 
-                logger.info(f"临时记忆已保存: {len(staged_memories)} 条")
-
             except Exception as e:
-                logger.error(f"保存临时记忆失败: {e}", exc_info=True)
+                logger.error(f"保存临时记忆失败: {e}")
                 raise
 
     async def load_staged_memories(self) -> list[StagedMemory]:
@@ -305,7 +297,7 @@ class PersistenceManager:
             临时记忆列表
         """
         if not self.staged_file.exists():
-            logger.info("临时记忆文件不存在，返回空列表")
+            logger.debug("临时记忆文件不存在，返回空列表")
             return []
 
         async with self._file_lock:  # 使用文件锁防止并发访问
@@ -330,12 +322,10 @@ class PersistenceManager:
                     return []
 
                 staged_memories = [StagedMemory.from_dict(sm) for sm in data.get("staged_memories", [])]
-
-                logger.info(f"临时记忆加载完成: {len(staged_memories)} 条")
                 return staged_memories
 
             except Exception as e:
-                logger.error(f"加载临时记忆失败: {e}", exc_info=True)
+                logger.error(f"加载临时记忆失败: {e}")
                 return []
 
     async def create_backup(self) -> Path | None:
@@ -359,13 +349,13 @@ class PersistenceManager:
                 # 清理旧备份（只保留最近10个）
                 await self._cleanup_old_backups(keep=10)
 
-                logger.info(f"备份创建成功: {backup_file}")
+                logger.debug(f"备份创建成功: {backup_file}")
                 return backup_file
 
             return None
 
         except Exception as e:
-            logger.error(f"创建备份失败: {e}", exc_info=True)
+            logger.error(f"创建备份失败: {e}")
             return None
 
     async def _load_from_backup(self) -> GraphStore | None:
@@ -401,12 +391,12 @@ class PersistenceManager:
                 return None
 
             graph_store = GraphStore.from_dict(data)
-            logger.info(f"从备份恢复成功: {graph_store.get_statistics()}")
+            logger.debug(f"从备份恢复成功: {graph_store.get_statistics()}")
 
             return graph_store
 
         except Exception as e:
-            logger.error(f"从备份恢复失败: {e}", exc_info=True)
+            logger.error(f"从备份恢复失败: {e}")
             return None
 
     async def _cleanup_old_backups(self, keep: int = 10) -> None:
@@ -446,7 +436,7 @@ class PersistenceManager:
         self._running = True
 
         async def auto_save_loop():
-            logger.info(f"自动保存任务已启动，间隔: {self.auto_save_interval}秒")
+            logger.debug(f"自动保存任务已启动，间隔: {self.auto_save_interval}秒")
 
             while self._running:
                 try:
@@ -470,9 +460,7 @@ class PersistenceManager:
                         await self.create_backup()
 
                 except Exception as e:
-                    logger.error(f"自动保存失败: {e}", exc_info=True)
-
-            logger.info("自动保存任务已停止")
+                    logger.error(f"自动保存失败: {e}")
 
         self._auto_save_task = asyncio.create_task(auto_save_loop())
 
@@ -481,7 +469,7 @@ class PersistenceManager:
         self._running = False
         if self._auto_save_task:
             self._auto_save_task.cancel()
-            logger.info("自动保存任务已取消")
+            logger.debug("自动保存任务已取消")
 
     async def export_to_json(self, output_file: Path, graph_store: GraphStore) -> None:
         """
@@ -505,10 +493,8 @@ class PersistenceManager:
                 json_str = json.dumps(data, ensure_ascii=False, indent=2)
                 await f.write(json_str)
 
-            logger.info(f"图数据已导出: {output_file}")
-
         except Exception as e:
-            logger.error(f"导出图数据失败: {e}", exc_info=True)
+            logger.error(f"导出图数据失败: {e}")
             raise
 
     async def import_from_json(self, input_file: Path) -> GraphStore | None:
@@ -527,12 +513,10 @@ class PersistenceManager:
                 data = json.loads(content)
 
             graph_store = GraphStore.from_dict(data)
-            logger.info(f"图数据已导入: {graph_store.get_statistics()}")
-
             return graph_store
 
         except Exception as e:
-            logger.error(f"导入图数据失败: {e}", exc_info=True)
+            logger.error(f"导入图数据失败: {e}")
             raise
 
     def get_data_size(self) -> dict[str, int]:

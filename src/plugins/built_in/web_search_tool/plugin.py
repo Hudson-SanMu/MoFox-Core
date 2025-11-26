@@ -76,7 +76,7 @@ class WEBSEARCHPLUGIN(BasePlugin):
                 logger.info(f"❌ 不可用搜索引擎: {', '.join(unavailable_engines)}")
 
         except Exception as e:
-            logger.error(f"❌ 搜索引擎初始化失败: {e}", exc_info=True)
+            logger.error(f"❌ 搜索引擎初始化失败: {e}")
     config_file_name: str = "config.toml"  # 配置文件名
 
     # 配置节描述

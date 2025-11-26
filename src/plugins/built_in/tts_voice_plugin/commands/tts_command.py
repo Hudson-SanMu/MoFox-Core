@@ -71,6 +71,6 @@ class TTSVoiceCommand(PlusCommand):
                 return False, "语音合成失败", True
 
         except Exception as e:
-            logger.error(f"执行 /tts 命令时出错: {e}", exc_info=True)
+            logger.error(f"执行 /tts 命令时出错: {e}")
             await self.send_text("❌ 语音合成时发生了意想不到的错误，请查看日志。")
             return False, "命令执行异常", True

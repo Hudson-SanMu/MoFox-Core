@@ -119,7 +119,7 @@ class SecurityManager:
                 return await self._check_sequential(message, context, start_time)
 
         except Exception as e:
-            logger.error(f"安全检测失败: {e}", exc_info=True)
+            logger.error(f"安全检测失败: {e}")
             return SecurityCheckResult(
                 is_safe=True,  # 异常情况下默认允许通过，避免阻断正常消息
                 level=SecurityLevel.SAFE,

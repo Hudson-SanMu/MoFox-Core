@@ -116,7 +116,7 @@ class ReplyTrackerService:
 
             except Exception as e:
                 # 捕获迁移过程中可能出现的任何异常
-                logger.error(f"迁移旧数据文件时发生错误: {e}", exc_info=True)
+                logger.error(f"迁移旧数据文件时发生错误: {e}")
 
     def _validate_data(self, data: Any) -> bool:
         """
@@ -175,7 +175,7 @@ class ReplyTrackerService:
             self.storage.set("data", self.replied_comments)
             logger.debug("回复记录已暂存，将由存储API在后台保存")
         except Exception as e:
-            logger.error(f"持久化回复记录失败: {e}", exc_info=True)
+            logger.error(f"持久化回复记录失败: {e}")
 
     def _cleanup_old_records(self):
         """

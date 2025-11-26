@@ -164,11 +164,11 @@ class StreamContext(BaseDataModel):
                         await unified_manager.add_message(message_dict)
                         logger.debug(f"��Ϣ�����ӵ��������ϵͳ: {message.message_id}")
             except Exception as e:
-                logger.error(f"������Ϣ���������ϵͳʧ��: {e}", exc_info=True)
+                logger.error(f"������Ϣ���������ϵͳʧ��: {e}")
 
             return True
         except Exception as e:
-            logger.error(f"������Ϣ������������ʧ�� {self.stream_id}: {e}", exc_info=True)
+            logger.error(f"������Ϣ������������ʧ�� {self.stream_id}: {e}")
             return False
 
     async def update_message(self, message_id: str, updates: dict[str, Any]) -> bool:
@@ -197,7 +197,7 @@ class StreamContext(BaseDataModel):
             logger.debug(f"���µ�����������Ϣ: {self.stream_id}/{message_id}")
             return True
         except Exception as e:
-            logger.error(f"���µ�����������Ϣʧ�� {self.stream_id}/{message_id}: {e}", exc_info=True)
+            logger.error(f"���µ�����������Ϣʧ�� {self.stream_id}/{message_id}: {e}")
             return False
 
     def add_action_to_message(self, message_id: str, action: str):
@@ -277,7 +277,7 @@ class StreamContext(BaseDataModel):
             self._update_access_stats()
             return messages
         except Exception as e:
-            logger.error(f"获取上下文消息失败 {self.stream_id}: {e}", exc_info=True)
+            logger.error(f"获取上下文消息失败 {self.stream_id}: {e}")
             return []
 
     def mark_messages_as_read(self, message_ids: list[str]) -> bool:
@@ -292,7 +292,7 @@ class StreamContext(BaseDataModel):
                     logger.warning(f"标记消息已读失败 {message_id}: {e}")
             return marked_count > 0
         except Exception as e:
-            logger.error(f"批量标记消息已读失败 {self.stream_id}: {e}", exc_info=True)
+            logger.error(f"批量标记消息已读失败 {self.stream_id}: {e}")
             return False
 
     def calculate_interruption_probability(self, max_limit: int, min_probability: float = 0.1, probability_factor: float | None = None) -> float:
@@ -349,7 +349,7 @@ class StreamContext(BaseDataModel):
             logger.debug(f"清空上下文成功: {self.stream_id}")
             return True
         except Exception as e:
-            logger.error(f"清空上下文失败 {self.stream_id}: {e}", exc_info=True)
+            logger.error(f"清空上下文失败 {self.stream_id}: {e}")
             return False
 
     def get_statistics(self) -> dict[str, Any]:
@@ -378,7 +378,7 @@ class StreamContext(BaseDataModel):
             stats["cache_stats"] = self.get_cache_stats()
             return stats
         except Exception as e:
-            logger.error(f"获取上下文统计失败 {self.stream_id}: {e}", exc_info=True)
+            logger.error(f"获取上下文统计失败 {self.stream_id}: {e}")
             return {}
 
     def validate_integrity(self) -> bool:
@@ -547,7 +547,7 @@ class StreamContext(BaseDataModel):
                 logger.debug(f"无历史消息需要加载: {self.stream_id}")
 
         except Exception as e:
-            logger.error(f"从数据库加载历史消息失败: {self.stream_id}, {e}", exc_info=True)
+            logger.error(f"从数据库加载历史消息失败: {self.stream_id}, {e}")
             self._history_initialized = False
 
     def _detect_chat_type(self, message: "DatabaseMessages"):
@@ -588,7 +588,7 @@ class StreamContext(BaseDataModel):
                 return 0.5
 
         except Exception as e:
-            logger.error(f"计算消息兴趣时出现异常: {e}", exc_info=True)
+            logger.error(f"计算消息兴趣时出现异常: {e}")
             if hasattr(message, "interest_calculated"):
                 message.interest_calculated = False
             return 0.5

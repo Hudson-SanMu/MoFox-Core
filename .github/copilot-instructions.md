@@ -137,7 +137,7 @@ from src.common.logger import get_logger
 
 logger = get_logger("module_name")
 logger.info("信息")
-logger.error("错误", exc_info=True)  # 包含堆栈跟踪
+logger.error("错误")
 ```
 
 **日志级别**: 通过 `bot_config.toml` 的 `[logging]` 配置

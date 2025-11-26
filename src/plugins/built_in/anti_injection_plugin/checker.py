@@ -256,7 +256,7 @@ class AntiInjectionChecker(SecurityChecker):
                 reason="LLM API不可用",
             )
         except Exception as e:
-            logger.error(f"LLM检测失败: {e}", exc_info=True)
+            logger.error(f"LLM检测失败: {e}")
             return SecurityCheckResult(
                 is_safe=True,
                 level=SecurityLevel.SAFE,

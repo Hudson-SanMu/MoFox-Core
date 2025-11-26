@@ -513,7 +513,7 @@ class BaseAction(ABC):
             return result
 
         except Exception as e:
-            logger.error(f"{log_prefix} 调用时发生错误: {e}", exc_info=True)
+            logger.error(f"{log_prefix} 调用时发生错误: {e}")
             return False, f"调用Action '{action_name}' 时发生错误: {e}"
 
     @classmethod

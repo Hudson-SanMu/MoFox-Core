@@ -92,7 +92,7 @@ class ProactiveThinkingReplyHandler(BaseEventHandler):
                 logger.warning(f"❌ 重置聊天流 {stream_id} 主动思考任务失败")
 
         except Exception as e:
-            logger.error(f"❌ 处理reply事件时出错: {e}", exc_info=True)
+            logger.error(f"❌ 处理reply事件时出错: {e}")
 
         # 总是继续处理其他handler
         return HandlerResult(success=True, continue_process=True, message=None)
@@ -165,7 +165,7 @@ class ProactiveThinkingMessageHandler(BaseEventHandler):
                 logger.info(f"为新聊天流 {stream_id} 创建了主动思考任务")
 
         except Exception as e:
-            logger.error(f"处理消息事件时出错: {e}", exc_info=True)
+            logger.error(f"处理消息事件时出错: {e}")
 
         # 总是继续处理其他handler
         return HandlerResult(success=True, continue_process=True, message=None)

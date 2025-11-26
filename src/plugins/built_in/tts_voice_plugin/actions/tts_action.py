@@ -47,7 +47,7 @@ def _get_available_styles() -> list[str]:
 
         return style_names if style_names else ["default"]
     except Exception as e:
-        logger.error(f"动态加载TTS风格列表时出错: {e}", exc_info=True)
+        logger.error(f"动态加载TTS风格列表时出错: {e}")
         return ["default"]  # 出现任何错误都回退
 
 
@@ -196,7 +196,7 @@ class TTSVoiceAction(BaseAction):
                 return False, "语音合成失败"
 
         except Exception as e:
-            logger.error(f"{self.log_prefix} 语音合成过程中发生未知错误: {e!s}", exc_info=True)
+            logger.error(f"{self.log_prefix} 语音合成过程中发生未知错误: {e!s}")
             await self.store_action_info(
                 action_prompt_display=f"语音合成失败: {e!s}",
                 action_done=False

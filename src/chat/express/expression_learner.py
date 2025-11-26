@@ -542,7 +542,7 @@ class ExpressionLearner:
                     # 获取 StyleLearner 实例
                     learner = style_learner_manager.get_learner(chat_id)
 
-                    logger.info(f"开始训练 StyleLearner: chat_id={chat_id}, 样本数={len(expr_list)}")
+                    logger.debug(f"开始训练 StyleLearner: chat_id={chat_id}, 样本数={len(expr_list)}")
 
                     # 为每个学习到的表达方式训练模型
                     # 使用 situation 作为输入，style 作为目标
@@ -566,12 +566,12 @@ class ExpressionLearner:
 
                     # 保存模型
                     if learner.save(style_learner_manager.model_save_path):
-                        logger.info(f"StyleLearner 模型保存成功: {chat_id}")
+                        logger.debug(f"StyleLearner 模型保存成功: {chat_id}")
                     else:
                         logger.error(f"StyleLearner 模型保存失败: {chat_id}")
 
                 except Exception as e:
-                    logger.error(f"训练 StyleLearner 失败: {e}", exc_info=True)
+                    logger.error(f"训练 StyleLearner 失败: {e}")
 
             return learnt_expressions
         return None

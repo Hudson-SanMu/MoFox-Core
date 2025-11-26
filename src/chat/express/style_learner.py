@@ -51,8 +51,6 @@ class StyleLearner:
             "last_update": time.time(),
         }
 
-        logger.info(f"StyleLearner初始化成功: chat_id={chat_id}")
-
     def add_style(self, style: str, situation: str | None = None) -> bool:
         """
         动态添加一个新的风格
@@ -178,7 +176,7 @@ class StyleLearner:
                 logger.debug(f"被删除的风格样例(前5): {deleted_styles[:5]}")
 
         except Exception as e:
-            logger.error(f"清理风格失败: {e}", exc_info=True)
+            logger.error(f"清理风格失败: {e}")
 
     def learn_mapping(self, up_content: str, style: str) -> bool:
         """
@@ -271,7 +269,7 @@ class StyleLearner:
             return best_style, style_scores
 
         except Exception as e:
-            logger.error(f"预测style失败: {e}", exc_info=True)
+            logger.error(f"预测style失败: {e}")
             return None, {}
 
     def get_style_info(self, style: str) -> tuple[str | None, str | None]:
@@ -373,7 +371,6 @@ class StyleLearner:
             with open(meta_path, "wb") as f:
                 pickle.dump(meta_data, f)
 
-            logger.info(f"StyleLearner保存成功: {save_dir}")
             return True
 
         except Exception as e:
@@ -421,7 +418,6 @@ class StyleLearner:
                 if "style_last_used" not in self.learning_stats:
                     self.learning_stats["style_last_used"] = {}
 
-            logger.info(f"StyleLearner加载成功: {save_dir}")
             return True
 
         except Exception as e:
@@ -454,7 +450,7 @@ class StyleLearnerManager:
         # 确保保存目录存在
         os.makedirs(model_save_path, exist_ok=True)
 
-        logger.info(f"StyleLearnerManager初始化成功, 模型保存路径: {model_save_path}")
+        logger.debug(f"StyleLearnerManager初始化成功, 模型保存路径: {model_save_path}")
 
     def get_learner(self, chat_id: str, model_config: dict | None = None) -> StyleLearner:
         """
@@ -520,7 +516,7 @@ class StyleLearnerManager:
             if not learner.save(self.model_save_path):
                 success = False
 
-        logger.info(f"保存所有StyleLearner {'成功' if success else '部分失败'}")
+        logger.debug(f"保存所有StyleLearner {'成功' if success else '部分失败'}")
         return success
 
     def cleanup_all_old_styles(self, ratio: float | None = None) -> dict[str, int]:
@@ -540,7 +536,7 @@ class StyleLearnerManager:
                 cleanup_results[chat_id] = cleaned
 
         total_cleaned = sum(cleanup_results.values())
-        logger.info(f"清理所有StyleLearner完成: 总共清理了 {total_cleaned} 个风格")
+        logger.debug(f"清理所有StyleLearner完成: 总共清理了 {total_cleaned} 个风格")
         return cleanup_results
 
     def apply_decay_all(self, factor: float | None = None):
@@ -553,7 +549,7 @@ class StyleLearnerManager:
         for learner in self.learners.values():
             learner.apply_decay(factor)
 
-        logger.info("对所有StyleLearner应用知识衰减")
+        logger.debug("对所有StyleLearner应用知识衰减")
 
     def get_all_stats(self) -> dict[str, dict]:
         """

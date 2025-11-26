@@ -424,7 +424,7 @@ def rebuild_faiss_only():
         embed_manager.save_to_file()
         logger.info("✅ FAISS 索引重建完成！")
     except Exception as e:
-        logger.error(f"重建 FAISS 索引时发生错误: {e}", exc_info=True)
+        logger.error(f"重建 FAISS 索引时发生错误: {e}")
 
 
 def main():

@@ -81,7 +81,7 @@ class ShortTermMemoryManager:
             return
 
         try:
-            logger.info("开始初始化短期记忆管理器...")
+            logger.debug("开始初始化短期记忆管理器...")
 
             # 初始化嵌入生成器
             self.embedding_generator = EmbeddingGenerator()
@@ -90,10 +90,10 @@ class ShortTermMemoryManager:
             await self._load_from_disk()
 
             self._initialized = True
-            logger.info(f"✅ 短期记忆管理器初始化完成 (已加载 {len(self.memories)} 条记忆)")
+            logger.debug(f"短期记忆管理器初始化完成 (已加载 {len(self.memories)} 条记忆)")
 
         except Exception as e:
-            logger.error(f"短期记忆管理器初始化失败: {e}", exc_info=True)
+            logger.error(f"短期记忆管理器初始化失败: {e}")
             raise
 
     async def add_from_block(self, block: MemoryBlock) -> ShortTermMemory | None:
@@ -116,7 +116,7 @@ class ShortTermMemoryManager:
             await self.initialize()
 
         try:
-            logger.info(f"开始处理记忆块: {block.id}")
+            logger.debug(f"开始处理记忆块: {block.id}")
 
             # 步骤1: 使用 LLM 提取结构化记忆
             extracted_memory = await self._extract_structured_memory(block)
@@ -126,7 +126,7 @@ class ShortTermMemoryManager:
 
             # 步骤2: 决策如何处理新记忆
             decision = await self._decide_memory_operation(extracted_memory)
-            logger.info(f"LLM 决策: {decision}")
+            logger.debug(f"LLM 决策: {decision}")
 
             # 步骤3: 执行决策
             result_memory = await self._execute_decision(extracted_memory, decision)
@@ -145,7 +145,7 @@ class ShortTermMemoryManager:
             return result_memory
 
         except Exception as e:
-            logger.error(f"添加短期记忆失败: {e}", exc_info=True)
+            logger.error(f"添加短期记忆失败: {e}")
             return None
 
     async def _extract_structured_memory(self, block: MemoryBlock) -> ShortTermMemory | None:
@@ -232,11 +232,11 @@ class ShortTermMemoryManager:
                 attributes=data.get("attributes", {}),
             )
 
-            logger.info(f"✅ 提取结构化记忆: {memory.content[:50]}...")
+            logger.debug(f"提取结构化记忆: {memory.content[:50]}...")
             return memory
 
         except Exception as e:
-            logger.error(f"提取结构化记忆失败: {e}", exc_info=True)
+            logger.error(f"提取结构化记忆失败: {e}")
             return None
 
     async def _decide_memory_operation(self, new_memory: ShortTermMemory) -> ShortTermDecision:
@@ -337,11 +337,11 @@ class ShortTermMemoryManager:
                 updated_importance=data.get("updated_importance"),
             )
 
-            logger.info(f"LLM 决策完成: {decision}")
+            logger.debug(f"LLM 决策完成: {decision}")
             return decision
 
         except Exception as e:
-            logger.error(f"LLM 决策失败: {e}", exc_info=True)
+            logger.error(f"LLM 决策失败: {e}")
             # 默认创建新记忆
             return ShortTermDecision(
                 operation=ShortTermOperation.CREATE_NEW,
@@ -366,7 +366,7 @@ class ShortTermMemoryManager:
             if decision.operation == ShortTermOperation.CREATE_NEW:
                 # 创建新记忆
                 self.memories.append(new_memory)
-                logger.info(f"✅ 创建新短期记忆: {new_memory.id}")
+                logger.debug(f"创建新短期记忆: {new_memory.id}")
                 return new_memory
 
             elif decision.operation == ShortTermOperation.MERGE:
@@ -389,7 +389,7 @@ class ShortTermMemoryManager:
                 target.embedding = await self._generate_embedding(target.content)
                 target.update_access()
 
-                logger.info(f"✅ 合并记忆到: {target.id}")
+                logger.debug(f"合并记忆到: {target.id}")
                 return target
 
             elif decision.operation == ShortTermOperation.UPDATE:
@@ -412,7 +412,7 @@ class ShortTermMemoryManager:
                 target.source_block_ids.extend(new_memory.source_block_ids)
                 target.update_access()
 
-                logger.info(f"✅ 更新记忆: {target.id}")
+                logger.debug(f"更新记忆: {target.id}")
                 return target
 
             elif decision.operation == ShortTermOperation.DISCARD:
@@ -432,7 +432,7 @@ class ShortTermMemoryManager:
                 return new_memory
 
         except Exception as e:
-            logger.error(f"执行决策失败: {e}", exc_info=True)
+            logger.error(f"执行决策失败: {e}")
             return None
 
     async def _find_similar_memories(
@@ -466,7 +466,7 @@ class ShortTermMemoryManager:
             return scored[:top_k]
 
         except Exception as e:
-            logger.error(f"查找相似记忆失败: {e}", exc_info=True)
+            logger.error(f"查找相似记忆失败: {e}")
             return []
 
     def _find_memory_by_id(self, memory_id: str | None) -> ShortTermMemory | None:
@@ -491,7 +491,7 @@ class ShortTermMemoryManager:
             return embedding
 
         except Exception as e:
-            logger.error(f"生成向量失败: {e}", exc_info=True)
+            logger.error(f"生成向量失败: {e}")
             return None
 
     async def _generate_embeddings_batch(self, texts: list[str]) -> list[np.ndarray | None]:
@@ -513,7 +513,7 @@ class ShortTermMemoryManager:
             return embeddings
 
         except Exception as e:
-            logger.error(f"批量生成向量失败: {e}", exc_info=True)
+            logger.error(f"批量生成向量失败: {e}")
             return [None] * len(texts)
 
     def _parse_json_response(self, response: str) -> dict[str, Any] | None:
@@ -583,7 +583,7 @@ class ShortTermMemoryManager:
             return results
 
         except Exception as e:
-            logger.error(f"检索短期记忆失败: {e}", exc_info=True)
+            logger.error(f"检索短期记忆失败: {e}")
             return []
 
     def get_memories_for_transfer(self) -> list[ShortTermMemory]:
@@ -643,7 +643,7 @@ class ShortTermMemoryManager:
             asyncio.create_task(self._save_to_disk())
 
         except Exception as e:
-            logger.error(f"清除已转移记忆失败: {e}", exc_info=True)
+            logger.error(f"清除已转移记忆失败: {e}")
 
     def get_statistics(self) -> dict[str, Any]:
         """获取短期记忆层统计信息"""
@@ -680,7 +680,7 @@ class ShortTermMemoryManager:
                 logger.debug(f"短期记忆已保存到 {save_path}")
 
             except Exception as e:
-                logger.error(f"保存短期记忆失败: {e}", exc_info=True)
+                logger.error(f"保存短期记忆失败: {e}")
 
     async def _load_from_disk(self) -> None:
         """从磁盘加载短期记忆"""
@@ -702,7 +702,7 @@ class ShortTermMemoryManager:
             logger.info(f"短期记忆已从 {load_path} 加载 ({len(self.memories)} 条)")
 
         except Exception as e:
-            logger.error(f"加载短期记忆失败: {e}", exc_info=True)
+            logger.error(f"加载短期记忆失败: {e}")
 
     async def _reload_embeddings(self) -> None:
         """重新生成记忆的向量"""
@@ -747,7 +747,7 @@ class ShortTermMemoryManager:
             logger.info("✅ 短期记忆管理器已关闭")
 
         except Exception as e:
-            logger.error(f"关闭短期记忆管理器失败: {e}", exc_info=True)
+            logger.error(f"关闭短期记忆管理器失败: {e}")
 
 
 # 全局单例

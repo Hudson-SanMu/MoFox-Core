@@ -82,7 +82,7 @@ class TTSVoicePlugin(BasePlugin):
                 return value if value is not None else default
 
             except Exception as e:
-                logger.error(f"Failed to manually load '{key}' from config: {e}", exc_info=True)
+                logger.error(f"Failed to manually load '{key}' from config: {e}")
                 return default
 
         return self.get_config(key, default)

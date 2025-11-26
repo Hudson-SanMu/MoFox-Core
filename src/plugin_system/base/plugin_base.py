@@ -141,7 +141,7 @@ class PluginBase(ABC):
                 f.write(toml_str)
             logger.info(f"{self.log_prefix} 已生成默认配置文件: {config_file_path}")
         except OSError as e:
-            logger.error(f"{self.log_prefix} 保存默认配置文件失败: {e}", exc_info=True)
+            logger.error(f"{self.log_prefix} 保存默认配置文件失败: {e}")
 
     def _backup_config_file(self, config_file_path: str) -> str:
         """备份配置文件到指定的 backup 子目录"""
@@ -158,7 +158,7 @@ class PluginBase(ABC):
             logger.info(f"{self.log_prefix} 配置文件已备份到: {backup_path}")
             return str(backup_path)
         except Exception as e:
-            logger.error(f"{self.log_prefix} 备份配置文件失败: {e}", exc_info=True)
+            logger.error(f"{self.log_prefix} 备份配置文件失败: {e}")
             return ""
 
     def _synchronize_config(
@@ -285,7 +285,7 @@ class PluginBase(ABC):
                 f.write(toml_str)
             logger.info(f"{self.log_prefix} 配置文件已保存: {config_file_path}")
         except OSError as e:
-            logger.error(f"{self.log_prefix} 保存配置文件失败: {e}", exc_info=True)
+            logger.error(f"{self.log_prefix} 保存配置文件失败: {e}")
 
     def _load_plugin_config(self):  # sourcery skip: extract-method
         """
@@ -314,7 +314,7 @@ class PluginBase(ABC):
                 shutil.move(plugin_config_path, user_config_path)
                 logger.info(f"{self.log_prefix} 已将配置文件从 {plugin_config_path} 迁移到 {user_config_path}")
             except OSError as e:
-                logger.error(f"{self.log_prefix} 迁移配置文件失败: {e}", exc_info=True)
+                logger.error(f"{self.log_prefix} 迁移配置文件失败: {e}")
 
         # 如果用户配置文件仍然不存在，生成默认的
         if not os.path.exists(user_config_path):
@@ -333,7 +333,7 @@ class PluginBase(ABC):
             with open(user_config_path, encoding="utf-8") as f:
                 user_config: dict[str, Any] = toml.load(f) or {}
         except Exception as e:
-            logger.error(f"{self.log_prefix} 加载用户配置文件 {user_config_path} 失败: {e}", exc_info=True)
+            logger.error(f"{self.log_prefix} 加载用户配置文件 {user_config_path} 失败: {e}")
             self.config = self._generate_config_from_schema()  # 加载失败时使用默认 schema
             return
 

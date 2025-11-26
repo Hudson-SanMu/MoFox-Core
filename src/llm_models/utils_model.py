@@ -351,7 +351,7 @@ class _PromptProcessor:
             return perturbed_text
 
         except Exception as e:
-            logger.error(f"提示词扰动处理失败: {e}", exc_info=True)
+            logger.error(f"提示词扰动处理失败: {e}")
             return prompt_text  # 发生异常时返回原始文本，保证流程不中断
 
     @staticmethod
@@ -377,7 +377,7 @@ class _PromptProcessor:
                     result = result.replace(original, replacement, 1)
             return result
         except Exception as e:
-            logger.error(f"语义变体替换失败: {e}", exc_info=True)
+            logger.error(f"语义变体替换失败: {e}")
             return text
 
     @staticmethod
@@ -434,7 +434,7 @@ class _PromptProcessor:
 
             return result
         except Exception as e:
-            logger.error(f"空白字符噪声注入失败: {e}", exc_info=True)
+            logger.error(f"空白字符噪声注入失败: {e}")
             return text
 
     @staticmethod
@@ -477,7 +477,7 @@ class _PromptProcessor:
 
             return "".join(result)
         except Exception as e:
-            logger.error(f"随机噪音注入失败: {e}", exc_info=True)
+            logger.error(f"随机噪音注入失败: {e}")
             return text
 
     @staticmethod

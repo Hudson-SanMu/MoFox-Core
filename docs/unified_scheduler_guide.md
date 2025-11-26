@@ -368,7 +368,7 @@ class MyPlugin(PluginBase):
            # 任务逻辑
            pass
        except Exception as e:
-           self.logger.error(f"任务执行失败: {e}", exc_info=True)
+           self.logger.error(f"任务执行失败: {e}")
    ```
 
 5. **性能考虑**: 

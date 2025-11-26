@@ -214,7 +214,7 @@ class ImageManager:
             return f"[表情包：{refined_part}]"
 
         except Exception as e:
-            logger.error(f"获取表情包描述失败: {e!s}", exc_info=True)
+            logger.error(f"获取表情包描述失败: {e!s}")
             return "[表情包(处理失败)]"
 
     async def get_image_description(self, image_base64: str) -> str:
@@ -257,7 +257,7 @@ class ImageManager:
                     if description and description.strip():
                         break  # 成功获取描述则跳出循环
                 except Exception as e:
-                    logger.error(f"VLM调用失败 (第 {i+1}/3 次): {e}", exc_info=True)
+                    logger.error(f"VLM调用失败 (第 {i+1}/3 次): {e}")
 
                 if i < 2: # 如果不是最后一次，则等待1秒
                     logger.warning("识图失败，将在1秒后重试...")
@@ -286,7 +286,7 @@ class ImageManager:
             return f"[图片：{description}]"
 
         except Exception as e:
-            logger.error(f"获取图片描述时发生严重错误: {e!s}", exc_info=True)
+            logger.error(f"获取图片描述时发生严重错误: {e!s}")
             return "[图片(处理失败)]"
 
     @staticmethod
@@ -388,7 +388,7 @@ class ImageManager:
             logger.error("GIF转换失败: 内存不足，可能是GIF太大或帧数太多")
             return None  # 内存不够啦
         except Exception as e:
-            logger.error(f"GIF转换失败: {e!s}", exc_info=True)  # 记录详细错误信息
+            logger.error(f"GIF转换失败: {e!s}")  # 记录详细错误信息
             return None  # 其他错误也返回None
 
     async def process_image(self, image_base64: str) -> tuple[str, str]:
@@ -459,7 +459,7 @@ class ImageManager:
             return image_id, description
 
         except Exception as e:
-            logger.error(f"处理图片时发生严重错误: {e!s}", exc_info=True)
+            logger.error(f"处理图片时发生严重错误: {e!s}")
             return "", "[图片(处理失败)]"
 
 

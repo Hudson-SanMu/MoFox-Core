@@ -291,7 +291,7 @@ class CoreSinkManager:
             # 使用 MessageRuntime 处理消息
             await self._runtime.handle_message(envelope)
         except Exception as e:
-            logger.error(f"MessageRuntime 处理消息时出错: {e}", exc_info=True)
+            logger.error(f"MessageRuntime 处理消息时出错: {e}")
 
 
 # 全局单例

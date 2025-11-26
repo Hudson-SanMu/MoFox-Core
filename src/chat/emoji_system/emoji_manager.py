@@ -1039,9 +1039,9 @@ class EmojiManager:
                                 break
                         logger.warning("[VLM分析] VLM返回的JSON数据不完整或格式错误，准备重试。")
                     except (json.JSONDecodeError, AttributeError) as e:
-                        logger.error(f"VLM JSON解析失败 (第 {i+1}/3 次): {e}", exc_info=True)
+                        logger.error(f"VLM JSON解析失败 (第 {i+1}/3 次): {e}")
                     except Exception as e:
-                        logger.error(f"VLM调用失败 (第 {i+1}/3 次): {e}", exc_info=True)
+                        logger.error(f"VLM调用失败 (第 {i+1}/3 次): {e}")
 
                     description, emotions, refined_description = "", [], ""  # Reset for retry
                     if i < 2:

@@ -109,7 +109,7 @@ class UserProfileTool(BaseTool):
             }
 
         except Exception as e:
-            logger.error(f"用户画像更新失败: {e}", exc_info=True)
+            logger.error(f"用户画像更新失败: {e}")
             return {
                 "type": "error",
                 "id": function_args.get("target_user_id", "unknown"),
@@ -199,7 +199,7 @@ class UserProfileTool(BaseTool):
                 logger.info(f"用户画像已更新到数据库: {user_id}")
 
         except Exception as e:
-            logger.error(f"更新用户画像到数据库失败: {e}", exc_info=True)
+            logger.error(f"更新用户画像到数据库失败: {e}")
             raise
 
 

@@ -63,7 +63,6 @@ class PermissionAPI:
 
     def set_permission_manager(self, manager: IPermissionManager):
         self._permission_manager = manager
-        logger.info("权限管理器已设置")
 
     def _ensure_manager(self):
         if self._permission_manager is None:

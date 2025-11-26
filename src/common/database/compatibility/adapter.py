@@ -272,7 +272,7 @@ async def db_query(
             return {"count": count}
 
     except Exception as e:
-        logger.error(f"数据库操作失败: {e}", exc_info=True)
+        logger.error(f"数据库操作失败: {e}")
         return None if single_result or query_type != "get" else []
 
 
@@ -308,7 +308,7 @@ async def db_save(
         return _model_to_dict(instance)
 
     except Exception as e:
-        logger.error(f"保存数据库记录出错: {e}", exc_info=True)
+        logger.error(f"保存数据库记录出错: {e}")
         return None
 
 

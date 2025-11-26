@@ -30,11 +30,11 @@ class PermissionManager(IPermissionManager):
         """异步初始化数据库连接"""
         self.engine = await get_engine()
         self.SessionLocal = async_sessionmaker(bind=self.engine)
-        logger.info("权限管理器初始化完成")
+        logger.debug("权限管理器初始化完成")
 
     def _load_master_users(self):
         """从配置文件加载Master用户列表"""
-        logger.info("开始从配置文件加载Master用户...")
+        logger.debug("开始从配置文件加载Master用户...")
         try:
             master_users_config = global_config.permission.master_users
             if not isinstance(master_users_config, list):
@@ -61,7 +61,7 @@ class PermissionManager(IPermissionManager):
             logger.info(f"成功加载 {len(self._master_users)} 个Master用户")
 
         except Exception as e:
-            logger.error(f"加载Master用户配置时发生严重错误: {e}", exc_info=True)
+            logger.error(f"加载Master用户配置时发生严重错误: {e}")
             self._master_users = set()
 
     def reload_master_users(self):

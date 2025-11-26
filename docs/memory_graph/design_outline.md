@@ -1422,7 +1422,7 @@ class MemoryConsolidationScheduler:
                 await asyncio.sleep(self.interval.total_seconds())
                 
             except Exception as e:
-                logger.error(f"记忆整理任务失败: {e}", exc_info=True)
+                logger.error(f"记忆整理任务失败: {e}")
                 # 失败后等待10分钟再重试
                 await asyncio.sleep(600)
     

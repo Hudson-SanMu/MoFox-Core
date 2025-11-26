@@ -75,5 +75,5 @@ class BlockShuffler:
             return prompt_template, shuffled_context
 
         except Exception as e:
-            logger.error(f"Block重排失败: {e}", exc_info=True)
+            logger.error(f"Block重排失败: {e}")
             return prompt_template, context_data

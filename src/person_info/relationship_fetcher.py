@@ -233,7 +233,7 @@ class RelationshipFetcher:
                     relation_parts.append(f"你们的关系程度：{score_desc}（{rel_data['relationship_score']:.2f}）")
 
         except Exception as e:
-            logger.error(f"查询UserRelationships表失败: {e}", exc_info=True)
+            logger.error(f"查询UserRelationships表失败: {e}")
 
         # 构建最终的关系信息字符串
         if relation_parts:

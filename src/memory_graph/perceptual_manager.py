@@ -80,11 +80,6 @@ class PerceptualMemoryManager:
         self._initialized = False
         self._save_lock = asyncio.Lock()
 
-        logger.info(
-            f"感知记忆管理器已创建 (max_blocks={max_blocks}, "
-            f"block_size={block_size}, activation_threshold={activation_threshold})"
-        )
-
     @property
     def memory(self) -> PerceptualMemory:
         """获取感知记忆对象（保证非 None）"""
@@ -99,7 +94,7 @@ class PerceptualMemoryManager:
             return
 
         try:
-            logger.info("开始初始化感知记忆管理器...")
+            logger.debug("开始初始化感知记忆管理器...")
 
             # 初始化嵌入生成器
             self.embedding_generator = EmbeddingGenerator()
@@ -109,7 +104,7 @@ class PerceptualMemoryManager:
 
             # 如果没有加载到数据，创建新的
             if not self.perceptual_memory:
-                logger.info("未找到现有数据，创建新的感知记忆堆")
+                logger.debug("未找到现有数据，创建新的感知记忆堆")
                 self.perceptual_memory = PerceptualMemory(
                     max_blocks=self.max_blocks,
                     block_size=self.block_size,
@@ -119,12 +114,12 @@ class PerceptualMemoryManager:
 
             self._initialized = True
             logger.info(
-                f"✅ 感知记忆管理器初始化完成 "
+                f"感知记忆管理器初始化完成 "
                 f"(已加载 {len(self.perceptual_memory.blocks)} 个记忆块)"
             )
 
         except Exception as e:
-            logger.error(f"感知记忆管理器初始化失败: {e}", exc_info=True)
+            logger.error(f"感知记忆管理器初始化失败: {e}")
             raise
 
     async def add_message(self, message: dict[str, Any]) -> MemoryBlock | None:
@@ -179,7 +174,7 @@ class PerceptualMemoryManager:
             return None
 
         except Exception as e:
-            logger.error(f"添加消息失败: {e}", exc_info=True)
+            logger.error(f"添加消息失败: {e}")
             return None
 
     async def _create_memory_block(self, stream_id: str) -> MemoryBlock | None:
@@ -234,9 +229,9 @@ class PerceptualMemoryManager:
             if len(self.perceptual_memory.blocks) > self.max_blocks:
                 removed_blocks = self.perceptual_memory.blocks[self.max_blocks :]
                 self.perceptual_memory.blocks = self.perceptual_memory.blocks[: self.max_blocks]
-                logger.info(f"记忆堆已满，移除 {len(removed_blocks)} 个旧块")
+                logger.debug(f"记忆堆已满，移除 {len(removed_blocks)} 个旧块")
 
-            logger.info(
+            logger.debug(
                 f"✅ 创建新记忆块: {block.id} (stream={stream_id[:8]}, "
                 f"堆大小={len(self.perceptual_memory.blocks)}/{self.max_blocks})"
             )
@@ -247,7 +242,7 @@ class PerceptualMemoryManager:
             return block
 
         except Exception as e:
-            logger.error(f"创建记忆块失败: {e}", exc_info=True)
+            logger.error(f"创建记忆块失败: {e}")
             return None
 
     def _normalize_message_timestamp(self, message: dict[str, Any]) -> float:
@@ -375,7 +370,7 @@ class PerceptualMemoryManager:
             return embedding
 
         except Exception as e:
-            logger.error(f"生成向量失败: {e}", exc_info=True)
+            logger.error(f"生成向量失败: {e}")
             return None
 
     async def _generate_embeddings_batch(self, texts: list[str]) -> list[np.ndarray | None]:
@@ -397,7 +392,7 @@ class PerceptualMemoryManager:
             return embeddings
 
         except Exception as e:
-            logger.error(f"批量生成向量失败: {e}", exc_info=True)
+            logger.error(f"批量生成向量失败: {e}")
             return [None] * len(texts)
 
     async def recall_blocks(
@@ -464,8 +459,8 @@ class PerceptualMemoryManager:
 
                 # 检查是否达到激活阈值
                 if block.recall_count >= self.activation_threshold:
-                    logger.info(
-                        f"🔥 记忆块 {block.id} 被激活！"
+                    logger.debug(
+                        f"记忆块 {block.id} 被激活 "
                         f"(召回次数={block.recall_count}, 阈值={self.activation_threshold})"
                     )
 
@@ -480,15 +475,11 @@ class PerceptualMemoryManager:
             ]
             
             if activated_blocks:
-                logger.info(
-                    f"检测到 {len(activated_blocks)} 个记忆块达到激活阈值 "
-                    f"(recall_count >= {self.activation_threshold})，需要转移到短期记忆"
-                )
                 # 设置标记供 unified_manager 处理
                 for block in activated_blocks:
                     block.metadata["needs_transfer"] = True
 
-            logger.info(
+            logger.debug(
                 f"召回 {len(recalled_blocks)} 个记忆块 "
                 f"(top_k={top_k}, threshold={similarity_threshold:.2f})"
             )
@@ -499,7 +490,7 @@ class PerceptualMemoryManager:
             return recalled_blocks
 
         except Exception as e:
-            logger.error(f"召回记忆块失败: {e}", exc_info=True)
+            logger.error(f"召回记忆块失败: {e}")
             return []
 
     async def _promote_blocks(self, blocks_to_promote: list[MemoryBlock]) -> None:
@@ -526,7 +517,7 @@ class PerceptualMemoryManager:
             logger.debug(f"提升 {len(blocks_to_promote)} 个块到堆顶")
 
         except Exception as e:
-            logger.error(f"提升块失败: {e}", exc_info=True)
+            logger.error(f"提升块失败: {e}")
 
     def get_activated_blocks(self) -> list[MemoryBlock]:
         """
@@ -569,8 +560,6 @@ class PerceptualMemoryManager:
                     for j, b in enumerate(self.perceptual_memory.blocks):
                         b.position_in_stack = j
 
-                    logger.info(f"移除记忆块: {block_id}")
-
                     # 异步保存
                     asyncio.create_task(self._save_to_disk())
 
@@ -580,7 +569,7 @@ class PerceptualMemoryManager:
             return False
 
         except Exception as e:
-            logger.error(f"移除记忆块失败: {e}", exc_info=True)
+            logger.error(f"移除记忆块失败: {e}")
             return False
 
     def get_statistics(self) -> dict[str, Any]:
@@ -628,7 +617,7 @@ class PerceptualMemoryManager:
                 logger.debug(f"感知记忆已保存到 {save_path}")
 
             except Exception as e:
-                logger.error(f"保存感知记忆失败: {e}", exc_info=True)
+                logger.error(f"保存感知记忆失败: {e}")
 
     async def _load_from_disk(self) -> None:
         """从磁盘加载感知记忆"""
@@ -638,7 +627,7 @@ class PerceptualMemoryManager:
             load_path = self.data_dir / "perceptual_memory.json"
 
             if not load_path.exists():
-                logger.info("未找到感知记忆数据文件")
+                logger.debug("未找到感知记忆数据文件")
                 return
 
             data = orjson.loads(load_path.read_bytes())
@@ -647,17 +636,13 @@ class PerceptualMemoryManager:
             # 重新加载向量数据
             await self._reload_embeddings()
 
-            logger.info(f"感知记忆已从 {load_path} 加载")
-
         except Exception as e:
-            logger.error(f"加载感知记忆失败: {e}", exc_info=True)
+            logger.error(f"加载感知记忆失败: {e}")
 
     async def _reload_embeddings(self) -> None:
         """重新生成记忆块的向量"""
         if not self.perceptual_memory:
             return
-
-        logger.info("重新生成记忆块向量...")
 
         blocks_to_process = []
         texts_to_process = []
@@ -668,10 +653,9 @@ class PerceptualMemoryManager:
                 texts_to_process.append(block.combined_text)
 
         if not blocks_to_process:
-            logger.info("没有需要重新生成向量的块")
             return
 
-        logger.info(f"开始批量生成 {len(blocks_to_process)} 个块的向量...")
+        logger.debug(f"开始批量生成 {len(blocks_to_process)} 个块的向量...")
 
         embeddings = await self._generate_embeddings_batch(texts_to_process)
 
@@ -681,7 +665,7 @@ class PerceptualMemoryManager:
                 block.embedding = embedding
                 success_count += 1
 
-        logger.info(f"✅ 向量重新生成完成（成功: {success_count}/{len(blocks_to_process)}）")
+        logger.debug(f"向量重新生成完成（成功: {success_count}/{len(blocks_to_process)}）")
 
     async def shutdown(self) -> None:
         """关闭管理器"""
@@ -689,16 +673,15 @@ class PerceptualMemoryManager:
             return
 
         try:
-            logger.info("正在关闭感知记忆管理器...")
+            logger.debug("正在关闭感知记忆管理器...")
 
             # 最后一次保存
             await self._save_to_disk()
 
             self._initialized = False
-            logger.info("✅ 感知记忆管理器已关闭")
 
         except Exception as e:
-            logger.error(f"关闭感知记忆管理器失败: {e}", exc_info=True)
+            logger.error(f"关闭感知记忆管理器失败: {e}")
 
 
 # 全局单例

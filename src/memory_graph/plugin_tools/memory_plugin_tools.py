@@ -130,7 +130,7 @@ class _DeprecatedCreateMemoryTool(BaseTool):
                 }
 
         except Exception as e:
-            logger.error(f"[CreateMemoryTool] 执行失败: {e}", exc_info=True)
+            logger.error(f"[CreateMemoryTool] 执行失败: {e}")
             return {
                 "name": self.name,
                 "content": f"创建记忆时出错: {e!s}"
@@ -190,7 +190,7 @@ class _DeprecatedLinkMemoriesTool(BaseTool):
                 }
 
         except Exception as e:
-            logger.error(f"[LinkMemoriesTool] 执行失败: {e}", exc_info=True)
+            logger.error(f"[LinkMemoriesTool] 执行失败: {e}")
             return {
                 "name": self.name,
                 "content": f"关联记忆时出错: {e!s}"
@@ -260,7 +260,7 @@ class _DeprecatedSearchMemoriesTool(BaseTool):
                 }
 
         except Exception as e:
-            logger.error(f"[SearchMemoriesTool] 执行失败: {e}", exc_info=True)
+            logger.error(f"[SearchMemoriesTool] 执行失败: {e}")
             return {
                 "name": self.name,
                 "content": f"搜索记忆时出错: {e!s}"

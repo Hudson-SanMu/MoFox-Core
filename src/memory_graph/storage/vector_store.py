@@ -47,8 +47,6 @@ class VectorStore:
         self.collection = None
         self.embedding_function = embedding_function
 
-        logger.info(f"初始化向量存储: collection={collection_name}, dir={self.data_dir}")
-
     async def initialize(self) -> None:
         """异步初始化 ChromaDB"""
         try:
@@ -70,10 +68,10 @@ class VectorStore:
                 metadata={"description": "Memory graph node embeddings"},
             )
 
-            logger.info(f"ChromaDB 初始化完成，集合包含 {self.collection.count()} 个节点")
+            logger.debug(f"ChromaDB 初始化完成，集合包含 {self.collection.count()} 个节点")
 
         except Exception as e:
-            logger.error(f"初始化 ChromaDB 失败: {e}", exc_info=True)
+            logger.error(f"初始化 ChromaDB 失败: {e}")
             raise
 
     async def add_node(self, node: MemoryNode) -> None:
@@ -118,7 +116,7 @@ class VectorStore:
             logger.debug(f"添加节点到向量存储: {node}")
 
         except Exception as e:
-            logger.error(f"添加节点失败: {e}", exc_info=True)
+            logger.error(f"添加节点失败: {e}")
             raise
 
     async def add_nodes_batch(self, nodes: list[MemoryNode]) -> None:
@@ -164,10 +162,8 @@ class VectorStore:
                 documents=[n.content for n in valid_nodes],
             )
 
-            logger.info(f"批量添加 {len(valid_nodes)} 个节点到向量存储")
-
         except Exception as e:
-            logger.error(f"批量添加节点失败: {e}", exc_info=True)
+            logger.error(f"批量添加节点失败: {e}")
             raise
 
     async def search_similar_nodes(
@@ -237,7 +233,7 @@ class VectorStore:
             return similar_nodes
 
         except Exception as e:
-            logger.error(f"相似节点搜索失败: {e}", exc_info=True)
+            logger.error(f"相似节点搜索失败: {e}")
             raise
 
     async def search_with_multiple_queries(
@@ -344,15 +340,10 @@ class VectorStore:
             fused_results.sort(key=lambda x: x[1], reverse=True)
             final_results = fused_results[:limit]
 
-            logger.info(
-                f"多查询融合搜索完成: {len(query_embeddings)} 个查询, "
-                f"融合后 {len(fused_results)} 个结果, 返回 {len(final_results)} 个"
-            )
-
             return final_results
 
         except Exception as e:
-            logger.error(f"多查询融合搜索失败: {e}", exc_info=True)
+            logger.error(f"多查询融合搜索失败: {e}")
             raise
 
     async def get_node_by_id(self, node_id: str) -> dict[str, Any] | None:
@@ -387,7 +378,7 @@ class VectorStore:
             return None
 
         except Exception as e:
-            logger.error(f"获取节点失败: {e}", exc_info=True)
+            logger.error(f"获取节点失败: {e}")
             return None
 
     async def delete_node(self, node_id: str) -> None:
@@ -405,7 +396,7 @@ class VectorStore:
             logger.debug(f"删除节点: {node_id}")
 
         except Exception as e:
-            logger.error(f"删除节点失败: {e}", exc_info=True)
+            logger.error(f"删除节点失败: {e}")
             raise
 
     async def update_node_embedding(self, node_id: str, embedding: np.ndarray) -> None:
@@ -424,7 +415,7 @@ class VectorStore:
             logger.debug(f"更新节点 embedding: {node_id}")
 
         except Exception as e:
-            logger.error(f"更新节点 embedding 失败: {e}", exc_info=True)
+            logger.error(f"更新节点 embedding 失败: {e}")
             raise
 
     def get_total_count(self) -> int:
@@ -448,5 +439,5 @@ class VectorStore:
             logger.warning(f"向量存储已清空: {self.collection_name}")
 
         except Exception as e:
-            logger.error(f"清空向量存储失败: {e}", exc_info=True)
+            logger.error(f"清空向量存储失败: {e}")
             raise

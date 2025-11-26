@@ -82,6 +82,6 @@ class SendFeedAction(BaseAction):
                 return False, result.get("message", "未知错误")
 
         except Exception as e:
-            logger.error(f"执行发送说说动作时发生未知异常: {e}", exc_info=True)
+            logger.error(f"执行发送说说动作时发生未知异常: {e}")
             await self.send_text("糟糕，发送的时候网络好像波动了一下...")
             return False, "动作执行异常"

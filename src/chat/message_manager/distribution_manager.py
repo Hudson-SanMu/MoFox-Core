@@ -277,7 +277,7 @@ class StreamLoopManager:
                     logger.info(f"🛑 [流工作器] stream={stream_id[:8]}, 任务ID={task_id}, 被取消")
                     break
                 except Exception as e:
-                    logger.error(f"❌ [流工作器] stream={stream_id[:8]}, 任务ID={task_id}, 出错: {e}", exc_info=True)
+                    logger.error(f"❌ [流工作器] stream={stream_id[:8]}, 任务ID={task_id}, 出错: {e}")
                     self.stats["total_failures"] += 1
                     await asyncio.sleep(5.0)  # 错误时等待5秒再重试
 
@@ -398,7 +398,7 @@ class StreamLoopManager:
                 chatter_task.cancel()
             raise
         except Exception as e:
-            logger.error(f"流处理异常: {stream_id} - {e}", exc_info=True)
+            logger.error(f"流处理异常: {stream_id} - {e}")
             return False
         finally:
             # 清除 Chatter 处理标志
@@ -699,7 +699,7 @@ class StreamLoopManager:
                 logger.warning(f"创建强制分发流循环失败: {stream_id}")
 
         except Exception as e:
-            logger.error(f"强制分发流处理失败 {stream_id}: {e}", exc_info=True)
+            logger.error(f"强制分发流处理失败 {stream_id}: {e}")
 
 
 # 全局流循环管理器实例

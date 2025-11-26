@@ -365,7 +365,6 @@ class UnifiedScheduler:
             logger.warning("调度器已在运行中")
             return
 
-        logger.info("正在启动统一调度器...")
         self._running = True
         self._stopping = False
         self._start_time = datetime.now()
@@ -384,14 +383,14 @@ class UnifiedScheduler:
         except ImportError:
             logger.warning("无法导入 event_manager，事件触发功能将不可用")
 
-        logger.info("统一调度器已启动")
+        logger.debug("统一调度器已启动")
 
     async def stop(self) -> None:
         """停止调度器（优雅关闭）"""
         if not self._running:
             return
 
-        logger.info("正在停止统一调度器...")
+        logger.debug("正在停止统一调度器...")
         self._stopping = True
         self._running = False
 
@@ -486,7 +485,7 @@ class UnifiedScheduler:
                 logger.debug("调度器主循环被取消")
                 break
             except Exception as e:
-                logger.error(f"调度器主循环发生错误: {e}", exc_info=True)
+                logger.error(f"调度器主循环发生错误: {e}")
 
     async def _deadlock_check_loop(self) -> None:
         """死锁检测循环"""
@@ -504,7 +503,7 @@ class UnifiedScheduler:
                 logger.debug("死锁检测循环被取消")
                 break
             except Exception as e:
-                logger.error(f"死锁检测循环发生错误: {e}", exc_info=True)
+                logger.error(f"死锁检测循环发生错误: {e}")
                 # 继续运行，不因单次错误停止
 
     async def _cleanup_loop(self) -> None:
@@ -522,7 +521,7 @@ class UnifiedScheduler:
                 logger.debug("清理循环被取消")
                 break
             except Exception as e:
-                logger.error(f"清理循环发生错误: {e}", exc_info=True)
+                logger.error(f"清理循环发生错误: {e}")
 
     # ==================== 任务触发逻辑 ====================
 
@@ -541,7 +540,7 @@ class UnifiedScheduler:
                 if should_trigger:
                     tasks_to_trigger.append(task)
             except Exception as e:
-                logger.error(f"检查任务 {task.task_name} 触发条件时出错: {e}", exc_info=True)
+                logger.error(f"检查任务 {task.task_name} 触发条件时出错: {e}")
 
         # 第二阶段：并发触发所有任务
         if tasks_to_trigger:
@@ -604,7 +603,7 @@ class UnifiedScheduler:
                 result = condition_func()
             return bool(result)
         except Exception as e:
-            logger.error(f"执行任务 {task.task_name} 的自定义条件函数时出错: {e}", exc_info=True)
+            logger.error(f"执行任务 {task.task_name} 的自定义条件函数时出错: {e}")
             return False
 
     async def _trigger_tasks_concurrently(self, tasks: list[ScheduleTask]) -> None:
@@ -659,7 +658,7 @@ class UnifiedScheduler:
 
                 except Exception as e:
                     # 任务执行失败
-                    logger.error(f"任务 {task.task_name} 执行失败: {e}", exc_info=True)
+                    logger.error(f"任务 {task.task_name} 执行失败: {e}")
                     task.finish_execution(success=False, error=e)
                     self._total_failures += 1
 
@@ -695,7 +694,7 @@ class UnifiedScheduler:
                 )
             return result
         except Exception as e:
-            logger.error(f"执行任务 {task.task_name} 的回调函数时出错: {e}", exc_info=True)
+            logger.error(f"执行任务 {task.task_name} 的回调函数时出错: {e}")
             raise
 
     def _acquire_semaphore(self):
@@ -803,7 +802,7 @@ class UnifiedScheduler:
                     raise
 
                 except Exception as e:
-                    logger.error(f"事件任务 {task.task_name} 执行失败: {e}", exc_info=True)
+                    logger.error(f"事件任务 {task.task_name} 执行失败: {e}")
                     task.finish_execution(success=False, error=e)
                     self._total_failures += 1
 
@@ -823,7 +822,7 @@ class UnifiedScheduler:
         except RecursionError:
             logger.error("死锁检测发生递归错误，跳过本轮检测")
         except Exception as e:
-            logger.error(f"死锁检测处理失败: {e}", exc_info=True)
+            logger.error(f"死锁检测处理失败: {e}")
 
     async def _check_and_handle_deadlocks(self) -> None:
         """检查并处理死锁任务"""
@@ -847,7 +846,7 @@ class UnifiedScheduler:
             try:
                 await self._cancel_task(task, reason="deadlock detected")
             except Exception as e:
-                logger.error(f"取消任务 {task_name} 时出错: {e}", exc_info=True)
+                logger.error(f"取消任务 {task_name} 时出错: {e}")
                 # 强制清理
                 task._asyncio_task = None
                 task.status = TaskStatus.CANCELLED
@@ -884,7 +883,7 @@ class UnifiedScheduler:
                     break
 
             except Exception as e:
-                logger.error(f"取消任务 {task.task_name} 时发生异常: {e}", exc_info=True)
+                logger.error(f"取消任务 {task.task_name} 时发生异常: {e}")
                 return False
 
         # 第三阶段：强制清理
@@ -1095,7 +1094,7 @@ class UnifiedScheduler:
             await exec_task
             return task.status == TaskStatus.COMPLETED
         except Exception as e:
-            logger.error(f"强制触发任务 {task.task_name} 失败: {e}", exc_info=True)
+            logger.error(f"强制触发任务 {task.task_name} 失败: {e}")
             return False
 
     async def pause_schedule(self, schedule_id: str) -> bool:
@@ -1293,18 +1292,12 @@ async def initialize_scheduler():
     这个函数应该在 bot 启动时调用
     """
     try:
-        logger.info("正在启动统一调度器...")
         await unified_scheduler.start()
         logger.info("统一调度器启动成功")
 
-        # 获取初始统计信息
-        stats = unified_scheduler.get_statistics()
-        logger.info(f"调度器状态: {stats}")
-
     except Exception as e:
-        logger.error(f"启动统一调度器失败: {e}", exc_info=True)
+        logger.error(f"启动统一调度器失败: {e}")
         raise
-
 
 async def shutdown_scheduler():
     """关闭调度器
@@ -1329,4 +1322,4 @@ async def shutdown_scheduler():
         logger.info("统一调度器已关闭")
 
     except Exception as e:
-        logger.error(f"关闭统一调度器失败: {e}", exc_info=True)
+        logger.error(f"关闭统一调度器失败: {e}")

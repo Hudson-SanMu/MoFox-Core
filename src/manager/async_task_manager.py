@@ -77,7 +77,7 @@ class AsyncTaskManager:
         except asyncio.CancelledError:
             logger.debug(f"任务 '{task.get_name()}' 被取消")
         except Exception as e:
-            logger.error(f"任务 '{task.get_name()}' 执行时发生异常: {e}", exc_info=True)
+            logger.error(f"任务 '{task.get_name()}' 执行时发生异常: {e}")
 
     async def add_task(self, task: AsyncTask, call_back: Callable[[asyncio.Task], None] | None = None):
         """
@@ -152,7 +152,7 @@ class AsyncTaskManager:
                     except asyncio.CancelledError:
                         logger.info(f"任务 '{task_name}' 已取消")
                     except Exception as e:
-                        logger.error(f"任务 '{task_name}' 执行时发生异常: {e}", exc_info=True)
+                        logger.error(f"任务 '{task_name}' 执行时发生异常: {e}")
 
             # 清空任务列表
             self.tasks.clear()

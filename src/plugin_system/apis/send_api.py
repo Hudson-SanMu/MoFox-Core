@@ -310,6 +310,15 @@ async def _send_to_target(
             timestamp=current_time,
         )
 
+        # Use readable display text so binary/base64 payloads are not stored directly
+        display_message_for_db = display_message or ""
+        if not display_message_for_db:
+            if message_type in {"emoji", "image", "voice", "video", "file"}:
+                # Leave empty to keep processed_plain_text (e.g., generated descriptions) instead of raw payloads
+                display_message_for_db = ""
+            elif isinstance(content, str):
+                display_message_for_db = content
+
         sent_msg = await heart_fc_sender.send_message(
             envelope,
             chat_stream=target_stream,
@@ -317,7 +326,7 @@ async def _send_to_target(
             storage_message=storage_message,
             show_log=show_log,
             thinking_start_time=current_time,
-            display_message=display_message or (content if isinstance(content, str) else ""),
+            display_message=display_message_for_db,
         )
 
         if sent_msg:

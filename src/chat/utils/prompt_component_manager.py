@@ -99,7 +99,7 @@ class PromptComponentManager:
                         result = await instance.execute()
                         return str(result) if result is not None else ""
                     except Exception as e:
-                        logger.error(f"执行静态规则提供者 '{cls.prompt_name}' 时出错: {e}", exc_info=True)
+                        logger.error(f"执行静态规则提供者 '{cls.prompt_name}' 时出错: {e}")
                         return ""  # 出错时返回空字符串，避免影响主流程
 
                 return content_provider
@@ -313,7 +313,7 @@ class PromptComponentManager:
                 try:
                     content = await provider(params, target_prompt_name)
                 except Exception as e:
-                    logger.error(f"执行规则 '{rule}' (来源: {source}) 的内容提供者时失败: {e}", exc_info=True)
+                    logger.error(f"执行规则 '{rule}' (来源: {source}) 的内容提供者时失败: {e}")
                     continue
 
             try:
@@ -336,7 +336,7 @@ class PromptComponentManager:
             except re.error as e:
                 logger.error(f"应用规则时发生正则错误: {e} (pattern: '{rule.target_content}')")
             except Exception as e:
-                logger.error(f"应用注入规则 '{rule}' (来源: {source}) 失败: {e}", exc_info=True)
+                logger.error(f"应用注入规则 '{rule}' (来源: {source}) 失败: {e}")
 
         # 4. 占位符恢复
         final_template = modified_template

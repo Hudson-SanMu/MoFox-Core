@@ -62,8 +62,6 @@ async def initialize_memory_manager(
         if isinstance(data_dir, str):
             data_dir = Path(data_dir)
 
-        logger.info(f"正在初始化全局 MemoryManager (data_dir={data_dir})...")
-
         _memory_manager = MemoryManager(data_dir=data_dir)
         await _memory_manager.initialize()
 
@@ -73,7 +71,7 @@ async def initialize_memory_manager(
         return _memory_manager
 
     except Exception as e:
-        logger.error(f"初始化 MemoryManager 失败: {e}", exc_info=True)
+        logger.error(f"初始化 MemoryManager 失败: {e}")
         _initialized = False
         _memory_manager = None
         raise
@@ -99,11 +97,10 @@ async def shutdown_memory_manager():
 
     if _memory_manager:
         try:
-            logger.info("正在关闭全局 MemoryManager...")
             await _memory_manager.shutdown()
             logger.info("✅ 全局 MemoryManager 已关闭")
         except Exception as e:
-            logger.error(f"关闭 MemoryManager 时出错: {e}", exc_info=True)
+            logger.error(f"关闭 MemoryManager 时出错: {e}")
         finally:
             _memory_manager = None
             _initialized = False
@@ -175,12 +172,10 @@ async def initialize_unified_memory_manager():
 
         # 初始化
         await _unified_memory_manager.initialize()
-
-        logger.info("✅ 统一记忆管理器单例已初始化")
         return _unified_memory_manager
 
     except Exception as e:
-        logger.error(f"初始化统一记忆管理器失败: {e}", exc_info=True)
+        logger.error(f"初始化统一记忆管理器失败: {e}")
         raise
 
 
@@ -210,5 +205,5 @@ async def shutdown_unified_memory_manager() -> None:
         logger.info("✅ 统一记忆管理器已关闭")
 
     except Exception as e:
-        logger.error(f"关闭统一记忆管理器失败: {e}", exc_info=True)
+        logger.error(f"关闭统一记忆管理器失败: {e}")
 

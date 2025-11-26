@@ -71,17 +71,17 @@ class LongTermMemoryManager:
             return
 
         try:
-            logger.info("开始初始化长期记忆管理器...")
+            logger.debug("开始初始化长期记忆管理器...")
 
             # 确保底层 MemoryManager 已初始化
             if not self.memory_manager._initialized:
                 await self.memory_manager.initialize()
 
             self._initialized = True
-            logger.info("✅ 长期记忆管理器初始化完成")
+            logger.debug("长期记忆管理器初始化完成")
 
         except Exception as e:
-            logger.error(f"长期记忆管理器初始化失败: {e}", exc_info=True)
+            logger.error(f"长期记忆管理器初始化失败: {e}")
             raise
 
     async def transfer_from_short_term(
@@ -107,7 +107,7 @@ class LongTermMemoryManager:
             await self.initialize()
 
         try:
-            logger.info(f"开始转移 {len(short_term_memories)} 条短期记忆到长期记忆...")
+            logger.debug(f"开始转移 {len(short_term_memories)} 条短期记忆到长期记忆...")
 
             result = {
                 "processed_count": 0,
@@ -143,11 +143,11 @@ class LongTermMemoryManager:
                 # 让出控制权
                 await asyncio.sleep(0.01)
 
-            logger.info(f"✅ 短期记忆转移完成: {result}")
+            logger.debug(f"短期记忆转移完成: {result}")
             return result
 
         except Exception as e:
-            logger.error(f"转移短期记忆失败: {e}", exc_info=True)
+            logger.error(f"转移短期记忆失败: {e}")
             return {"error": str(e), "processed_count": 0}
 
     async def _process_batch(self, batch: list[ShortTermMemory]) -> dict[str, Any]:
@@ -196,7 +196,7 @@ class LongTermMemoryManager:
                     result["failed_count"] += 1
 
             except Exception as e:
-                logger.error(f"处理短期记忆 {stm.id} 失败: {e}", exc_info=True)
+                logger.error(f"处理短期记忆 {stm.id} 失败: {e}")
                 result["failed_count"] += 1
 
         return result
@@ -272,7 +272,7 @@ class LongTermMemoryManager:
             return expanded_memories
 
         except Exception as e:
-            logger.error(f"检索相似长期记忆失败: {e}", exc_info=True)
+            logger.error(f"检索相似长期记忆失败: {e}")
             return []
 
     async def _decide_graph_operations(
@@ -310,11 +310,11 @@ class LongTermMemoryManager:
             # 解析图操作指令
             operations = self._parse_graph_operations(response)
 
-            logger.info(f"LLM 生成 {len(operations)} 个图操作指令")
+            logger.debug(f"LLM 生成 {len(operations)} 个图操作指令")
             return operations
 
         except Exception as e:
-            logger.error(f"LLM 决策图操作失败: {e}", exc_info=True)
+            logger.error(f"LLM 决策图操作失败: {e}")
             # 默认创建新记忆
             return [
                 GraphOperation(
@@ -553,13 +553,13 @@ class LongTermMemoryManager:
                         logger.warning(f"未实现的操作类型: {op.operation_type}")
 
                 except Exception as e:
-                    logger.error(f"执行图操作失败: {op}, 错误: {e}", exc_info=True)
+                    logger.error(f"执行图操作失败: {op}, 错误: {e}")
 
-            logger.info(f"执行了 {success_count}/{len(operations)} 个图操作")
+            logger.debug(f"执行了 {success_count}/{len(operations)} 个图操作")
             return success_count > 0
 
         except Exception as e:
-            logger.error(f"执行图操作失败: {e}", exc_info=True)
+            logger.error(f"执行图操作失败: {e}")
             return False
 
     @staticmethod
@@ -984,7 +984,7 @@ class LongTermMemoryManager:
             return {"decayed_count": decayed_count, "total_memories": len(all_memories)}
 
         except Exception as e:
-            logger.error(f"应用长期记忆衰减失败: {e}", exc_info=True)
+            logger.error(f"应用长期记忆衰减失败: {e}")
             return {"error": str(e), "decayed_count": 0}
 
     def get_statistics(self) -> dict[str, Any]:
@@ -1012,7 +1012,7 @@ class LongTermMemoryManager:
             logger.info("✅ 长期记忆管理器已关闭")
 
         except Exception as e:
-            logger.error(f"关闭长期记忆管理器失败: {e}", exc_info=True)
+            logger.error(f"关闭长期记忆管理器失败: {e}")
 
 
 # 全局单例
