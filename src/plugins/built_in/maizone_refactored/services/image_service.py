@@ -78,7 +78,7 @@ class ImageService:
         """
         try:
             # 获取配置
-            identity = config_api.get_global_config("identity", "年龄为19岁,是女孩子,身高为160cm,黑色短发")
+            identity = config_api.get_global_config("personality.identity", "年龄为19岁,是女孩子,身高为160cm,黑色短发")
             enable_ref = bool(self.get_config("models.image_ref", True))
             
             # 构建提示词
