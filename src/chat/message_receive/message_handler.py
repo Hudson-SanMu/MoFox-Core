@@ -120,9 +120,6 @@ class MessageHandler:
         # 注册前置钩子：消息预处理和过滤
         runtime.register_before_hook(self._before_hook)
 
-        # 注册后置钩子：存储、情绪更新等
-        runtime.register_after_hook(self._after_hook)
-
         # 注册错误钩子：统一异常处理
         runtime.register_error_hook(self._error_hook)
 
@@ -222,14 +219,6 @@ class MessageHandler:
                 await MessageStorage.update_message(dict(envelope))
                 raise UserWarning("Echo 消息已处理")
 
-    async def _after_hook(self, envelope: MessageEnvelope) -> None:
-        """
-        后置钩子：消息后处理
-
-        在消息处理完成后执行的清理工作
-        """
-        # 后置处理逻辑（如有需要）
-        pass
 
     async def _error_hook(self, envelope: MessageEnvelope, exc: BaseException) -> None:
         """
@@ -486,6 +475,21 @@ class MessageHandler:
             # 处理命令和后续流程
             await self._process_commands(message, chat)
 
+            # 触发消息事件
+            result = await event_manager.trigger_event(
+                EventType.ON_MESSAGE,
+                permission_group="SYSTEM",
+                message=message
+            )
+            if result and not result.all_continue_process():
+                raise UserWarning(
+                    f"插件{result.get_summary().get('stopped_handlers', '')}于消息到达时取消了消息处理"
+                )
+
+            # 预处理消息
+            await self._preprocess_message(message, chat)
+
+
         except UserWarning as uw:
             logger.info(str(uw))
         except Exception as e:
@@ -514,20 +518,6 @@ class MessageHandler:
                     await MessageStorage.store_message(message, chat)
                     logger.info(f"命令处理完成，跳过后续消息处理: {cmd_result}")
                     return
-
-            # 触发消息事件
-            result = await event_manager.trigger_event(
-                EventType.ON_MESSAGE,
-                permission_group="SYSTEM",
-                message=message
-            )
-            if result and not result.all_continue_process():
-                raise UserWarning(
-                    f"插件{result.get_summary().get('stopped_handlers', '')}于消息到达时取消了消息处理"
-                )
-
-            # 预处理消息
-            await self._preprocess_message(message, chat)
 
         except UserWarning as uw:
             logger.info(str(uw))
