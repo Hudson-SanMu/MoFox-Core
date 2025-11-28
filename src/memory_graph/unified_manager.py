@@ -13,10 +13,9 @@ import asyncio
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from src.common.logger import get_logger
-from src.config.config import TaskConfig
 from src.memory_graph.manager import MemoryManager
 from src.memory_graph.long_term_manager import LongTermMemoryManager
 from src.memory_graph.models import JudgeDecision, MemoryBlock, ShortTermMemory
@@ -84,7 +83,7 @@ class UnifiedMemoryManager:
         self.long_term_manager: LongTermMemoryManager
 
         # 底层 MemoryManager（长期记忆）
-        self.memory_manager: MemoryManager = cast(MemoryManager, memory_manager)
+        self.memory_manager: MemoryManager = memory_manager
 
         # 配置参数存储（用于初始化）
         self._config = {
@@ -331,11 +330,7 @@ class UnifiedMemoryManager:
 
 """
 
-            prompt = f"""你是一个记忆检索评估专家。你的任务是判断当前检索到的“感知记忆”（即时对话）和“短期记忆”（结构化信息）是否足以支撑一次有深度、有上下文的回复。
-
-**核心原则：**
-- **不要轻易检索长期记忆！** 只有在当前对话需要深入探讨、回忆过去复杂事件或需要特定背景知识时，才认为记忆不足。
-- **闲聊、简单问候、表情互动或无特定主题的对话，现有记忆通常是充足的。** 频繁检索长期记忆会拖慢响应速度。
+            prompt = f"""你是一个记忆检索评估专家。请判断检索到的记忆是否足以回答用户的问题。
 
 **用户查询：**
 {query}
@@ -346,36 +341,27 @@ class UnifiedMemoryManager:
 **检索到的短期记忆（结构化信息，自然语言描述）：**
 {short_term_desc or '（无）'}
 
-**评估指南：**
-1.  **分析用户意图**：用户是在闲聊，还是在讨论一个需要深入挖掘的话题？
-2.  **检查现有记忆**：当前的感知和短期记忆是否已经包含了足够的信息来回应用户的查询？
-    -   对于闲聊（如“你好”、“哈哈”、“[表情]”），现有记忆总是充足的 (`"is_sufficient": true`)。
-    -   对于需要回忆具体细节、深入探讨个人经历或专业知识的查询，如果现有记忆中没有相关信息，则可能不充足。
-3.  **决策**：
-    -   如果记忆充足，设置 `"is_sufficient": true`。
-    -   如果确实需要更多信息才能进行有意义的对话，设置 `"is_sufficient": false`，并提供具体的补充查询。
+**任务要求：**
+1. 判断这些记忆是否足以回答用户的问题
+2. 如果不充足，分析缺少哪些方面的信息
+3. 生成额外需要检索的 query（用于在长期记忆中检索）
 
 **输出格式（JSON）：**
 ```json
 {{
   "is_sufficient": true/false,
   "confidence": 0.85,
-  "reasoning": "在这里解释你的判断理由。例如：‘用户只是在打招呼，现有记忆已足够’或‘用户问到了一个具体的历史事件，需要检索长期记忆’。",
+  "reasoning": "判断理由",
   "missing_aspects": ["缺失的信息1", "缺失的信息2"],
   "additional_queries": ["补充query1", "补充query2"]
 }}
 ```
 
-请严格按照上述原则进行判断，并输出JSON："""
+请输出JSON："""
 
             # 调用记忆裁判模型
-            model_set = (
-                model_config.model_task_config.memory_judge
-                if model_config and model_config.model_task_config
-                else TaskConfig(model_name="deepseek/deepseek-v2", provider="deepseek")
-            )
             llm = LLMRequest(
-                model_set=model_set,
+                model_set=model_config.model_task_config.memory_judge,
                 request_type="unified_memory.judge",
             )
 

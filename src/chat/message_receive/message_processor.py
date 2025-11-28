@@ -56,7 +56,7 @@ async def process_message_from_dict(message_dict: MessageEnvelope, stream_id: st
     }
 
     # 异步处理消息段，生成纯文本
-    processed_plain_text = await _process_message_segments(message_segment, processing_state)
+    processed_plain_text = await _process_message_segments(message_segment, processing_state, message_info)
 
     # 解析 notice 信息
     is_notify = False
@@ -155,13 +155,15 @@ async def process_message_from_dict(message_dict: MessageEnvelope, stream_id: st
 
 async def _process_message_segments(
     segment: SegPayload | list[SegPayload], 
-    state: dict
+    state: dict, 
+    message_info: MessageInfoPayload
 ) -> str:
     """递归处理消息段，转换为文字描述
 
     Args:
         segment: 要处理的消息段（TypedDict 或列表）
         state: 处理状态字典（用于记录消息类型标记）
+        message_info: 消息基础信息（TypedDict 格式）
 
     Returns:
         str: 处理后的文本
@@ -170,7 +172,7 @@ async def _process_message_segments(
     if isinstance(segment, list):
         segments_text = []
         for seg in segment:
-            processed = await _process_message_segments(seg, state)
+            processed = await _process_message_segments(seg, state, message_info)
             if processed:
                 segments_text.append(processed)
         return " ".join(segments_text)
@@ -184,26 +186,28 @@ async def _process_message_segments(
         if seg_type == "seglist" and isinstance(seg_data, list):
             segments_text = []
             for sub_seg in seg_data:
-                processed = await _process_message_segments(sub_seg, state)
+                processed = await _process_message_segments(sub_seg, state, message_info)
                 if processed:
                     segments_text.append(processed)
             return " ".join(segments_text)
         
         # 处理其他类型
-        return await _process_single_segment(segment, state)
+        return await _process_single_segment(segment, state, message_info)
     
     return ""
 
 
 async def _process_single_segment(
     segment: SegPayload, 
-    state: dict
+    state: dict, 
+    message_info: MessageInfoPayload
 ) -> str:
     """处理单个消息段
 
     Args:
         segment: 消息段（TypedDict 格式）
         state: 处理状态字典
+        message_info: 消息基础信息（TypedDict 格式）
 
     Returns:
         str: 处理后的文本
@@ -230,6 +234,7 @@ async def _process_single_segment(
             return f"@{seg_data}" if isinstance(seg_data, str) else "@未知用户"
 
         elif seg_type == "image":
+            # 如果是base64图片数据
             if isinstance(seg_data, str):
                 state["has_picid"] = True
                 state["is_picid"] = True
@@ -242,17 +247,27 @@ async def _process_single_segment(
             state["has_emoji"] = True
             state["is_emoji"] = True
             if isinstance(seg_data, str):
-                image_manager = get_image_manager()
-                return await image_manager.get_emoji_description(seg_data)
+                return await get_image_manager().get_emoji_description(seg_data)
             return "[发了一个表情包，网卡了加载不出来]"
 
         elif seg_type == "voice":
             state["is_voice"] = True
-            # 检查是否是自己发送的语音
+
+            # 检查消息是否由机器人自己发送
+            user_info = message_info.get("user_info", {})
+            user_id_str = str(user_info.get("user_id", ""))
+            if user_id_str == str(global_config.bot.qq_account):
+                logger.info(f"检测到机器人自身发送的语音消息 (User ID: {user_id_str})，尝试从缓存获取文本。")
+                if isinstance(seg_data, str):
+                    cached_text = consume_self_voice_text(seg_data)
+                    if cached_text:
+                        logger.info(f"成功从缓存中获取语音文本: '{cached_text[:70]}...'")
+                        return f"[语音：{cached_text}]"
+                    else:
+                        logger.warning("机器人自身语音消息缓存未命中，将回退到标准语音识别。")
+
+            # 标准语音识别流程
             if isinstance(seg_data, str):
-                cached_text = consume_self_voice_text(seg_data)
-                if cached_text:
-                    return f"[语音：{cached_text}]"
                 return await get_voice_text(seg_data)
             return "[发了一段语音，网卡了加载不出来]"
 
@@ -284,7 +299,7 @@ async def _process_single_segment(
                 logger.warning("⚠️ Rust视频处理模块不可用，跳过视频分析")
                 return "[视频]"
 
-            if global_config and global_config.video_analysis and global_config.video_analysis.enable:
+            if global_config.video_analysis.enable:
                 logger.info("已启用视频识别,开始识别")
                 if isinstance(seg_data, dict):
                     try:
@@ -302,9 +317,8 @@ async def _process_single_segment(
 
                             # 使用video analyzer分析视频
                             video_analyzer = get_video_analyzer()
-                            prompt = global_config.video_analysis.batch_analysis_prompt if global_config and global_config.video_analysis else ""
                             result = await video_analyzer.analyze_video_from_bytes(
-                                video_bytes, filename, prompt=prompt
+                                video_bytes, filename, prompt=global_config.video_analysis.batch_analysis_prompt
                             )
 
                             logger.info(f"视频分析结果: {result}")

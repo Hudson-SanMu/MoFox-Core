@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 import uuid
 
 from mofox_wire import MessageBuilder
@@ -214,9 +214,6 @@ class MessageHandler:
             case RealMessageType.record:
                 return await self._handle_record_message(segment)
             case RealMessageType.video:
-                if not config_api.get_plugin_config(self.plugin_config, "features.enable_video_processing", True):
-                    logger.debug("视频消息处理已禁用，跳过")
-                    return None
                 return await self._handle_video_message(segment)
             case RealMessageType.rps:
                 return await self._handle_rps_message(segment)
@@ -334,13 +331,10 @@ class MessageHandler:
             {"type": seg.get("type", "text"), "data": seg.get("data", "")} for seg in reply_segments
         ] or [{"type": "text", "data": "[无法获取被引用的消息]"}]
 
-        return cast(
-            SegPayload,
-            {
-                "type": "seglist",
-                "data": [{"type": "text", "data": prefix_text}, *brief_segments, {"type": "text", "data": suffix_text}],
-            },
-        )
+        return {
+            "type": "seglist",
+            "data": [{"type": "text", "data": prefix_text}, *brief_segments, {"type": "text", "data": suffix_text}],
+        }
 
     async def _handle_record_message(self, segment: dict) -> SegPayload | None:
         """处理语音消息"""
@@ -386,17 +380,14 @@ class MessageHandler:
                 video_base64 = base64.b64encode(video_data).decode("utf-8")
                 logger.debug(f"视频文件大小: {len(video_data) / (1024 * 1024):.2f} MB")
 
-                return cast(
-                    SegPayload,
-                    {
-                        "type": "video",
-                        "data": {
-                            "base64": video_base64,
-                            "filename": Path(file_path).name,
-                            "size_mb": len(video_data) / (1024 * 1024),
-                        },
+                return {
+                    "type": "video",
+                    "data": {
+                        "base64": video_base64,
+                        "filename": Path(file_path).name,
+                        "size_mb": len(video_data) / (1024 * 1024),
                     },
-                )
+                }
             elif video_url:
                 # URL下载处理
                 from ..video_handler import get_video_downloader
@@ -410,18 +401,15 @@ class MessageHandler:
                 video_base64 = base64.b64encode(download_result["data"]).decode("utf-8")
                 logger.debug(f"视频下载成功，大小: {len(download_result['data']) / (1024 * 1024):.2f} MB")
 
-                return cast(
-                    SegPayload,
-                    {
-                        "type": "video",
-                        "data": {
-                            "base64": video_base64,
-                            "filename": download_result.get("filename", "video.mp4"),
-                            "size_mb": len(download_result["data"]) / (1024 * 1024),
-                            "url": video_url,
-                        },
+                return {
+                    "type": "video",
+                    "data": {
+                        "base64": video_base64,
+                        "filename": download_result.get("filename", "video.mp4"),
+                        "size_mb": len(download_result["data"]) / (1024 * 1024),
+                        "url": video_url,
                     },
-                )
+                }
             else:
                 logger.warning("既没有有效的本地文件路径，也没有有效的视频URL")
                 return None
@@ -466,39 +454,34 @@ class MessageHandler:
             processed_message = handled_message
 
         forward_hint = {"type": "text", "data": "这是一条转发消息：\n"}
-        return cast(SegPayload, {"type": "seglist", "data": [forward_hint, processed_message]})
+        return {"type": "seglist", "data": [forward_hint, processed_message]}
 
     async def _recursive_parse_image_seg(self, seg_data: SegPayload, to_image: bool) -> SegPayload:
         # sourcery skip: merge-else-if-into-elif
         if seg_data.get("type") == "seglist":
             new_seg_list = []
             for i_seg in seg_data.get("data", []):
-                if isinstance(i_seg, dict):  # 确保是字典类型
-                    parsed_seg = await self._recursive_parse_image_seg(i_seg, to_image)
-                    new_seg_list.append(parsed_seg)
+                parsed_seg = await self._recursive_parse_image_seg(i_seg, to_image)
+                new_seg_list.append(parsed_seg)
             return {"type": "seglist", "data": new_seg_list}
 
         if to_image:
             if seg_data.get("type") == "image":
                 image_url = seg_data.get("data")
-                if isinstance(image_url, str):
-                    try:
-                        encoded_image = await get_image_base64(image_url)
-                    except Exception as e:
-                        logger.error(f"图片处理失败: {str(e)}")
-                        return {"type": "text", "data": "[图片]"}
-                    return {"type": "image", "data": encoded_image}
-                return {"type": "text", "data": "[图片]"}
+                try:
+                    encoded_image = await get_image_base64(image_url)
+                except Exception as e:
+                    logger.error(f"图片处理失败: {str(e)}")
+                    return {"type": "text", "data": "[图片]"}
+                return {"type": "image", "data": encoded_image}
             if seg_data.get("type") == "emoji":
                 image_url = seg_data.get("data")
-                if isinstance(image_url, str):
-                    try:
-                        encoded_image = await get_image_base64(image_url)
-                    except Exception as e:
-                        logger.error(f"图片处理失败: {str(e)}")
-                        return {"type": "text", "data": "[表情包]"}
-                    return {"type": "emoji", "data": encoded_image}
-                return {"type": "text", "data": "[表情包]"}
+                try:
+                    encoded_image = await get_image_base64(image_url)
+                except Exception as e:
+                    logger.error(f"图片处理失败: {str(e)}")
+                    return {"type": "text", "data": "[表情包]"}
+                return {"type": "emoji", "data": encoded_image}
             logger.debug(f"不处理类型: {seg_data.get('type')}")
             return seg_data
 
@@ -612,7 +595,7 @@ class MessageHandler:
             "id": file_id,
         }
 
-        return cast(SegPayload, {"type": "file", "data": file_data})
+        return {"type": "file", "data": file_data}
 
     async def _handle_json_message(self, segment: dict) -> SegPayload | None:
         """
@@ -640,7 +623,7 @@ class MessageHandler:
                 # 从回声消息中提取文件信息
                 file_info = self._extract_file_info_from_echo(nested_data)
                 if file_info:
-                    return cast(SegPayload, {"type": "file", "data": file_info})
+                    return {"type": "file", "data": file_info}
 
             # 检查是否是QQ小程序分享消息
             if "app" in nested_data and "com.tencent.miniapp" in str(nested_data.get("app", "")):
