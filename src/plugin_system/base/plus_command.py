@@ -90,6 +90,9 @@ class PlusCommand(ABC):
         plain_text = self.message.processed_plain_text.strip()
 
         # 获取配置的命令前缀
+        if global_config is None or global_config.command is None:
+            self.args = CommandArgs("")
+            return
         prefixes = global_config.command.command_prefixes
 
         # 检查是否以任何前缀开头
@@ -167,6 +170,8 @@ class PlusCommand(ABC):
         plain_text = self.message.processed_plain_text.strip()
 
         # 获取配置的命令前缀
+        if global_config is None or global_config.command is None:
+            return False
         prefixes = global_config.command.command_prefixes
 
         # 检查每个前缀
@@ -189,7 +194,7 @@ class PlusCommand(ABC):
         Returns:
             Tuple[bool, Optional[str], bool]: (是否执行成功, 可选的回复消息, 是否拦截消息)
         """
-        pass
+        raise NotImplementedError
 
     def get_config(self, key: str, default=None):
         """获取插件配置值，使用嵌套键访问
@@ -351,10 +356,14 @@ def create_plus_command_adapter(plus_command_class):
         适配器类
     """
     from src.plugin_system.base.base_command import BaseCommand
+
+    # 调用类方法生成命令模式
+    _command_pattern = plus_command_class._generate_command_pattern()  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
+
     class AdapterClass(BaseCommand):
         command_name = plus_command_class.command_name
         command_description = plus_command_class.command_description
-        command_pattern = plus_command_class._generate_command_pattern()
+        command_pattern = _command_pattern
         chat_type_allow = getattr(plus_command_class, "chat_type_allow", ChatType.ALL)
 
         def __init__(self, message: DatabaseMessages, plugin_config: dict | None = None):
@@ -383,7 +392,7 @@ def create_plus_command_adapter(plus_command_class):
             # 执行命令，传递正确解析的参数
             try:
                 return await self.plus_command.execute(command_args)
-            except Exception as e:
+            except (TypeError, ValueError, RuntimeError) as e:
                 logger.error(f"执行命令时出错: {e}")
                 return False, f"命令执行出错: {e!s}", self.intercept_message
 
@@ -442,7 +451,7 @@ def create_legacy_command_adapter(legacy_command_class):
             try:
                 # 旧的execute不接收args参数
                 return await self.legacy_command.execute()
-            except Exception as e:
+            except (TypeError, ValueError, RuntimeError) as e:
                 logger.error(f"执行旧版命令 '{self.command_name}' 时出错: {e}")
                 return False, f"命令执行出错: {e!s}", self.intercept_message
 
