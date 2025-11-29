@@ -6,6 +6,8 @@ if (tab_links.length > 0) tab_links[0].classList.add("active");
 
 // 跟踪哪些tab的图表已经初始化
 const initializedTabs = new Set();
+// 存储初始化函数的引用，以便在showTab中调用
+let initializeStaticChartsForPeriod = null;
 
 function showTab(evt, tabName) {
     for (i = 0; i < tab_content.length; i++) {
@@ -20,7 +22,7 @@ function showTab(evt, tabName) {
     evt.currentTarget.classList.add("active");
     
     // 懒加载：只在第一次切换到tab时初始化该tab的图表
-    if (!initializedTabs.has(tabName) && tabName !== 'charts') {
+    if (!initializedTabs.has(tabName) && tabName !== 'charts' && initializeStaticChartsForPeriod) {
         initializeStaticChartsForPeriod(tabName);
         initializedTabs.add(tabName);
     }
@@ -186,7 +188,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // 懒加载函数：只初始化指定tab的静态图表
-    function initializeStaticChartsForPeriod(period_id) {
+    // 将函数赋值给外部变量，使得showTab可以调用
+    initializeStaticChartsForPeriod = function(period_id) {
         if (!staticChartData[period_id]) {
             console.warn(`No static chart data for period: ${period_id}`);
             return;
@@ -989,7 +992,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
-    }
+    };
     
     // 初始化第一个tab(默认显示的tab)的图表
     const firstTab = tab_content[0]?.id;
