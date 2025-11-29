@@ -10,6 +10,7 @@ import orjson
 from mofox_wire import MessageEnvelope
 from mofox_wire.types import MessageInfoPayload, SegPayload, UserInfoPayload, GroupInfoPayload
 
+from src.chat.message_receive.special_message_parser import parse_special_message
 from src.chat.utils.self_voice_cache import consume_self_voice_text
 from src.chat.utils.utils_image import get_image_manager
 from src.chat.utils.utils_video import get_video_analyzer, is_video_analysis_available
@@ -342,9 +343,16 @@ async def _process_single_segment(
                 return "[发了一个视频，但格式不支持]"
             else:
                 return ""
-        else:
-            logger.warning(f"未知的消息段类型: {seg_type}")
-            return f"[{seg_type} 消息]"
+
+        # 尝试使用特殊消息解析器处理 XML、JSON、Location、Share、Contact、Forward 等类型
+        special_result = parse_special_message(seg_type, seg_data)
+        if special_result is not None:
+            logger.debug(f"特殊消息解析成功: {seg_type} -> {special_result[:100]}...")
+            return special_result
+
+        # 未知消息类型
+        logger.warning(f"未知的消息段类型: {seg_type}")
+        return f"[{seg_type} 消息]"
 
     except Exception as e:
         logger.error(f"处理消息段失败: {e!s}, 类型: {seg_type}, 数据: {seg_data}")
