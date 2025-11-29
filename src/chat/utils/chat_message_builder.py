@@ -39,11 +39,13 @@ def replace_user_references_sync(
     Returns:
         str: 处理后的内容字符串
     """
+    assert global_config is not None
     if not content:
         return ""
 
     if name_resolver is None:
         def default_resolver(platform: str, user_id: str) -> str:
+            assert global_config is not None
             # 检查是否是机器人自己
             if replace_bot_name and (user_id == str(global_config.bot.qq_account)):
                 return f"{global_config.bot.nickname}(你)"
@@ -116,10 +118,12 @@ async def replace_user_references_async(
     Returns:
         str: 处理后的内容字符串
     """
+    assert global_config is not None
     if name_resolver is None:
         person_info_manager = get_person_info_manager()
 
         async def default_resolver(platform: str, user_id: str) -> str:
+            assert global_config is not None
             # 检查是否是机器人自己
             if replace_bot_name and (user_id == str(global_config.bot.qq_account)):
                 return f"{global_config.bot.nickname}(你)"
@@ -392,7 +396,7 @@ async def get_actions_by_timestamp_with_chat_inclusive(
                 actions = list(result.scalars())
                 return [action.__dict__ for action in reversed(actions)]
             else:  # earliest
-                result = await session.execute(
+                query = await session.execute(
                     select(ActionRecords)
                     .where(
                         and_(
@@ -540,6 +544,7 @@ async def _build_readable_messages_internal(
     Returns:
         包含格式化消息的字符串、原始消息详情列表、图片映射字典和更新后的计数器的元组。
     """
+    assert global_config is not None
     if not messages:
         return "", [], pic_id_mapping or {}, pic_counter
 
@@ -694,6 +699,7 @@ async def _build_readable_messages_internal(
             percentile = i / n_messages  # 计算消息在列表中的位置百分比 (0 <= percentile < 1)
             original_len = len(content)
             limit = -1  # 默认不截断
+            replace_content = ""
 
             if percentile < 0.2:  # 60% 之前的消息 (即最旧的 60%)
                 limit = 50
@@ -973,6 +979,7 @@ async def build_readable_messages(
         truncate: 是否截断长消息
         show_actions: 是否显示动作记录
     """
+    assert global_config is not None
     # 创建messages的深拷贝，避免修改原始列表
     if not messages:
         return ""
@@ -1112,6 +1119,7 @@ async def build_anonymous_messages(messages: list[dict[str, Any]]) -> str:
     构建匿名可读消息，将不同人的名称转为唯一占位符（A、B、C...），bot自己用SELF。
     处理 回复<aaa:bbb> 和 @<aaa:bbb> 字段，将bbb映射为匿名占位符。
     """
+    assert global_config is not None
     if not messages:
         print("111111111111没有消息，无法构建匿名消息")
         return ""
@@ -1127,6 +1135,7 @@ async def build_anonymous_messages(messages: list[dict[str, Any]]) -> str:
     def get_anon_name(platform, user_id):
         # print(f"get_anon_name: platform:{platform}, user_id:{user_id}")
         # print(f"global_config.bot.qq_account:{global_config.bot.qq_account}")
+        assert global_config is not None
 
         if user_id == global_config.bot.qq_account:
             # print("SELF11111111111111")
@@ -1204,6 +1213,7 @@ async def get_person_id_list(messages: list[dict[str, Any]]) -> list[str]:
     Returns:
         一个包含唯一 person_id 的列表。
     """
+    assert global_config is not None
     person_ids_set = set()  # 使用集合来自动去重
 
     for msg in messages:

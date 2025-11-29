@@ -338,6 +338,7 @@ class HTMLReportGenerator:
 
         # 渲染模板
         # 读取CSS和JS文件内容
+        assert isinstance(self.jinja_env.loader, FileSystemLoader)
         async with aiofiles.open(os.path.join(self.jinja_env.loader.searchpath[0], "report.css"), encoding="utf-8") as f:
             report_css = await f.read()
         async with aiofiles.open(os.path.join(self.jinja_env.loader.searchpath[0], "report.js"), encoding="utf-8") as f:

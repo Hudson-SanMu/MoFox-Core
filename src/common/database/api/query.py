@@ -20,7 +20,7 @@ from src.common.logger import get_logger
 
 logger = get_logger("database.query")
 
-T = TypeVar("T", bound="Base")
+T = TypeVar("T", bound=Any)
 
 
 class QueryBuilder(Generic[T]):
@@ -330,7 +330,7 @@ class QueryBuilder(Generic[T]):
 
         items = await self.all()
 
-        return items, total
+        return items, total  # type: ignore
 
 
 class AggregateQuery:

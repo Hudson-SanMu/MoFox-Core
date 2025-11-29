@@ -44,6 +44,7 @@ def get_string_field(max_length=255, **kwargs):
     """
     from src.config.config import global_config
 
+    assert global_config is not None
     db_type = global_config.database.database_type
 
     # MySQL 索引需要指定长度的 VARCHAR

@@ -173,9 +173,10 @@ class SecurityManager:
         pre_check_results = await asyncio.gather(*pre_check_tasks, return_exceptions=True)
 
         # 筛选需要完整检查的检测器
-        checkers_to_run = [
-            c for c, need_check in zip(enabled_checkers, pre_check_results) if need_check is True
-        ]
+        checkers_to_run = []
+        for c, need_check in zip(enabled_checkers, pre_check_results):
+            if need_check is True:
+                checkers_to_run.append(c)
 
         if not checkers_to_run:
             return SecurityCheckResult(
@@ -192,20 +193,22 @@ class SecurityManager:
         results = await asyncio.gather(*check_tasks, return_exceptions=True)
 
         # 过滤异常结果
-        valid_results = []
+        valid_results: list[SecurityCheckResult] = []
         for checker, result in zip(checkers_to_run, results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(f"检测器 '{checker.name}' 执行失败: {result}")
                 continue
-            result.checker_name = checker.name
-            valid_results.append(result)
+
+            if isinstance(result, SecurityCheckResult):
+                result.checker_name = checker.name
+                valid_results.append(result)
 
         # 合并结果
         return self._merge_results(valid_results, time.time() - start_time)
 
     async def _check_all(self, message: str, context: dict, start_time: float) -> SecurityCheckResult:
         """检测所有模式（顺序执行所有检测器）"""
-        results = []
+        results: list[SecurityCheckResult] = []
 
         for checker in self._checkers:
             if not checker.enabled:

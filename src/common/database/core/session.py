@@ -75,6 +75,7 @@ async def _apply_session_settings(session: AsyncSession, db_type: str) -> None:
             # 可以设置 schema 搜索路径等
             from src.config.config import global_config
 
+            assert global_config is not None
             schema = global_config.database.postgresql_schema
             if schema and schema != "public":
                 await session.execute(text(f"SET search_path TO {schema}"))
@@ -114,6 +115,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
         # 获取数据库类型并应用特定设置
         from src.config.config import global_config
 
+        assert global_config is not None
         await _apply_session_settings(session, global_config.database.database_type)
 
         yield session
@@ -142,6 +144,7 @@ async def get_db_session_direct() -> AsyncGenerator[AsyncSession, None]:
             # 应用数据库特定设置
             from src.config.config import global_config
 
+            assert global_config is not None
             await _apply_session_settings(session, global_config.database.database_type)
 
             yield session

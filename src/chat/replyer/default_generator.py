@@ -240,6 +240,8 @@ class DefaultReplyer:
         chat_stream: "ChatStream",
         request_type: str = "replyer",
     ):
+        assert global_config is not None
+        assert model_config is not None
         self.express_model = LLMRequest(model_set=model_config.model_task_config.replyer, request_type=request_type)
         self.chat_stream = chat_stream
         # 这些将在异步初始化中设置
@@ -267,6 +269,7 @@ class DefaultReplyer:
 
     async def _build_auth_role_prompt(self) -> str:
         """根据主人配置生成额外提示词"""
+        assert global_config is not None
         master_config = global_config.permission.master_prompt
         if not master_config or not master_config.enable:
             return ""
@@ -515,6 +518,7 @@ class DefaultReplyer:
         Returns:
             str: 表达习惯信息字符串
         """
+        assert global_config is not None
         # 检查是否允许在此聊天流中使用表达
         use_expression, _, _ = global_config.expression.get_expression_config_for_chat(self.chat_stream.stream_id)
         if not use_expression:
@@ -583,6 +587,7 @@ class DefaultReplyer:
         Returns:
             str: 记忆信息字符串
         """
+        assert global_config is not None
         # 检查是否启用三层记忆系统
         if not (global_config.memory and global_config.memory.enable):
             return ""
@@ -776,6 +781,7 @@ class DefaultReplyer:
         Returns:
             str: 关键词反应提示字符串，如果没有触发任何反应则为空字符串
         """
+        assert global_config is not None
         if target is None:
             return ""
 
@@ -834,6 +840,7 @@ class DefaultReplyer:
         Returns:
             str: 格式化的notice信息文本，如果没有notice或未启用则返回空字符串
         """
+        assert global_config is not None
         try:
             logger.debug(f"开始构建notice块，chat_id={chat_id}")
 
@@ -902,6 +909,7 @@ class DefaultReplyer:
         Returns:
             Tuple[str, str]: (已读历史消息prompt, 未读历史消息prompt)
         """
+        assert global_config is not None
         try:
             # 从message_manager获取真实的已读/未读消息
 
@@ -1002,6 +1010,7 @@ class DefaultReplyer:
         """
         回退的已读/未读历史消息构建方法
         """
+        assert global_config is not None
         # 通过is_read字段分离已读和未读消息
         read_messages = []
         unread_messages = []
@@ -1115,6 +1124,7 @@ class DefaultReplyer:
         Returns:
             str: 构建好的上下文
         """
+        assert global_config is not None
         if available_actions is None:
             available_actions = {}
         chat_stream = self.chat_stream
@@ -1607,6 +1617,7 @@ class DefaultReplyer:
         reply_to: str,
         reply_message: dict[str, Any] | DatabaseMessages | None = None,
     ) -> str:  # sourcery skip: merge-else-if-into-elif, remove-redundant-if
+        assert global_config is not None
         chat_stream = self.chat_stream
         chat_id = chat_stream.stream_id
         is_group_chat = bool(chat_stream.group_info)
@@ -1767,6 +1778,7 @@ class DefaultReplyer:
         return prompt_text
 
     async def llm_generate_content(self, prompt: str):
+        assert global_config is not None
         with Timer("LLM生成", {}):  # 内部计时器，可选保留
             # 直接使用已初始化的模型实例
             logger.info(f"使用模型集生成回复: {self.express_model.model_for_task}")
@@ -1792,6 +1804,8 @@ class DefaultReplyer:
         return content, reasoning_content, model_name, tool_calls
 
     async def get_prompt_info(self, message: str, sender: str, target: str):
+        assert global_config is not None
+        assert model_config is not None
         related_info = ""
         start_time = time.time()
         from src.plugins.built_in.knowledge.lpmm_get_knowledge import SearchKnowledgeFromLPMMTool
@@ -1843,6 +1857,7 @@ class DefaultReplyer:
             return ""
 
     async def build_relation_info(self, sender: str, target: str):
+        assert global_config is not None
         # 获取用户ID
         if sender == f"{global_config.bot.nickname}(你)":
             return "你将要回复的是你自己发送的消息。"
@@ -1927,6 +1942,7 @@ class DefaultReplyer:
             reply_to: 回复对象
             reply_message: 回复的原始消息
         """
+        assert global_config is not None
         return  # 已禁用，保留函数签名以防其他地方有引用
 
         # 以下代码已废弃，不再执行

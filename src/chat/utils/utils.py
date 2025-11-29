@@ -49,6 +49,7 @@ def is_mentioned_bot_in_message(message) -> tuple[bool, float]:
         tuple[bool, float]: (是否提及, 提及类型)
         提及类型: 0=未提及, 1=弱提及（文本匹配）, 2=强提及（@/回复/私聊）
     """
+    assert global_config is not None
     nicknames = global_config.bot.alias_names
     mention_type = 0  # 0=未提及, 1=弱提及, 2=强提及
 
@@ -132,6 +133,7 @@ def is_mentioned_bot_in_message(message) -> tuple[bool, float]:
 
 async def get_embedding(text, request_type="embedding") -> list[float] | None:
     """获取文本的embedding向量"""
+    assert model_config is not None
     # 每次都创建新的LLMRequest实例以避免事件循环冲突
     llm = LLMRequest(model_set=model_config.model_task_config.embedding, request_type=request_type)
     try:
@@ -139,11 +141,12 @@ async def get_embedding(text, request_type="embedding") -> list[float] | None:
     except Exception as e:
         logger.error(f"获取embedding失败: {e!s}")
         embedding = None
-    return embedding
+    return embedding  # type: ignore
 
 
 async def get_recent_group_speaker(chat_stream_id: str, sender, limit: int = 12) -> list:
     # 获取当前群聊记录内发言的人
+    assert global_config is not None
     filter_query = {"chat_id": chat_stream_id}
     sort_order = [("time", -1)]
     recent_messages = await find_messages(message_filter=filter_query, sort=sort_order, limit=limit)
@@ -400,11 +403,12 @@ def recover_quoted_content(sentences: list[str], placeholder_map: dict[str, str]
         recovered_sentences.append(sentence)
     return recovered_sentences
 
-
 def process_llm_response(text: str, enable_splitter: bool = True, enable_chinese_typo: bool = True) -> list[str]:
+    assert global_config is not None
     if not global_config.response_post_process.enable_response_post_process:
         return [text]
 
+    # --- 三层防护系统 ---
     # --- 三层防护系统 ---
     # 第一层：保护颜文字
     protected_text, kaomoji_mapping = protect_kaomoji(text) if global_config.response_splitter.enable_kaomoji_protection else (text, {})

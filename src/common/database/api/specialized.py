@@ -122,7 +122,7 @@ async def get_recent_actions(
         动作记录列表
     """
     query = QueryBuilder(ActionRecords)
-    return await query.filter(chat_id=chat_id).order_by("-time").limit(limit).all()
+    return await query.filter(chat_id=chat_id).order_by("-time").limit(limit).all()  # type: ignore
 
 
 # ===== Messages 业务API =====
@@ -148,7 +148,7 @@ async def get_chat_history(
         .limit(limit)
         .offset(offset)
         .all()
-    )
+    )  # type: ignore
 
 
 async def get_message_count(stream_id: str) -> int:
@@ -292,7 +292,7 @@ async def get_active_streams(
     if platform:
         query = query.filter(platform=platform)
 
-    return await query.order_by("-last_message_time").limit(limit).all()
+    return await query.order_by("-last_message_time").limit(limit).all()  # type: ignore
 
 
 # ===== LLMUsage 业务API =====
@@ -390,7 +390,7 @@ async def get_usage_statistics(
     # 聚合统计
     total_input = await query.sum("input_tokens")
     total_output = await query.sum("output_tokens")
-    total_count = await query.filter().count() if hasattr(query, "count") else 0
+    total_count = await getattr(query.filter(), "count")() if hasattr(query, "count") else 0
 
     return {
         "total_input_tokens": int(total_input),

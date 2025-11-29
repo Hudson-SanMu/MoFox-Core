@@ -11,6 +11,8 @@ logger = get_logger("chat_voice")
 
 async def get_voice_text(voice_base64: str) -> str:
     """获取音频文件转录文本"""
+    assert global_config is not None
+    assert model_config is not None
     if not global_config.voice.enable_asr:
         logger.warning("语音识别未启用，无法处理语音消息")
         return "[语音]"

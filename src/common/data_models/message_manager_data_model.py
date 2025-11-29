@@ -62,7 +62,9 @@ class StreamContext(BaseDataModel):
     stream_id: str
     chat_type: ChatType = ChatType.PRIVATE  # 聊天类型，默认为私聊
     chat_mode: ChatMode = ChatMode.FOCUS  # 聊天模式，默认为专注模式
-    max_context_size: int = field(default_factory=lambda: getattr(global_config.chat, "max_context_size", 100))
+    max_context_size: int = field(
+        default_factory=lambda: getattr(global_config.chat, "max_context_size", 100) if global_config else 100
+    )
     unread_messages: list["DatabaseMessages"] = field(default_factory=list)
     history_messages: list["DatabaseMessages"] = field(default_factory=list)
     last_check_time: float = field(default_factory=time.time)
@@ -98,7 +100,9 @@ class StreamContext(BaseDataModel):
     def __post_init__(self):
         """初始化历史消息异步加载"""
         if not self.max_context_size or self.max_context_size <= 0:
-            self.max_context_size = getattr(global_config.chat, "max_context_size", 100)
+            self.max_context_size = (
+                getattr(global_config.chat, "max_context_size", 100) if global_config else 100
+            )
 
         try:
             loop = asyncio.get_event_loop()
@@ -118,6 +122,7 @@ class StreamContext(BaseDataModel):
     async def add_message(self, message: "DatabaseMessages", skip_energy_update: bool = False) -> bool:
         """添加消息到上下文，支持跳过能量更新的选项"""
         try:
+            assert global_config is not None
             cache_enabled = global_config.chat.enable_message_cache
             if cache_enabled and not self.is_cache_enabled:
                 self.enable_cache(True)
@@ -150,7 +155,7 @@ class StreamContext(BaseDataModel):
             # ͬ�����ݵ�ͳһ�������
             try:
                 if global_config.memory and global_config.memory.enable:
-                    unified_manager = _get_unified_memory_manager()
+                    unified_manager: Any = _get_unified_memory_manager()
                     if unified_manager:
                         message_dict = {
                             "message_id": str(message.message_id),
@@ -161,7 +166,7 @@ class StreamContext(BaseDataModel):
                             "platform": message.chat_info.platform,
                             "stream_id": self.stream_id,
                         }
-                        await unified_manager.add_message(message_dict)
+                        await unified_manager.add_message(message_dict)  # type: ignore
                         logger.debug(f"��Ϣ�����ӵ��������ϵͳ: {message.message_id}")
             except Exception as e:
                 logger.error(f"������Ϣ���������ϵͳʧ��: {e}")

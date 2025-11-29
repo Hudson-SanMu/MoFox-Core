@@ -44,6 +44,8 @@ class VideoAnalyzer:
     """基于 inkfox 的视频关键帧 + LLM 描述分析器"""
 
     def __init__(self) -> None:
+        assert global_config is not None
+        assert model_config is not None
         cfg = getattr(global_config, "video_analysis", object())
         self.max_frames: int = getattr(cfg, "max_frames", 20)
         self.frame_quality: int = getattr(cfg, "frame_quality", 85)

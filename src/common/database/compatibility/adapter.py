@@ -123,7 +123,7 @@ async def build_filters(model_class, filters: dict[str, Any]):
     return conditions
 
 
-def _model_to_dict(instance) -> dict[str, Any]:
+def _model_to_dict(instance) -> dict[str, Any] | None:
     """将数据库模型实例转换为字典（兼容旧API
 
     Args:
@@ -238,7 +238,7 @@ async def db_query(
                 return None
 
             # 更新记录
-            updated = await crud.update(instance.id, data)
+            updated = await crud.update(instance.id, data)  # type: ignore
             return _model_to_dict(updated)
 
         elif query_type == "delete":
@@ -257,7 +257,7 @@ async def db_query(
                 return None
 
             # 删除记录
-            success = await crud.delete(instance.id)
+            success = await crud.delete(instance.id)  # type: ignore
             return {"deleted": success}
 
         elif query_type == "count":

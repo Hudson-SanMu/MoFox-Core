@@ -13,7 +13,7 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, TypeVar
+from typing import Any
 
 from sqlalchemy import delete, insert, select, update
 
@@ -22,8 +22,6 @@ from src.common.logger import get_logger
 from src.common.memory_utils import estimate_size_smart
 
 logger = get_logger("batch_scheduler")
-
-T = TypeVar("T")
 
 
 class Priority(IntEnum):
@@ -429,7 +427,7 @@ class AdaptiveBatchScheduler:
 
                     # 执行更新（但不commit）
                     result = await session.execute(stmt)
-                    results.append((op, result.rowcount))
+                    results.append((op, result.rowcount))  # type: ignore
 
                 # 注意：commit 由 get_db_session_direct 上下文管理器自动处理
 
@@ -471,7 +469,7 @@ class AdaptiveBatchScheduler:
 
                     # 执行删除（但不commit）
                     result = await session.execute(stmt)
-                    results.append((op, result.rowcount))
+                    results.append((op, result.rowcount))  # type: ignore
 
                 # 注意：commit 由 get_db_session_direct 上下文管理器自动处理
 

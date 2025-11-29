@@ -649,6 +649,7 @@ class Prompt:
 
     async def _build_expression_habits(self) -> dict[str, Any]:
         """构建表达习惯（如表情、口癖）的上下文块."""
+        assert global_config is not None
         # 检查当前聊天是否启用了表达习惯功能
         use_expression, _, _ = global_config.expression.get_expression_config_for_chat(
             self.parameters.chat_id
@@ -728,6 +729,7 @@ class Prompt:
 
     async def _build_tool_info(self) -> dict[str, Any]:
         """构建工具调用结果的上下文块."""
+        assert global_config is not None
         if not global_config.tool.enable_tool:
             return {"tool_info_block": ""}
 
@@ -779,6 +781,7 @@ class Prompt:
 
     async def _build_knowledge_info(self) -> dict[str, Any]:
         """构建从知识库检索到的相关信息的上下文块."""
+        assert global_config is not None
         if not global_config.lpmm_knowledge.enable:
             return {"knowledge_prompt": ""}
 
@@ -873,6 +876,7 @@ class Prompt:
 
     def _prepare_s4u_params(self, context_data: dict[str, Any]) -> dict[str, Any]:
         """为S4U（Scene for You）模式准备最终用于格式化的参数字典."""
+        assert global_config is not None
         return {
             **context_data,
             "expression_habits_block": context_data.get("expression_habits_block", ""),
@@ -915,6 +919,7 @@ class Prompt:
 
     def _prepare_normal_params(self, context_data: dict[str, Any]) -> dict[str, Any]:
         """为Normal模式准备最终用于格式化的参数字典."""
+        assert global_config is not None
         return {
             **context_data,
             "expression_habits_block": context_data.get("expression_habits_block", ""),
@@ -959,6 +964,7 @@ class Prompt:
 
     def _prepare_default_params(self, context_data: dict[str, Any]) -> dict[str, Any]:
         """为默认模式（或其他未指定模式）准备最终用于格式化的参数字典."""
+        assert global_config is not None
         return {
             "expression_habits_block": context_data.get("expression_habits_block", ""),
             "relation_info_block": context_data.get("relation_info_block", ""),
@@ -1143,6 +1149,7 @@ class Prompt:
         Returns:
             str: 构建好的跨群聊上下文字符串。
         """
+        assert global_config is not None
         if not global_config.cross_context.enable:
             return ""
 

@@ -104,7 +104,7 @@ class ChatterActionManager:
                 log_prefix=log_prefix,
                 shutting_down=shutting_down,
                 plugin_config=plugin_config,
-                action_message=action_message,
+                action_message=action_message,  # type: ignore
             )
 
             logger.debug(f"创建Action实例成功: {action_name}")
@@ -173,6 +173,7 @@ class ChatterActionManager:
         Returns:
             执行结果
         """
+        assert global_config is not None
 
         chat_stream = None
         try:

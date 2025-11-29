@@ -46,6 +46,7 @@ async def get_engine() -> AsyncEngine:
     if _engine_lock is None:
         _engine_lock = asyncio.Lock()
 
+    assert _engine_lock is not None
     # 使用锁保护初始化过程
     async with _engine_lock:
         # 双重检查锁定模式
@@ -55,6 +56,7 @@ async def get_engine() -> AsyncEngine:
         try:
             from src.config.config import global_config
 
+            assert global_config is not None
             config = global_config.database
             db_type = config.database_type
 

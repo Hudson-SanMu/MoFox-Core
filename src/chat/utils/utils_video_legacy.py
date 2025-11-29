@@ -135,6 +135,8 @@ class LegacyVideoAnalyzer:
 
     def __init__(self):
         """初始化视频分析器"""
+        assert global_config is not None
+        assert model_config is not None
         # 使用专用的视频分析配置
         try:
             self.video_llm = LLMRequest(

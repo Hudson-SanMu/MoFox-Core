@@ -192,7 +192,7 @@ class StatisticOutputTask(AsyncTask):
             self._statistic_console_output(stats, now)
             # 使用新的 HTMLReportGenerator 生成报告
             chart_data = await self._collect_chart_data(stats)
-            deploy_time = datetime.fromtimestamp(local_storage.get("deploy_time", now.timestamp()))
+            deploy_time = datetime.fromtimestamp(float(local_storage.get("deploy_time", now.timestamp())))  # type: ignore
             report_generator = HTMLReportGenerator(
                 name_mapping=self.name_mapping,
                 stat_period=self.stat_period,
@@ -219,7 +219,7 @@ class StatisticOutputTask(AsyncTask):
 
                 # 使用新的 HTMLReportGenerator 生成报告
                 chart_data = await self._collect_chart_data(stats)
-                deploy_time = datetime.fromtimestamp(local_storage.get("deploy_time", now.timestamp()))
+                deploy_time = datetime.fromtimestamp(float(local_storage.get("deploy_time", now.timestamp())))  # type: ignore
                 report_generator = HTMLReportGenerator(
                     name_mapping=self.name_mapping,
                     stat_period=self.stat_period,

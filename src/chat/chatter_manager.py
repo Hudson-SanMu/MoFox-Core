@@ -83,7 +83,7 @@ class ChatterManager:
         inactive_streams = []
         for stream_id, instance in self.instances.items():
             if hasattr(instance, "get_activity_time"):
-                activity_time = instance.get_activity_time()
+                activity_time = getattr(instance, "get_activity_time")()
                 if (current_time - activity_time) > max_inactive_seconds:
                     inactive_streams.append(stream_id)
 
