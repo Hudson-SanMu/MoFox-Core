@@ -131,6 +131,36 @@ class SandboxEnvironment:
         except Exception as e:
             logger.warning(f"设置资源限制失败: {e}")
 
+    def _check_dangerous_patterns(self, code: str):
+        """检查代码中的危险模式
+        
+        Args:
+            code: 要检查的代码
+            
+        Raises:
+            SandboxSecurityError: 如果发现危险模式
+        """
+        import re
+        
+        # 使用更精确的正则表达式，避免误检测
+        dangerous_patterns = [
+            (r"\.__class__\b", "禁止访问 __class__ 属性"),
+            (r"\.__bases__\b", "禁止访问 __bases__ 属性"),
+            (r"\.__subclasses__\(", "禁止访问 __subclasses__ 方法"),
+            (r"\.__mro__\b", "禁止访问 __mro__ 属性"),
+            (r"\.__globals__\b", "禁止访问 __globals__ 属性"),
+            (r"\.__code__\b", "禁止访问 __code__ 属性"),
+            (r"^\s*__builtins__\b", "禁止直接访问 __builtins__"),  # 行首的__builtins__
+            (r"[^a-zA-Z_]__builtins__\b", "禁止直接访问 __builtins__"),  # 非标识符字符后的__builtins__
+            (r"\.func_globals\b", "禁止访问 func_globals"),
+            (r"\.gi_frame\b", "禁止访问 gi_frame"),
+            (r"\.gi_code\b", "禁止访问 gi_code"),
+        ]
+        
+        for pattern, error_msg in dangerous_patterns:
+            if re.search(pattern, code):
+                raise SandboxSecurityError(error_msg)
+
     def _create_restricted_globals(self) -> Dict[str, Any]:
         """创建受限的全局命名空间"""
         # 基础安全的内置函数
@@ -274,8 +304,11 @@ class SandboxEnvironment:
             # 设置资源限制（仅Unix/Linux）
             self._set_resource_limits()
 
-            # 编译代码
+            # 编译代码 - 使用受限模式
             compiled_code = compile(code, "<sandbox>", "exec")
+
+            # 检查代码中的危险模式
+            self._check_dangerous_patterns(code)
 
             # 执行代码
             self._start_time = time.time()
