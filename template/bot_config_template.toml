@@ -1,5 +1,5 @@
 [inner]
-version = "7.9.0"
+version = "7.9.1" 
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -391,7 +391,7 @@ reaction = "请按照以下模板造句：[n]是这样的，xx只要xx就可以�
 # 可以自定义部分提示词
 [custom_prompt]
 image_prompt = "请用中文描述这张图片的内容。如果有文字，请把文字描述概括出来，请留意其主题，直观感受，输出为一段平文本，最多30字，请注意不要分点，就输出一段文本"
-planner_custom_prompt_content = "" # 决策器自定义提示词内容，如果这里没有内容则不生效
+planner_custom_prompt_content = "" # AFC的决策器自定义提示词内容，如果这里没有内容则不生效
 
 [response_post_process]
 enable_response_post_process = true # 是否启用回复后处理，包括错别字生成器，回复分割器
@@ -535,23 +535,6 @@ s4u_stream_limit = 3 # S4U模式下，最多检索多少个不同的聊天流 (�
 s4u_whitelist_chats = []
 # 黑名单列表，格式同上
 s4u_blacklist_chats = []
-
-# --- Normal模式: 共享组配置 ---
-# 现在这些是预留plugin使用的上下文互通组配置
-# 您可以根据需要添加多个互通组
-# 在回复过程中只会遵循上面的--S4U模式: 用户中心上下文检索--
-
-# --- QQ空间专用互通组 (示例) ---
-# Maizone插件会根据组名 "Maizone默认互通组" 来获取上下文
-# 您可以修改下面的chat_ids来定义哪些聊天内容可以被Maizone插件参考
-[[cross_context.groups]]
-name = "Maizone默认互通组"
-mode = "whitelist"
-default_limit = 10
-chat_ids = [
-    ["group", "111111"],     # 示例群聊1
-    ["private", "222222"]  # 示例私聊2
-]
 
 [affinity_flow]
 enable_normal_mode = true # 是否启用 Normal 聊天模式。启用后，在专注模式回复后会自动切换，并根据兴趣度决定是否回复，以实现更快速的回复。
