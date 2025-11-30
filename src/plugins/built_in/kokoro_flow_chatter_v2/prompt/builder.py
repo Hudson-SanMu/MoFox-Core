@@ -69,8 +69,11 @@ class PromptBuilder:
         # 1. 构建人设块
         persona_block = self._build_persona_block()
         
-        # 2. 构建关系块
-        relation_block = await self._build_relation_block(user_name, chat_stream, user_id)
+        # 2. 使用 context_builder 获取关系、记忆、表达习惯等
+        context_data = await self._build_context_data(user_name, chat_stream, user_id)
+        relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
+        memory_block = context_data.get("memory_block", "")
+        expression_habits = self._build_combined_expression_block(context_data.get("expression_habits", ""))
         
         # 3. 构建活动流
         activity_stream = await self._build_activity_stream(session, user_name)
@@ -95,6 +98,8 @@ class PromptBuilder:
             user_name=user_name,
             persona_block=persona_block,
             relation_block=relation_block,
+            memory_block=memory_block or "（暂无相关记忆）",
+            expression_habits=expression_habits or "（根据自然对话风格回复即可）",
             activity_stream=activity_stream or "（这是你们第一次聊天）",
             current_situation=current_situation,
             chat_history_block=chat_history_block,
@@ -121,20 +126,55 @@ class PromptBuilder:
         if personality.identity:
             parts.append(personality.identity)
         
-        if personality.reply_style:
-            parts.append(f"\n### 说话风格\n{personality.reply_style}")
-        
         return "\n\n".join(parts) if parts else "你是一个温暖、真诚的人。"
     
-    async def _build_relation_block(
+    def _build_combined_expression_block(self, learned_habits: str) -> str:
+        """
+        构建合并后的表达习惯块
+        
+        合并：
+        - 说话风格（来自人设配置 personality.reply_style）
+        - 表达习惯（来自学习系统）
+        """
+        parts = []
+        
+        # 1. 添加说话风格（来自配置）
+        if global_config and global_config.personality.reply_style:
+            parts.append(f"**说话风格**：\n{global_config.personality.reply_style}")
+        
+        # 2. 添加学习到的表达习惯
+        if learned_habits and learned_habits.strip():
+            # 如果 learned_habits 已经有标题，直接追加；否则添加标题
+            if learned_habits.startswith("### "):
+                # 移除原有标题，统一格式
+                lines = learned_habits.split("\n")
+                content_lines = [l for l in lines if not l.startswith("### ")]
+                parts.append("\n".join(content_lines).strip())
+            else:
+                parts.append(learned_habits)
+        
+        if parts:
+            return "\n\n".join(parts)
+        
+        return ""
+    
+    async def _build_context_data(
         self,
         user_name: str,
         chat_stream: Optional["ChatStream"],
         user_id: Optional[str] = None,
-    ) -> str:
-        """构建关系块"""
+    ) -> dict[str, str]:
+        """
+        使用 KFCContextBuilder 构建完整的上下文数据
+        
+        包括：关系信息、记忆、表达习惯等
+        """
         if not chat_stream:
-            return f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。"
+            return {
+                "relation_info": f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。",
+                "memory_block": "",
+                "expression_habits": "",
+            }
         
         try:
             # 延迟导入上下文构建器
@@ -143,21 +183,30 @@ class PromptBuilder:
                 self._context_builder = KFCContextBuilder
             
             builder = self._context_builder(chat_stream)
+            
+            # 获取最近的消息作为 target_message（用于记忆检索）
+            target_message = ""
+            if chat_stream.context:
+                unread = chat_stream.context.get_unread_messages()
+                if unread:
+                    target_message = unread[-1].processed_plain_text or unread[-1].display_message or ""
+            
             context_data = await builder.build_all_context(
                 sender_name=user_name,
-                target_message="",
-                context=None,
+                target_message=target_message,
+                context=chat_stream.context,
                 user_id=user_id,
             )
             
-            relation_info = context_data.get("relation_info", "")
-            if relation_info:
-                return relation_info
+            return context_data
             
         except Exception as e:
-            logger.warning(f"构建关系块失败: {e}")
-        
-        return f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。"
+            logger.warning(f"构建上下文数据失败: {e}")
+            return {
+                "relation_info": f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。",
+                "memory_block": "",
+                "expression_habits": "",
+            }
     
     async def _build_chat_history_block(
         self,

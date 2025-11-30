@@ -20,23 +20,29 @@ KFC_V2_MAIN_PROMPT = Prompt(
 ## 2. 你与 {user_name} 的关系
 {relation_block}
 
-## 3. 你们之间发生的事（活动流）
+## 3. 相关记忆
+{memory_block}
+
+## 4. 你们之间发生的事（活动流）
 以下是你和 {user_name} 最近的互动历史，按时间顺序记录了你们的对话和你的心理活动：
 
 {activity_stream}
 
-## 4. 当前情况
+## 5. 当前情况
 {current_situation}
 
-## 5. 聊天历史总览
+## 6. 聊天历史总览
 以下是你和 {user_name} 的聊天记录，帮助你更好地理解对话上下文：
 
 {chat_history_block}
 
-## 6. 你可以做的事情
+## 7. 你可以做的事情
 {available_actions}
 
-## 7. 你的回复格式
+## 8. 你的表达习惯
+{expression_habits}
+
+## 9. 你的回复格式
 {output_format}
 """,
 )

@@ -148,9 +148,9 @@ def load_config() -> KokoroFlowChatterConfig:
         if hasattr(global_config, 'kokoro_flow_chatter'):
             kfc_cfg = getattr(global_config, 'kokoro_flow_chatter')
             
-            # 基础配置
-            if hasattr(kfc_cfg, 'enabled'):
-                config.enabled = kfc_cfg.enabled
+            # 基础配置 - 支持 enabled 和 enable 两种写法
+            if hasattr(kfc_cfg, 'enable'):
+                config.enabled = kfc_cfg.enable
             if hasattr(kfc_cfg, 'enabled_stream_types'):
                 config.enabled_stream_types = list(kfc_cfg.enabled_stream_types)
             if hasattr(kfc_cfg, 'debug'):
@@ -165,9 +165,12 @@ def load_config() -> KokoroFlowChatterConfig:
                     max_wait_seconds=getattr(wait_cfg, 'max_wait_seconds', 1800),
                 )
             
-            # 主动思考配置
-            if hasattr(kfc_cfg, 'proactive'):
-                pro_cfg = kfc_cfg.proactive
+            # 主动思考配置 - 支持 proactive 和 proactive_thinking 两种写法
+            pro_cfg = None
+            if hasattr(kfc_cfg, 'proactive_thinking'):
+                pro_cfg = kfc_cfg.proactive_thinking
+            
+            if pro_cfg:
                 config.proactive = ProactiveConfig(
                     enabled=getattr(pro_cfg, 'enabled', True),
                     silence_threshold_seconds=getattr(pro_cfg, 'silence_threshold_seconds', 7200),

@@ -283,6 +283,11 @@ class ProactiveThinker:
             action_manager = ChatterActionManager()
             await action_manager.load_actions(session.stream_id)
             
+            # 通过 ActionModifier 过滤动作
+            from src.chat.planner_actions.action_modifier import ActionModifier
+            action_modifier = ActionModifier(action_manager, session.stream_id)
+            await action_modifier.modify_actions(chatter_name="KokoroFlowChatter")
+            
             # 调用 Replyer 生成超时决策
             response = await generate_response(
                 session=session,
@@ -431,6 +436,11 @@ class ProactiveThinker:
             # 加载动作
             action_manager = ChatterActionManager()
             await action_manager.load_actions(session.stream_id)
+            
+            # 通过 ActionModifier 过滤动作
+            from src.chat.planner_actions.action_modifier import ActionModifier
+            action_modifier = ActionModifier(action_manager, session.stream_id)
+            await action_modifier.modify_actions(chatter_name="KokoroFlowChatter")
             
             # 计算沉默时长
             silence_seconds = time.time() - session.last_activity_at
