@@ -23,7 +23,7 @@ from .base_client import APIResponse, BaseClient, UsageRecord, client_registry
 logger = get_logger("AioHTTP-Gemini客户端")
 
 
-# gemini_thinking参数（默认范围）
+# gemini_thinking参数(默认范围) - 旧版 thinking_budget
 # 不同模型的思考预算范围配置
 THINKING_BUDGET_LIMITS = {
     "gemini-2.5-flash": {"min": 1, "max": 24576, "can_disable": True},
@@ -31,8 +31,15 @@ THINKING_BUDGET_LIMITS = {
     "gemini-2.5-pro": {"min": 128, "max": 32768, "can_disable": False},
 }
 # 思维预算特殊值
-THINKING_BUDGET_AUTO = -1  # 自动调整思考预算，由模型决定
-THINKING_BUDGET_DISABLED = 0  # 禁用思考预算（如果模型允许禁用）
+THINKING_BUDGET_AUTO = -1  # 自动调整思考预算,由模型决定
+THINKING_BUDGET_DISABLED = 0  # 禁用思考预算(如果模型允许禁用)
+
+# 新版 thinking_level 参数
+# 支持的思考等级
+THINKING_LEVEL_LOW = "low"
+THINKING_LEVEL_MEDIUM = "medium"
+THINKING_LEVEL_HIGH = "high"
+VALID_THINKING_LEVELS = [THINKING_LEVEL_LOW, THINKING_LEVEL_MEDIUM, THINKING_LEVEL_HIGH]
 
 gemini_safe_settings = [
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -161,20 +168,25 @@ def _convert_tool_options(tool_options: list[ToolOption]) -> list[dict]:
 def _build_generation_config(
     max_tokens: int,
     temperature: float,
-    thinking_budget: int,
+    thinking_budget: int | None = None,
+    thinking_level: str | None = None,
     response_format: RespFormat | None = None,
     extra_params: dict | None = None,
 ) -> dict:
     """
     构建并返回 Gemini API 的 `generationConfig` 字典。
 
-    此函数整合了多个参数，如最大输出 token 数、温度、思考预算、响应格式和
+    此函数整合了多个参数，如最大输出 token 数、温度、思考配置(预算或等级)、响应格式和
     其他自定义参数，以创建一个符合 Gemini API 规范的配置对象。
+
+    注意: thinking_budget 和 thinking_level 不能同时使用，否则会返回 400 错误。
+    优先使用 thinking_level (新版)，如果未提供则使用 thinking_budget (旧版)。
 
     Args:
         max_tokens: 生成内容的最大 token 数。
         temperature: 控制生成文本的随机性，值越高越随机。
-        thinking_budget: 模型的思考预算。
+        thinking_budget: 模型的思考预算(旧版，与 thinking_level 互斥)。
+        thinking_level: 模型的思考等级(新版，可选值: "low", "medium", "high")。
         response_format: 指定响应的格式，例如 JSON 对象或遵循特定 schema。
         extra_params: 一个包含其他要合并到配置中的参数的字典。
 
@@ -186,8 +198,18 @@ def _build_generation_config(
         "temperature": temperature,
         "topK": 1,
         "topP": 1,
-        "thinkingConfig": {"includeThoughts": True, "thinkingBudget": thinking_budget},
     }
+
+    # 处理思考配置 - 新版 thinking_level 优先于旧版 thinking_budget
+    if thinking_level is not None:
+        # 使用新版 thinkingLevel 参数
+        if thinking_level in VALID_THINKING_LEVELS:
+            config["thinkingConfig"] = {"thinkingLevel": thinking_level}
+        else:
+            logger.warning(f"无效的 thinking_level 值 {thinking_level}，有效值为: {VALID_THINKING_LEVELS}")
+    elif thinking_budget is not None:
+        # 使用旧版 thinkingBudget 参数
+        config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": thinking_budget}
 
     # 处理响应格式
     if response_format:
@@ -201,8 +223,9 @@ def _build_generation_config(
     if extra_params:
         # 拷贝一份以防修改原始字典
         safe_extra_params = extra_params.copy()
-        # 移除已单独处理的 thinking_budget
+        # 移除已单独处理的参数
         safe_extra_params.pop("thinking_budget", None)
+        safe_extra_params.pop("thinking_level", None)
         config.update(safe_extra_params)
 
     return config
@@ -575,19 +598,38 @@ class AiohttpGeminiClient(BaseClient):
         # 转换消息格式
         contents, system_instructions = _convert_messages(message_list)
 
-        # 处理思考预算
-        tb = THINKING_BUDGET_AUTO
-        if extra_params and "thinking_budget" in extra_params:
-            try:
-                tb = int(extra_params["thinking_budget"])
-            except (ValueError, TypeError):
-                logger.warning(f"无效的 thinking_budget 值 {extra_params['thinking_budget']}，将使用默认动态模式 {tb}")
-        tb = self.clamp_thinking_budget(tb, model_info.model_identifier)
+        # 处理思考配置 - 优先使用新版 thinking_level，否则使用旧版 thinking_budget
+        thinking_level = None
+        thinking_budget = None
+        
+        if extra_params:
+            # 优先检查新版 thinking_level
+            if "thinking_level" in extra_params:
+                level_value = extra_params.get("thinking_level", "").lower()
+                if level_value in VALID_THINKING_LEVELS:
+                    thinking_level = level_value
+                else:
+                    logger.warning(f"无效的 thinking_level 值 {level_value}，有效值为: {VALID_THINKING_LEVELS}")
+            # 如果没有 thinking_level，则使用旧版 thinking_budget
+            elif "thinking_budget" in extra_params:
+                try:
+                    tb = int(extra_params["thinking_budget"])
+                    thinking_budget = self.clamp_thinking_budget(tb, model_info.model_identifier)
+                except (ValueError, TypeError):
+                    logger.warning(f"无效的 thinking_budget 值 {extra_params['thinking_budget']}，将使用默认动态模式")
+                    thinking_budget = THINKING_BUDGET_AUTO
 
         # 构建请求体
         request_data = {
             "contents": contents,
-            "generationConfig": _build_generation_config(max_tokens, temperature, tb, response_format, extra_params),
+            "generationConfig": _build_generation_config(
+                max_tokens,
+                temperature,
+                thinking_budget=thinking_budget,
+                thinking_level=thinking_level,
+                response_format=response_format,
+                extra_params=extra_params
+            ),
             "safetySettings": gemini_safe_settings,
         }
 
@@ -700,7 +742,14 @@ class AiohttpGeminiClient(BaseClient):
 
         request_data = {
             "contents": contents,
-            "generationConfig": _build_generation_config(2048, 0.1, THINKING_BUDGET_AUTO, None, extra_params),
+            "generationConfig": _build_generation_config(
+                2048,
+                0.1,
+                thinking_budget=THINKING_BUDGET_AUTO,
+                thinking_level=None,
+                response_format=None,
+                extra_params=extra_params
+            ),
             "safetySettings": gemini_safe_settings,
         }
 
