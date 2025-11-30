@@ -38,7 +38,7 @@ class PromptBuilder:
     def __init__(self):
         self._context_builder = None
     
-    async def build_prompt(
+    async def build_planner_prompt(
         self,
         session: KokoroSession,
         user_name: str,
@@ -48,7 +48,7 @@ class PromptBuilder:
         extra_context: Optional[dict] = None,
     ) -> str:
         """
-        构建完整的提示词
+        构建规划器提示词（用于生成行动计划）
         
         Args:
             session: 会话对象
@@ -59,7 +59,7 @@ class PromptBuilder:
             extra_context: 额外上下文（如 trigger_reason）
             
         Returns:
-            完整的提示词
+            完整的规划器提示词
         """
         extra_context = extra_context or {}
         
@@ -89,8 +89,8 @@ class PromptBuilder:
         # 6. 构建可用动作
         actions_block = self._build_actions_block(available_actions)
         
-        # 7. 获取输出格式
-        output_format = await self._get_output_format()
+        # 7. 获取规划器输出格式
+        output_format = await self._get_planner_output_format()
         
         # 8. 使用统一的 prompt 管理系统格式化
         prompt = await global_prompt_manager.format_prompt(
@@ -105,6 +105,76 @@ class PromptBuilder:
             chat_history_block=chat_history_block,
             available_actions=actions_block,
             output_format=output_format,
+        )
+        
+        return prompt
+    
+    async def build_replyer_prompt(
+        self,
+        session: KokoroSession,
+        user_name: str,
+        thought: str,
+        situation_type: str = "new_message",
+        chat_stream: Optional["ChatStream"] = None,
+        extra_context: Optional[dict] = None,
+    ) -> str:
+        """
+        构建回复器提示词（用于生成自然的回复文本）
+        
+        Args:
+            session: 会话对象
+            user_name: 用户名称
+            thought: 规划器生成的想法
+            situation_type: 情况类型
+            chat_stream: 聊天流对象
+            extra_context: 额外上下文
+            
+        Returns:
+            完整的回复器提示词
+        """
+        extra_context = extra_context or {}
+        
+        # 获取 user_id
+        user_id = session.user_id if session else None
+        
+        # 1. 构建人设块
+        persona_block = self._build_persona_block()
+        
+        # 2. 使用 context_builder 获取关系、记忆、表达习惯等
+        context_data = await self._build_context_data(user_name, chat_stream, user_id)
+        relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
+        memory_block = context_data.get("memory_block", "")
+        expression_habits = self._build_combined_expression_block(context_data.get("expression_habits", ""))
+        
+        # 3. 构建活动流
+        activity_stream = await self._build_activity_stream(session, user_name)
+        
+        # 4. 构建当前情况（简化版，不需要那么详细）
+        current_situation = await self._build_current_situation(
+            session, user_name, situation_type, extra_context
+        )
+        
+        # 5. 构建聊天历史总览
+        chat_history_block = await self._build_chat_history_block(chat_stream)
+        
+        # 6. 构建回复情景上下文
+        reply_context = await self._build_reply_context(
+            session, user_name, situation_type, extra_context
+        )
+        
+        # 7. 使用回复器专用模板
+        prompt = await global_prompt_manager.format_prompt(
+            PROMPT_NAMES["replyer"],
+            user_name=user_name,
+            persona_block=persona_block,
+            relation_block=relation_block,
+            memory_block=memory_block or "（暂无相关记忆）",
+            activity_stream=activity_stream or "（这是你们第一次聊天）",
+            current_situation=current_situation,
+            chat_history_block=chat_history_block,
+            expression_habits=expression_habits or "（根据自然对话风格回复即可）",
+            thought=thought,
+            reply_context=reply_context,
         )
         
         return prompt
@@ -578,6 +648,91 @@ class PromptBuilder:
     "expected_reaction": "期待的反应",
     "max_wait_seconds": 300
 }"""
+    
+    async def _get_planner_output_format(self) -> str:
+        """获取规划器输出格式模板"""
+        try:
+            prompt = await global_prompt_manager.get_prompt_async(
+                PROMPT_NAMES["planner_output_format"]
+            )
+            return prompt.template
+        except KeyError:
+            # 如果模板未注册，返回默认格式
+            return """请用 JSON 格式回复：
+{
+    "thought": "你的想法",
+    "actions": [{"type": "kfc_reply"}],
+    "expected_reaction": "期待的反应",
+    "max_wait_seconds": 300
+}
+
+注意：kfc_reply 动作不需要填写 content 字段，回复内容会单独生成。"""
+    
+    async def _build_reply_context(
+        self,
+        session: KokoroSession,
+        user_name: str,
+        situation_type: str,
+        extra_context: dict,
+    ) -> str:
+        """
+        构建回复情景上下文
+        
+        根据 situation_type 构建不同的情景描述，帮助回复器理解当前要回复的情境
+        """
+        # 获取最后一条用户消息
+        target_message = ""
+        entries = session.get_recent_entries(limit=10)
+        for entry in reversed(entries):
+            if entry.event_type == EventType.USER_MESSAGE:
+                target_message = entry.content or ""
+                break
+        
+        if situation_type == "new_message":
+            return await global_prompt_manager.format_prompt(
+                PROMPT_NAMES["replyer_context_normal"],
+                user_name=user_name,
+                target_message=target_message or "（无消息内容）",
+            )
+        
+        elif situation_type == "reply_in_time":
+            elapsed = session.waiting_config.get_elapsed_seconds()
+            max_wait = session.waiting_config.max_wait_seconds
+            return await global_prompt_manager.format_prompt(
+                PROMPT_NAMES["replyer_context_in_time"],
+                user_name=user_name,
+                target_message=target_message or "（无消息内容）",
+                elapsed_minutes=elapsed / 60,
+                max_wait_minutes=max_wait / 60,
+            )
+        
+        elif situation_type == "reply_late":
+            elapsed = session.waiting_config.get_elapsed_seconds()
+            max_wait = session.waiting_config.max_wait_seconds
+            return await global_prompt_manager.format_prompt(
+                PROMPT_NAMES["replyer_context_late"],
+                user_name=user_name,
+                target_message=target_message or "（无消息内容）",
+                elapsed_minutes=elapsed / 60,
+                max_wait_minutes=max_wait / 60,
+            )
+        
+        elif situation_type == "proactive":
+            silence = extra_context.get("silence_duration", "一段时间")
+            trigger_reason = extra_context.get("trigger_reason", "")
+            return await global_prompt_manager.format_prompt(
+                PROMPT_NAMES["replyer_context_proactive"],
+                user_name=user_name,
+                silence_duration=silence,
+                trigger_reason=trigger_reason,
+            )
+        
+        # 默认使用普通情景
+        return await global_prompt_manager.format_prompt(
+            PROMPT_NAMES["replyer_context_normal"],
+            user_name=user_name,
+            target_message=target_message or "（无消息内容）",
+        )
 
 
 # 全局单例

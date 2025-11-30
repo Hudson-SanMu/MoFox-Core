@@ -21,7 +21,8 @@ from src.config.config import global_config
 from src.plugin_system.apis.unified_scheduler import TriggerType, unified_scheduler
 
 from .models import EventType, SessionStatus
-from .replyer import generate_response
+from .planner import generate_plan
+from .replyer import generate_reply_text
 from .session import KokoroSession, get_session_manager
 
 if TYPE_CHECKING:
@@ -288,8 +289,8 @@ class ProactiveThinker:
             action_modifier = ActionModifier(action_manager, session.stream_id)
             await action_modifier.modify_actions(chatter_name="KokoroFlowChatter")
             
-            # 调用 Replyer 生成超时决策
-            response = await generate_response(
+            # 调用 Planner 生成超时决策
+            plan_response = await generate_plan(
                 session=session,
                 user_name=session.user_id,  # 这里可以改进，获取真实用户名
                 situation_type="timeout",
@@ -297,32 +298,50 @@ class ProactiveThinker:
                 available_actions=action_manager.get_using_actions(),
             )
             
+            # 对于需要回复的动作，调用 Replyer 生成实际文本
+            processed_actions = []
+            for action in plan_response.actions:
+                if action.type == "kfc_reply":
+                    success, reply_text = await generate_reply_text(
+                        session=session,
+                        user_name=session.user_id,
+                        thought=plan_response.thought,
+                        situation_type="timeout",
+                        chat_stream=chat_stream,
+                    )
+                    if success and reply_text:
+                        action.params["content"] = reply_text
+                    else:
+                        logger.warning("[ProactiveThinker] 回复生成失败，跳过该动作")
+                        continue
+                processed_actions.append(action)
+            
             # 执行动作
-            for action in response.actions:
+            for action in processed_actions:
                 await action_manager.execute_action(
                     action_name=action.type,
                     chat_id=session.stream_id,
                     target_message=None,
-                    reasoning=response.thought,
+                    reasoning=plan_response.thought,
                     action_data=action.params,
                     thinking_id=None,
-                    log_prefix="[KFC V2 ProactiveThinker]",
+                    log_prefix="[KFC ProactiveThinker]",
                 )
             
             # 记录到 mental_log
             session.add_bot_planning(
-                thought=response.thought,
-                actions=[a.to_dict() for a in response.actions],
-                expected_reaction=response.expected_reaction,
-                max_wait_seconds=response.max_wait_seconds,
+                thought=plan_response.thought,
+                actions=[a.to_dict() for a in processed_actions],
+                expected_reaction=plan_response.expected_reaction,
+                max_wait_seconds=plan_response.max_wait_seconds,
             )
             
             # 更新状态
-            if response.max_wait_seconds > 0:
+            if plan_response.max_wait_seconds > 0:
                 # 继续等待
                 session.start_waiting(
-                    expected_reaction=response.expected_reaction,
-                    max_wait_seconds=response.max_wait_seconds,
+                    expected_reaction=plan_response.expected_reaction,
+                    max_wait_seconds=plan_response.max_wait_seconds,
                 )
             else:
                 # 不再等待
@@ -333,8 +352,8 @@ class ProactiveThinker:
             
             logger.info(
                 f"[ProactiveThinker] 超时决策完成: user={session.user_id}, "
-                f"actions={[a.type for a in response.actions]}, "
-                f"continue_wait={response.max_wait_seconds > 0}"
+                f"actions={[a.type for a in processed_actions]}, "
+                f"continue_wait={plan_response.max_wait_seconds > 0}"
             )
             
         except Exception as e:
@@ -449,23 +468,25 @@ class ProactiveThinker:
             else:
                 silence_duration = f"{silence_seconds / 3600:.1f} 小时"
             
-            # 调用 Replyer
-            response = await generate_response(
+            extra_context = {
+                "trigger_reason": trigger_reason,
+                "silence_duration": silence_duration,
+            }
+            
+            # 调用 Planner
+            plan_response = await generate_plan(
                 session=session,
                 user_name=session.user_id,
                 situation_type="proactive",
                 chat_stream=chat_stream,
                 available_actions=action_manager.get_using_actions(),
-                extra_context={
-                    "trigger_reason": trigger_reason,
-                    "silence_duration": silence_duration,
-                },
+                extra_context=extra_context,
             )
             
             # 检查是否决定不打扰
             is_do_nothing = (
-                len(response.actions) == 0 or
-                (len(response.actions) == 1 and response.actions[0].type == "do_nothing")
+                len(plan_response.actions) == 0 or
+                (len(plan_response.actions) == 1 and plan_response.actions[0].type == "do_nothing")
             )
             
             if is_do_nothing:
@@ -474,32 +495,51 @@ class ProactiveThinker:
                 await self.session_manager.save_session(session.user_id)
                 return
             
+            # 对于需要回复的动作，调用 Replyer 生成实际文本
+            processed_actions = []
+            for action in plan_response.actions:
+                if action.type == "kfc_reply":
+                    success, reply_text = await generate_reply_text(
+                        session=session,
+                        user_name=session.user_id,
+                        thought=plan_response.thought,
+                        situation_type="proactive",
+                        chat_stream=chat_stream,
+                        extra_context=extra_context,
+                    )
+                    if success and reply_text:
+                        action.params["content"] = reply_text
+                    else:
+                        logger.warning("[ProactiveThinker] 回复生成失败，跳过该动作")
+                        continue
+                processed_actions.append(action)
+            
             # 执行动作
-            for action in response.actions:
+            for action in processed_actions:
                 await action_manager.execute_action(
                     action_name=action.type,
                     chat_id=session.stream_id,
                     target_message=None,
-                    reasoning=response.thought,
+                    reasoning=plan_response.thought,
                     action_data=action.params,
                     thinking_id=None,
-                    log_prefix="[KFC V2 ProactiveThinker]",
+                    log_prefix="[KFC ProactiveThinker]",
                 )
             
             # 记录到 mental_log
             session.add_bot_planning(
-                thought=response.thought,
-                actions=[a.to_dict() for a in response.actions],
-                expected_reaction=response.expected_reaction,
-                max_wait_seconds=response.max_wait_seconds,
+                thought=plan_response.thought,
+                actions=[a.to_dict() for a in processed_actions],
+                expected_reaction=plan_response.expected_reaction,
+                max_wait_seconds=plan_response.max_wait_seconds,
             )
             
             # 更新状态
             session.last_proactive_at = time.time()
-            if response.max_wait_seconds > 0:
+            if plan_response.max_wait_seconds > 0:
                 session.start_waiting(
-                    expected_reaction=response.expected_reaction,
-                    max_wait_seconds=response.max_wait_seconds,
+                    expected_reaction=plan_response.expected_reaction,
+                    max_wait_seconds=plan_response.max_wait_seconds,
                 )
             
             # 保存
@@ -507,7 +547,7 @@ class ProactiveThinker:
             
             logger.info(
                 f"[ProactiveThinker] 主动发起完成: user={session.user_id}, "
-                f"actions={[a.type for a in response.actions]}"
+                f"actions={[a.type for a in processed_actions]}"
             )
             
         except Exception as e:

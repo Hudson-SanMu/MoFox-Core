@@ -19,7 +19,8 @@ from src.plugin_system.base.base_chatter import BaseChatter
 from src.plugin_system.base.component_types import ChatType
 
 from .models import SessionStatus
-from .replyer import generate_response
+from .planner import generate_plan
+from .replyer import generate_reply_text
 from .session import get_session_manager
 
 if TYPE_CHECKING:
@@ -143,8 +144,8 @@ class KokoroFlowChatter(BaseChatter):
                 # 8. 获取聊天流
                 chat_stream = await self._get_chat_stream()
                 
-                # 9. 调用 Replyer 生成响应
-                response = await generate_response(
+                # 9. 调用 Planner 生成行动计划
+                plan_response = await generate_plan(
                     session=session,
                     user_name=user_name,
                     situation_type=situation_type,
@@ -152,15 +153,35 @@ class KokoroFlowChatter(BaseChatter):
                     available_actions=available_actions,
                 )
                 
-                # 10. 执行动作作
+                # 10. 对于需要回复的动作，调用 Replyer 生成实际文本
+                processed_actions = []
+                for action in plan_response.actions:
+                    if action.type == "kfc_reply":
+                        # 调用 replyer 生成回复文本
+                        success, reply_text = await generate_reply_text(
+                            session=session,
+                            user_name=user_name,
+                            thought=plan_response.thought,
+                            situation_type=situation_type,
+                            chat_stream=chat_stream,
+                        )
+                        if success and reply_text:
+                            # 更新 action 的 content
+                            action.params["content"] = reply_text
+                        else:
+                            logger.warning("[KFC] 回复生成失败，跳过该动作")
+                            continue
+                    processed_actions.append(action)
+                
+                # 11. 执行动作
                 exec_results = []
                 has_reply = False
-                for action in response.actions:
+                for action in processed_actions:
                     result = await self.action_manager.execute_action(
                         action_name=action.type,
                         chat_id=self.stream_id,
                         target_message=target_message,
-                        reasoning=response.thought,
+                        reasoning=plan_response.thought,
                         action_data=action.params,
                         thinking_id=None,
                         log_prefix="[KFC]",
@@ -169,31 +190,31 @@ class KokoroFlowChatter(BaseChatter):
                     if result.get("success") and action.type in ("kfc_reply", "respond"):
                         has_reply = True
                 
-                # 11. 记录 Bot 规划到 mental_log
+                # 12. 记录 Bot 规划到 mental_log
                 session.add_bot_planning(
-                    thought=response.thought,
-                    actions=[a.to_dict() for a in response.actions],
-                    expected_reaction=response.expected_reaction,
-                    max_wait_seconds=response.max_wait_seconds,
+                    thought=plan_response.thought,
+                    actions=[a.to_dict() for a in processed_actions],
+                    expected_reaction=plan_response.expected_reaction,
+                    max_wait_seconds=plan_response.max_wait_seconds,
                 )
                 
-                # 12. 更新 Session 状态
-                if response.max_wait_seconds > 0:
+                # 13. 更新 Session 状态
+                if plan_response.max_wait_seconds > 0:
                     session.start_waiting(
-                        expected_reaction=response.expected_reaction,
-                        max_wait_seconds=response.max_wait_seconds,
+                        expected_reaction=plan_response.expected_reaction,
+                        max_wait_seconds=plan_response.max_wait_seconds,
                     )
                 else:
                     session.end_waiting()
                 
-                # 13. 标记消息为已读
+                # 14. 标记消息为已读
                 for msg in unread_messages:
                     context.mark_message_as_read(str(msg.message_id))
                 
-                # 14. 保存 Session
+                # 15. 保存 Session
                 await self.session_manager.save_session(user_id)
                 
-                # 15. 更新统计
+                # 16. 更新统计
                 self._stats["messages_processed"] += len(unread_messages)
                 if has_reply:
                     self._stats["successful_responses"] += 1
@@ -201,15 +222,15 @@ class KokoroFlowChatter(BaseChatter):
                 logger.info(
                     f"{SOFT_PURPLE}[KFC]{RESET} 处理完成: "
                     f"user={user_name}, situation={situation_type}, "
-                    f"actions={[a.type for a in response.actions]}, "
-                    f"wait={response.max_wait_seconds}s"
+                    f"actions={[a.type for a in processed_actions]}, "
+                    f"wait={plan_response.max_wait_seconds}s"
                 )
                 
                 return self._build_result(
                     success=True,
                     message="processed",
                     has_reply=has_reply,
-                    thought=response.thought,
+                    thought=plan_response.thought,
                     situation_type=situation_type,
                 )
                 
