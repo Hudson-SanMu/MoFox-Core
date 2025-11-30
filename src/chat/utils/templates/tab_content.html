@@ -1,85 +1,104 @@
 <div id="{{ div_id }}" class="tab-content">
-    <div class="info-item" style="background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); border-left-color: #1976D2;">
-        <strong>📖 名词解释</strong>
-        <div style="margin-top: 12px; line-height: 1.8; font-size: 0.9em;">
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #1976D2;">🎯 Token:</strong> AI处理文本的基本单位，约等于0.75个英文单词或0.5个中文字
-            </div>
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #1976D2;">💸 TPS:</strong> Token Per Second，每秒处理的Token数量，衡量AI响应速度
-            </div>
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #1976D2;">📊 每K Token成本:</strong> 每1000个Token的成本，用于比较不同模型的性价比
-            </div>
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #1976D2;">⚡ Token效率:</strong> 输出Token与输入Token的比率，反映模型输出丰富度
+    <div class="info-item" style="margin-bottom: 2rem; width: 100%; display: block;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            <span class="material-icons" style="color: var(--primary-color);">menu_book</span>
+            <strong style="font-size: 1.1rem;">名词解释</strong>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; font-size: 0.9rem;">
+            <div>
+                <strong style="color: var(--primary-color);">🎯 Token:</strong> AI处理文本的基本单位
             </div>
             <div>
-                <strong style="color: #1976D2;">🔄 消息/请求比:</strong> 平均每次AI请求处理的用户消息数量
+                <strong style="color: var(--primary-color);">💸 TPS:</strong> 每秒处理的Token数量
+            </div>
+            <div>
+                <strong style="color: var(--primary-color);">📊 每K Token成本:</strong> 每1000个Token的成本
+            </div>
+            <div>
+                <strong style="color: var(--primary-color);">⚡ Token效率:</strong> 输出/输入Token比率
+            </div>
+            <div>
+                <strong style="color: var(--primary-color);">🔄 消息/请求比:</strong> 每次请求处理的消息数
             </div>
         </div>
     </div>
 
     <div class="dashboard-layout">
         <div class="main-content">
-            <p class="info-item">
-                <strong>📅 统计时段: </strong>
-                {{ start_time }} ~ {{ end_time }}
-            </p>
+            <div class="header-meta">
+                <div class="info-item">
+                    <span class="material-icons" style="font-size: 18px;">date_range</span>
+                    <strong>统计时段: </strong> {{ start_time }} ~ {{ end_time }}
+                </div>
+            </div>
+            
             {{ summary_cards }}
 
             <h2>🤖 按模型分类统计</h2>
-            <table>
-                <tr><th>模型名称</th><th>调用次数</th><th>平均Token数</th><th>Token总量</th><th>TPS</th><th>每K Token成本</th><th>累计花费</th><th>平均耗时(秒)</th></tr>
-                <tbody>{{ model_rows }}</tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <tr><th>模型名称</th><th>调用次数</th><th>平均Token数</th><th>Token总量</th><th>TPS</th><th>每K Token成本</th><th>累计花费</th><th>平均耗时(秒)</th></tr>
+                    <tbody>{{ model_rows }}</tbody>
+                </table>
+            </div>
 
             <h2>🏢 按供应商分类统计</h2>
-            <table>
-                <thead>
-                    <tr><th>供应商名称</th><th>调用次数</th><th>Token总量</th><th>TPS</th><th>每K Token成本</th><th>累计花费</th><th>平均耗时(秒)</th></tr>
-                </thead>
-                <tbody>{{ provider_rows }}</tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>供应商名称</th><th>调用次数</th><th>Token总量</th><th>TPS</th><th>每K Token成本</th><th>累计花费</th><th>平均耗时(秒)</th></tr>
+                    </thead>
+                    <tbody>{{ provider_rows }}</tbody>
+                </table>
+            </div>
 
             <h2>🔧 按模块分类统计</h2>
-            <table>
-                <thead>
-                    <tr><th>模块名称</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>Token总量</th><th>累计花费</th><th>平均耗时(秒)</th><th>标准差(秒)</th></tr>
-                </thead>
-                <tbody>{{ module_rows }}</tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>模块名称</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>Token总量</th><th>累计花费</th><th>平均耗时(秒)</th><th>标准差(秒)</th></tr>
+                    </thead>
+                    <tbody>{{ module_rows }}</tbody>
+                </table>
+            </div>
 
             <h2>📝 按请求类型分类统计</h2>
-            <table>
-                <thead>
-                    <tr><th>请求类型</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>Token总量</th><th>累计花费</th><th>平均耗时(秒)</th><th>标准差(秒)</th></tr>
-                </thead>
-                <tbody>{{ type_rows }}</tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>请求类型</th><th>调用次数</th><th>输入Token</th><th>输出Token</th><th>Token总量</th><th>累计花费</th><th>平均耗时(秒)</th><th>标准差(秒)</th></tr>
+                    </thead>
+                    <tbody>{{ type_rows }}</tbody>
+                </table>
+            </div>
 
             <h2>💬 聊天消息统计</h2>
-            <table>
-                <thead>
-                    <tr><th>联系人/群组名称</th><th>消息数量</th></tr>
-                </thead>
-                <tbody>{{ chat_rows }}</tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>联系人/群组名称</th><th>消息数量</th></tr>
+                    </thead>
+                    <tbody>{{ chat_rows }}</tbody>
+                </table>
+            </div>
 
             <h2>🎓 大模型效率分析</h2>
-            <div class="info-item">
-                <strong>💡 提示:</strong> Token效率表示输出Token与输入Token的比率,比率越高说明模型输出越丰富
+            <div class="info-item" style="margin-bottom: 1rem;">
+                <span class="material-icons" style="font-size: 18px;">lightbulb</span>
+                <strong>提示:</strong> Token效率表示输出Token与输入Token的比率,比率越高说明模型输出越丰富
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>指标</th>
-                        <th>数值</th>
-                        <th>说明</th>
-                    </tr>
-                </thead>
-                <tbody>{{ efficiency_rows }}</tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>指标</th>
+                            <th>数值</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>{{ efficiency_rows }}</tbody>
+                </table>
+            </div>
         </div>
         
         <div class="sidebar-content">

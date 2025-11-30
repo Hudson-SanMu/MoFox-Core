@@ -22,20 +22,29 @@ function showTab(evt, tabName) {
     evt.currentTarget.classList.add("active");
     
     // 懒加载：只在第一次切换到tab时初始化该tab的图表
-    if (!initializedTabs.has(tabName) && tabName !== 'charts' && initializeStaticChartsForPeriod) {
-        initializeStaticChartsForPeriod(tabName);
+    if (!initializedTabs.has(tabName)) {
+        if (tabName === 'charts') {
+            if (window.initChartsTab) window.initChartsTab();
+        } else if (initializeStaticChartsForPeriod) {
+            initializeStaticChartsForPeriod(tabName);
+        }
         initializedTabs.add(tabName);
     }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
- // Chart data is injected by python via the HTML template.
-    let allChartData = {};
-    try {
-        allChartData = JSON.parse(all_chart_data_json_string);
-    } catch (e) {
-        console.error("Failed to parse all_chart_data:", e);
-        console.error("Problematic all_chart_data string:", all_chart_data_json_string);
+    // Chart data is injected by python via the HTML template.
+    let allChartData = null;
+    function getAllChartData() {
+        if (!allChartData) {
+            try {
+                const el = document.getElementById('all_chart_data');
+                if (el) allChartData = JSON.parse(el.textContent);
+            } catch (e) {
+                console.error("Failed to parse all_chart_data:", e);
+            }
+        }
+        return allChartData || {};
     }
 
     let currentCharts = {};
@@ -49,7 +58,10 @@ document.addEventListener('DOMContentLoaded', function () {
     window.switchTimeRange = function(timeRange) {
         document.querySelectorAll('.time-range-btn').forEach(btn => btn.classList.remove('active'));
         event.target.classList.add('active');
-        updateAllCharts(allChartData[timeRange], timeRange);
+        const data = getAllChartData();
+        if (data && data[timeRange]) {
+            updateAllCharts(data[timeRange], timeRange);
+        }
     }
 
     function updateAllCharts(data, timeRange) {
@@ -61,21 +73,28 @@ document.addEventListener('DOMContentLoaded', function () {
     function createChart(chartType, data, timeRange) {
         const config = chartConfigs[chartType];
         if (!data || !data[config.dataKey]) return;
-        // Material Design 3 Blue/Gray Color Palette
-        const colors = ['#1976D2', '#546E7A', '#42A5F5', '#90CAF9', '#78909C', '#B0BEC5', '#1565C0', '#607D8B', '#2196F3', '#CFD8DC'];
+        
+        // Modern Theme Colors
+        const colors = [
+            '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', // Blue
+            '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9', // Cyan
+            '#059669', '#10b981', '#34d399', '#6ee7b7', // Emerald
+            '#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd'  // Violet
+        ];
+        
         let datasets = [];
         if (chartType === 'totalCost') {
             datasets = [{ 
                 label: config.title, 
                 data: data[config.dataKey], 
-                borderColor: '#1976D2', 
-                backgroundColor: 'rgba(25, 118, 210, 0.1)', 
-                tension: 0.3, 
+                borderColor: '#2563eb', 
+                backgroundColor: 'rgba(37, 99, 235, 0.1)', 
+                tension: 0.4, 
                 fill: config.fill,
                 borderWidth: 2,
-                pointRadius: 3,
-                pointHoverRadius: 5,
-                pointBackgroundColor: '#1976D2',
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#2563eb',
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2
             }];
@@ -86,15 +105,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     label: name, 
                     data: chartData, 
                     borderColor: colors[i % colors.length], 
-                    backgroundColor: colors[i % colors.length] + '30', 
+                    backgroundColor: colors[i % colors.length] + '20', 
                     tension: 0.4, 
                     fill: config.fill,
                     borderWidth: 2,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
                     pointBackgroundColor: colors[i % colors.length],
                     pointBorderColor: '#fff',
-                    pointBorderWidth: 1
+                    pointBorderWidth: 2
                 });
                 i++;
             });
@@ -102,56 +121,79 @@ document.addEventListener('DOMContentLoaded', function () {
         const canvas = document.getElementById(config.id);
         if (!canvas) return;
         
+        // Destroy existing chart if any
+        if (currentCharts[chartType]) {
+            currentCharts[chartType].destroy();
+        }
+
         currentCharts[chartType] = new Chart(canvas, {
             type: 'line',
             data: { labels: data.time_labels, datasets: datasets },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
-                aspectRatio: 2.5,
+                maintainAspectRatio: false,
                 plugins: { 
                     title: { 
                         display: true, 
                         text: `${config.title}`, 
-                        font: { size: 16, weight: '500' },
-                        color: '#1C1B1F',
-                        padding: { top: 8, bottom: 16 }
+                        font: { size: 16, weight: '600', family: "'Inter', sans-serif" },
+                        color: '#0f172a',
+                        padding: { top: 10, bottom: 20 },
+                        align: 'start'
                     }, 
                     legend: { 
                         display: chartType !== 'totalCost', 
                         position: 'top',
+                        align: 'end',
                         labels: {
                             usePointStyle: true,
-                            padding: 15,
-                            font: { size: 12 }
+                            padding: 20,
+                            font: { size: 12, family: "'Inter', sans-serif" },
+                            boxWidth: 8,
+                            boxHeight: 8
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        backgroundColor: '#ffffff',
+                        titleColor: '#0f172a',
+                        bodyColor: '#475569',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
                         padding: 12,
-                        titleFont: { size: 14 },
-                        bodyFont: { size: 13 },
-                        cornerRadius: 8
+                        titleFont: { size: 13, weight: '600' },
+                        bodyFont: { size: 12 },
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxPadding: 4
                     }
                 },
                 scales: { 
                     x: { 
-                        title: { 
-                            display: true, 
-                            text: '⏰ 时间',
-                            font: { size: 13, weight: 'bold' }
+                        grid: { display: false },
+                        ticks: { 
+                            maxTicksLimit: 8,
+                            color: '#94a3b8',
+                            font: { size: 11 }
                         },
-                        ticks: { maxTicksLimit: 12 },
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        border: { display: false }
                     }, 
                     y: { 
                         title: { 
                             display: true, 
                             text: config.yAxisLabel,
-                            font: { size: 13, weight: 'bold' }
+                            color: '#94a3b8',
+                            font: { size: 11, weight: '500' }
                         },
                         beginAtZero: true,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        grid: { 
+                            color: '#f1f5f9',
+                            borderDash: [4, 4]
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { size: 11 }
+                        },
+                        border: { display: false }
                     } 
                 },
                 interaction: { 
@@ -159,44 +201,54 @@ document.addEventListener('DOMContentLoaded', function () {
                     mode: 'index' 
                 },
                 animation: {
-                    duration: 1000,
-                    easing: 'easeInOutQuart'
+                    duration: 800,
+                    easing: 'easeOutQuart'
                 }
             }
         });
     }
 
-    if (allChartData['24h']) {
-        updateAllCharts(allChartData['24h'], '24h');
-        // Activate the 24h button by default
-        document.querySelectorAll('.time-range-btn').forEach(btn => {
-            if (btn.textContent.includes('24小时')) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
-    }
+    // Function to initialize charts tab
+    window.initChartsTab = function() {
+        const data = getAllChartData();
+        if (data['24h']) {
+            updateAllCharts(data['24h'], '24h');
+            // Activate the 24h button by default
+            document.querySelectorAll('.time-range-btn').forEach(btn => {
+                if (btn.textContent.includes('24小时')) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+    };
 
     // Static charts
-    let staticChartData = {};
-    try {
-        staticChartData = JSON.parse(static_chart_data_json_string);
-    } catch (e) {
-        console.error("Failed to parse static_chart_data:", e);
-        console.error("Problematic static_chart_data string:", static_chart_data_json_string);
+    let staticChartData = null;
+    function getStaticChartData() {
+        if (!staticChartData) {
+            try {
+                const el = document.getElementById('static_chart_data');
+                if (el) staticChartData = JSON.parse(el.textContent);
+            } catch (e) {
+                console.error("Failed to parse static_chart_data:", e);
+            }
+        }
+        return staticChartData || {};
     }
 
     // 懒加载函数：只初始化指定tab的静态图表
     // 将函数赋值给外部变量，使得showTab可以调用
     initializeStaticChartsForPeriod = function(period_id) {
-        if (!staticChartData[period_id]) {
+        const data = getStaticChartData();
+        if (!data[period_id]) {
             console.warn(`No static chart data for period: ${period_id}`);
             return;
         }
-        const providerCostData = staticChartData[period_id].provider_cost_data;
-        const moduleCostData = staticChartData[period_id].module_cost_data;
-        const modelCostData = staticChartData[period_id].model_cost_data;
+        const providerCostData = data[period_id].provider_cost_data;
+        const moduleCostData = data[period_id].module_cost_data;
+        const modelCostData = data[period_id].model_cost_data;
         // 扩展的Material Design调色板 - 包含多种蓝色系和其他配色
         const colors = [
             '#1976D2', '#42A5F5', '#2196F3', '#64B5F6', '#90CAF9', '#BBDEFB',  // 蓝色系
