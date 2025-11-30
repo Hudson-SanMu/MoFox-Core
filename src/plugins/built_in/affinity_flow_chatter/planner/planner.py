@@ -13,7 +13,7 @@ from src.chat.message_receive.storage import MessageStorage
 from src.common.logger import get_logger
 from src.config.config import global_config
 from src.mood.mood_manager import mood_manager
-from src.plugin_system.base.component_types import ChatMode
+from src.plugin_system.base.component_types import ChatMode, ChatType
 from src.plugins.built_in.affinity_flow_chatter.planner.plan_executor import ChatterPlanExecutor
 from src.plugins.built_in.affinity_flow_chatter.planner.plan_filter import ChatterPlanFilter
 from src.plugins.built_in.affinity_flow_chatter.planner.plan_generator import ChatterPlanGenerator
@@ -201,6 +201,10 @@ class ChatterActionPlanner:
             reply_not_available = True
             aggregate_should_act = False
 
+            # 检查私聊必回配置
+            is_private_chat = context and context.chat_type == ChatType.PRIVATE
+            force_reply = is_private_chat and global_config.chat.private_chat_inevitable_reply
+
             if unread_messages:
                 # 直接使用消息中已计算的标志，无需重复计算兴趣值
                 for message in unread_messages:
@@ -219,9 +223,11 @@ class ChatterActionPlanner:
                             f"should_reply={message_should_reply}, should_act={message_should_act}"
                         )
 
-                        if message_should_reply:
+                        if message_should_reply or force_reply:
                             aggregate_should_act = True
                             reply_not_available = False
+                            if force_reply:
+                                logger.info(f"Focus模式 - 私聊必回已启用，强制回复消息 {message.message_id}")
                             break
 
                         if message_should_act:
@@ -394,12 +400,19 @@ class ChatterActionPlanner:
             should_reply = False
             target_message = None
 
+            # 检查私聊必回配置
+            is_private_chat = context and context.chat_type == ChatType.PRIVATE
+            force_reply = is_private_chat and global_config.chat.private_chat_inevitable_reply
+
             for message in unread_messages:
                 message_should_reply = getattr(message, "should_reply", False)
-                if message_should_reply:
+                if message_should_reply or force_reply:
                     should_reply = True
                     target_message = message
-                    logger.info(f"Normal模式 - 消息 {message.message_id} 达到reply阈值，准备回复")
+                    if force_reply:
+                        logger.info(f"Normal模式 - 私聊必回已启用，强制回复消息 {message.message_id}")
+                    else:
+                        logger.info(f"Normal模式 - 消息 {message.message_id} 达到reply阈值，准备回复")
                     break
 
             if should_reply and target_message:

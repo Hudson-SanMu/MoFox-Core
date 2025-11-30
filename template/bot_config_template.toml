@@ -1,5 +1,5 @@
 [inner]
-version = "7.9.1" 
+version = "7.9.2" 
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -171,6 +171,7 @@ learning_strength = 0.5
 
 [chat] #MoFox-Bot的聊天通用设置
 allow_reply_self = false # 是否允许回复自己说的话
+private_chat_inevitable_reply = false # 私聊必然回复
 
 max_context_size = 25 # 上下文长度
 thinking_timeout = 40 # MoFox-Bot一次回复最长思考规划时间，超过这个时间的思考会放弃（往往是api反应太慢）

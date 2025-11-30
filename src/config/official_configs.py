@@ -134,6 +134,7 @@ class ChatConfig(ValidatedConfigBase):
     thinking_timeout: int = Field(default=40, description="思考超时时间")
     mentioned_bot_inevitable_reply: bool = Field(default=False, description="提到机器人的必然回复")
     at_bot_inevitable_reply: bool = Field(default=False, description="@机器人的必然回复")
+    private_chat_inevitable_reply: bool = Field(default=False, description="私聊必然回复")
     allow_reply_self: bool = Field(default=False, description="是否允许回复自己说的话")
     timestamp_display_mode: Literal["normal", "normal_no_YMD", "relative"] = Field(
         default="normal_no_YMD", description="时间戳显示模式"
