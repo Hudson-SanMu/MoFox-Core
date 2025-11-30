@@ -439,7 +439,6 @@ class ChatterActionPlanner:
 
                 # 4. 构建回复动作（Normal模式使用respond动作）
                 from src.common.data_models.info_data_model import ActionPlannerInfo, Plan
-                from src.plugin_system.base.component_types import ChatType
 
                 # Normal模式使用respond动作，表示统一回应未读消息
                 # respond动作不需要target_message_id和action_message，因为它是统一回应所有未读消息
