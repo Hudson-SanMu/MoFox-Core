@@ -172,9 +172,9 @@ class ChatterActionManager:
             # 设置正在处理的状态
             chat_stream.context.is_replying = True
 
-            # no_action 特殊处理
-            if action_name == "no_action":
-                return {"action_type": "no_action", "success": True, "reply_text": ""}
+            # no_action / do_nothing 特殊处理
+            if action_name in ("no_action", "do_nothing"):
+                return {"action_type": action_name, "success": True, "reply_text": ""}
 
             # 创建并执行动作
             action_handler = self.create_action(

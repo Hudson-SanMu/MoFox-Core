@@ -364,11 +364,42 @@ kfc_WAITING_THOUGHT = Prompt(
 现在，请直接输出你等待时的内心想法：""",
 )
 
+# =================================================================================================
+# 统一模式输出格式（单次 LLM 调用，要求填写 content）
+# =================================================================================================
+
+kfc_UNIFIED_OUTPUT_FORMAT = Prompt(
+    name="kfc_unified_output_format",
+    template="""请用以下 JSON 格式回复：
+```json
+{{
+    "thought": "你脑子里在想什么，越自然越好",
+    "actions": [
+        {{"type": "kfc_reply", "content": "你的回复内容"}}
+    ],
+    "expected_reaction": "你期待对方的反应是什么",
+    "max_wait_seconds": 等待时间（秒），0 表示不等待
+}}
+```
+
+### 字段说明
+- `thought`：你的内心独白，记录你此刻的想法和感受。要自然，不要技术性语言。
+- `actions`：你要执行的动作列表。对于 `kfc_reply` 动作，**必须**填写 `content` 字段，写上你要说的话。
+- `expected_reaction`：你期待对方如何回应（用于判断是否需要等待）
+- `max_wait_seconds`：设定等待时间（秒），0 表示不等待，超时后你会考虑是否要主动说点什么。如果你认为聊天没有继续的必要，或不想打扰对方，可以设为 0。
+
+### 注意事项
+- kfc_reply 的 content 字段是**必填**的，直接写你要发送的消息内容
+- 即使什么都不想做，也放一个 `{{"type": "do_nothing"}}`
+- 可以组合多个动作，比如先发消息再发表情""",
+)
+
 # 导出所有模板名称，方便外部引用
 PROMPT_NAMES = {
     "main": "kfc_main",
     "output_format": "kfc_output_format",
     "planner_output_format": "kfc_planner_output_format",
+    "unified_output_format": "kfc_unified_output_format",
     "replyer": "kfc_replyer",
     "replyer_context_normal": "kfc_replyer_context_normal",
     "replyer_context_in_time": "kfc_replyer_context_in_time",

@@ -638,6 +638,12 @@ DEFAULT_MODULE_COLORS = {
     "context_web": "#5F5F00",  # 深黄色
     "gift_manager": "#D7005F",  # 粉红色
     "prompt": "#875FFF",  # 紫色（mais4u的prompt）
+    # Kokoro Flow Chatter (KFC) 系统
+    "kfc_planner": "#b19cd9",  # 淡紫色 - KFC 规划器
+    "kfc_replyer": "#b19cd9",  # 淡紫色 - KFC 回复器
+    "kfc_chatter": "#b19cd9",  # 淡紫色 - KFC 主模块
+    "kfc_unified": "#d7afff",  # 柔和紫色 - KFC 统一模式
+    "kfc_proactive_thinker": "#d7afff",  # 柔和紫色 - KFC 主动思考器
     "super_chat_manager": "#AF005F",  # 紫红色
     "watching": "#AF5F5F",  # 深橙色
     "offline_llm": "#303030",  # 深灰色
@@ -682,6 +688,7 @@ DEFAULT_MODULE_COLORS = {
     "kfc_session_manager": "#87D787",  # 绿色 - 会话管理
     "kfc_scheduler": "#D787AF",  # 柔和粉色 - 调度器
     "kfc_post_processor": "#5F87FF",  # 蓝色 - 后处理
+    "kfc_unified": "#FF5FAF",  # 粉色 - 统一模式
 }
 
 DEFAULT_MODULE_ALIASES = {
@@ -818,6 +825,7 @@ DEFAULT_MODULE_ALIASES = {
     "kfc_session_manager": "KFC会话",
     "kfc_scheduler": "KFC调度",
     "kfc_post_processor": "KFC后处理",
+    "kfc_unified": "KFC统一模式",
 }
 
 

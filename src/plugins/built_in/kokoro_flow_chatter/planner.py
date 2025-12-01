@@ -102,11 +102,12 @@ def _parse_response(raw_response: str) -> LLMResponse:
     response = LLMResponse.from_dict(data)
     
     if response.thought:
-        logger.info(
-            f"[KFC Planner] 解析成功: thought={response.thought[:50]}..., "
-            f"actions={[a.type for a in response.actions]}"
-        )
+        # 使用 logger 输出美化日志（颜色通过 logger 系统配置）
+        logger.info(f"💭 {response.thought}")
+        
+        actions_str = ", ".join(a.type for a in response.actions)
+        logger.debug(f"actions={actions_str}")
     else:
-        logger.warning("[KFC Planner] 响应缺少 thought")
+        logger.warning("响应缺少 thought")
     
     return response

@@ -1,5 +1,5 @@
 [inner]
-version = "7.9.4"
+version = "7.9.5"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -648,6 +648,12 @@ log_decisions = false # 是否记录每次决策的详细日志
 # 开启后，KFC将接管所有私聊消息；关闭后，私聊消息将由AFC处理。
 enable = true
 
+# --- 工作模式 ---
+# 可选值: "unified"（统一模式）或 "split"（分离模式）
+# unified: 单次LLM调用完成思考和回复生成，类似传统聊天方式，响应更快
+# split: Planner + Replyer两次LLM调用，先规划再生成回复，控制更精细
+mode = "split"
+
 # --- 核心行为配置 ---
 max_wait_seconds_default = 300 # 默认的最大等待秒数（AI发送消息后愿意等待用户回复的时间）
 enable_continuous_thinking = true # 是否在等待期间启用心理活动更新
@@ -676,7 +682,3 @@ quiet_hours_end = "07:00" # 勿扰结束时间
 
 # 5. 触发概率：每次检查时主动发起的概率，用于避免过于频繁打扰。
 trigger_probability = 0.3 # 0.0~1.0，默认30%概率
-
-# 6. 自然问候：在特定的时间，她会像朋友一样送上问候。
-enable_morning_greeting = true # 是否启用早安问候 (例如: 8:00 - 9:00)
-enable_night_greeting = true # 是否启用晚安问候 (例如: 22:00 - 23:00)

@@ -1,11 +1,19 @@
 """
 Kokoro Flow Chatter - Chatter 主类
 
-极简设计，只负责：
-1. 收到消息
-2. 调用 Planner 生成规划
-3. 执行动作（回复在 Action.execute() 中生成）
-4. 更新 Session
+支持两种工作模式：
+1. unified（统一模式）: 单次 LLM 调用完成思考 + 回复生成
+2. split（分离模式）: Planner + Replyer 两次 LLM 调用
+
+核心设计：
+- Chatter 只负责 "收到消息 → 规划执行" 的流程
+- 无论 Session 之前是什么状态，流程都一样
+- 区别只体现在提示词中
+
+不负责：
+- 等待超时处理（由 ProactiveThinker 负责）
+- 连续思考（由 ProactiveThinker 负责）
+- 主动发起对话（由 ProactiveThinker 负责）
 """
 
 import asyncio
@@ -18,8 +26,8 @@ from src.common.logger import get_logger
 from src.plugin_system.base.base_chatter import BaseChatter
 from src.plugin_system.base.component_types import ChatType
 
+from .config import KFCMode, get_config
 from .models import SessionStatus
-from .planner import generate_plan
 from .session import get_session_manager
 
 if TYPE_CHECKING:
@@ -27,14 +35,14 @@ if TYPE_CHECKING:
 
 logger = get_logger("kfc_chatter")
 
-# 控制台颜色
-SOFT_PURPLE = "\033[38;5;183m"
-RESET = "\033[0m"
-
 
 class KokoroFlowChatter(BaseChatter):
     """
     Kokoro Flow Chatter - 私聊特化的心流聊天器
+
+    支持两种工作模式（通过配置切换）：
+    - unified: 单次 LLM 调用完成思考和回复
+    - split: Planner + Replyer 两次 LLM 调用
 
     核心设计：
     - Chatter 只负责 "收到消息 → 规划执行" 的流程
@@ -62,18 +70,24 @@ class KokoroFlowChatter(BaseChatter):
         # 核心组件
         self.session_manager = get_session_manager()
         
+        # 加载配置
+        self._config = get_config()
+        self._mode = self._config.mode
+        
         # 并发控制
         self._lock = asyncio.Lock()
         self._processing = False
         
         # 统计
-        self._stats = {
+        self._stats: dict[str, Any] = {
             "messages_processed": 0,
             "successful_responses": 0,
             "failed_responses": 0,
         }
         
-        logger.info(f"{SOFT_PURPLE}[KFC]{RESET} 初始化完成: stream_id={stream_id}")
+        # 输出初始化信息
+        mode_str = "统一模式" if self._mode == KFCMode.UNIFIED else "分离模式"
+        logger.info(f"初始化完成 (模式: {mode_str}): stream_id={stream_id}")
     
     async def execute(self, context: StreamContext) -> dict:
         """
@@ -84,7 +98,7 @@ class KokoroFlowChatter(BaseChatter):
         2. 获取未读消息
         3. 记录用户消息到 mental_log
         4. 确定 situation_type（根据之前的等待状态）
-        5. 调用 Replyer 生成响应
+        5. 根据模式调用对应的生成器
         6. 执行动作
         7. 更新 Session（记录 Bot 规划，设置等待状态）
         8. 保存 Session
@@ -115,7 +129,6 @@ class KokoroFlowChatter(BaseChatter):
                 situation_type = self._determine_situation_type(session)
                 
                 # 5. **立即**结束等待状态，防止 ProactiveThinker 并发处理
-                # 在调用 LLM 之前就结束等待，避免 ProactiveThinker 检测到超时后也开始处理
                 if session.status == SessionStatus.WAITING:
                     session.end_waiting()
                     await self.session_manager.save_session(user_id)
@@ -143,25 +156,26 @@ class KokoroFlowChatter(BaseChatter):
                 # 8. 获取聊天流
                 chat_stream = await self._get_chat_stream()
                 
-                # 9. 调用 Planner 生成行动计划
-                plan_response = await generate_plan(
-                    session=session,
-                    user_name=user_name,
-                    situation_type=situation_type,
-                    chat_stream=chat_stream,
-                    available_actions=available_actions,
-                )
+                # 9. 根据模式调用对应的生成器
+                if self._mode == KFCMode.UNIFIED:
+                    plan_response = await self._execute_unified_mode(
+                        session=session,
+                        user_name=user_name,
+                        situation_type=situation_type,
+                        chat_stream=chat_stream,
+                        available_actions=available_actions,
+                    )
+                else:
+                    plan_response = await self._execute_split_mode(
+                        session=session,
+                        user_name=user_name,
+                        user_id=user_id,
+                        situation_type=situation_type,
+                        chat_stream=chat_stream,
+                        available_actions=available_actions,
+                    )
                 
-                # 10. 为 kfc_reply 动作注入必要的上下文信息
-                for action in plan_response.actions:
-                    if action.type == "kfc_reply":
-                        # 注入回复生成所需的上下文
-                        action.params["user_id"] = user_id
-                        action.params["user_name"] = user_name
-                        action.params["thought"] = plan_response.thought
-                        action.params["situation_type"] = situation_type
-                
-                # 11. 执行动作（回复生成在 Action.execute() 中完成）
+                # 10. 执行动作
                 exec_results = []
                 has_reply = False
                 for action in plan_response.actions:
@@ -178,7 +192,7 @@ class KokoroFlowChatter(BaseChatter):
                     if result.get("success") and action.type in ("kfc_reply", "respond"):
                         has_reply = True
                 
-                # 12. 记录 Bot 规划到 mental_log
+                # 11. 记录 Bot 规划到 mental_log
                 session.add_bot_planning(
                     thought=plan_response.thought,
                     actions=[a.to_dict() for a in plan_response.actions],
@@ -186,7 +200,7 @@ class KokoroFlowChatter(BaseChatter):
                     max_wait_seconds=plan_response.max_wait_seconds,
                 )
                 
-                # 13. 更新 Session 状态
+                # 12. 更新 Session 状态
                 if plan_response.max_wait_seconds > 0:
                     session.start_waiting(
                         expected_reaction=plan_response.expected_reaction,
@@ -195,20 +209,22 @@ class KokoroFlowChatter(BaseChatter):
                 else:
                     session.end_waiting()
                 
-                # 14. 标记消息为已读
+                # 13. 标记消息为已读
                 for msg in unread_messages:
                     context.mark_message_as_read(str(msg.message_id))
                 
-                # 15. 保存 Session
+                # 14. 保存 Session
                 await self.session_manager.save_session(user_id)
                 
-                # 16. 更新统计
+                # 15. 更新统计
                 self._stats["messages_processed"] += len(unread_messages)
                 if has_reply:
                     self._stats["successful_responses"] += 1
                 
+                # 输出完成信息
+                mode_str = "unified" if self._mode == KFCMode.UNIFIED else "split"
                 logger.info(
-                    f"{SOFT_PURPLE}[KFC]{RESET} 处理完成: "
+                    f"处理完成 ({mode_str}): "
                     f"user={user_name}, situation={situation_type}, "
                     f"actions={[a.type for a in plan_response.actions]}, "
                     f"wait={plan_response.max_wait_seconds}s"
@@ -220,6 +236,7 @@ class KokoroFlowChatter(BaseChatter):
                     has_reply=has_reply,
                     thought=plan_response.thought,
                     situation_type=situation_type,
+                    mode=mode_str,
                 )
                 
             except Exception as e:
@@ -231,6 +248,68 @@ class KokoroFlowChatter(BaseChatter):
             
             finally:
                 self._processing = False
+    
+    async def _execute_unified_mode(
+        self,
+        session,
+        user_name: str,
+        situation_type: str,
+        chat_stream,
+        available_actions,
+    ):
+        """
+        统一模式：单次 LLM 调用完成思考 + 回复生成
+        
+        LLM 输出的 JSON 中 kfc_reply 动作已包含 content 字段，
+        无需再调用 Replyer 生成回复。
+        """
+        from .unified import generate_unified_response
+        
+        plan_response = await generate_unified_response(
+            session=session,
+            user_name=user_name,
+            situation_type=situation_type,
+            chat_stream=chat_stream,
+            available_actions=available_actions,
+        )
+        
+        # 统一模式下 content 已经在 actions 中，无需注入
+        return plan_response
+    
+    async def _execute_split_mode(
+        self,
+        session,
+        user_name: str,
+        user_id: str,
+        situation_type: str,
+        chat_stream,
+        available_actions,
+    ):
+        """
+        分离模式：Planner + Replyer 两次 LLM 调用
+        
+        1. Planner 生成行动计划（JSON，kfc_reply 不含 content）
+        2. 为 kfc_reply 动作注入上下文，由 Action.execute() 调用 Replyer 生成回复
+        """
+        from .planner import generate_plan
+        
+        plan_response = await generate_plan(
+            session=session,
+            user_name=user_name,
+            situation_type=situation_type,
+            chat_stream=chat_stream,
+            available_actions=available_actions,
+        )
+        
+        # 为 kfc_reply 动作注入回复生成所需的上下文
+        for action in plan_response.actions:
+            if action.type == "kfc_reply":
+                action.params["user_id"] = user_id
+                action.params["user_name"] = user_name
+                action.params["thought"] = plan_response.thought
+                action.params["situation_type"] = situation_type
+        
+        return plan_response
     
     def _determine_situation_type(self, session) -> str:
         """
@@ -282,9 +361,16 @@ class KokoroFlowChatter(BaseChatter):
     
     def get_stats(self) -> dict[str, Any]:
         """获取统计信息"""
-        return self._stats.copy()
+        stats = self._stats.copy()
+        stats["mode"] = self._mode.value
+        return stats
     
     @property
     def is_processing(self) -> bool:
         """是否正在处理"""
         return self._processing
+    
+    @property
+    def mode(self) -> KFCMode:
+        """当前工作模式"""
+        return self._mode

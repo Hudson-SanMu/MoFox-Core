@@ -82,7 +82,8 @@ async def generate_reply_text(
         # 3. 清理并返回回复文本
         reply_text = _clean_reply_text(raw_response)
         
-        logger.info(f"[KFC Replyer] 生成成功 (model={model_name}): {reply_text[:50]}...")
+        # 使用 logger 输出美化日志（颜色通过 logger 系统配置）
+        logger.info(f"💬 {reply_text}")
         
         return True, reply_text
         

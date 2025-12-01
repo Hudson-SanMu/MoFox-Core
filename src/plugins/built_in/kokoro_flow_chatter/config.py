@@ -2,10 +2,37 @@
 Kokoro Flow Chatter - 配置
 
 可以通过 TOML 配置文件覆盖默认值
+
+支持两种工作模式：
+- unified: 统一模式，单次 LLM 调用完成思考和回复生成（类似旧版架构）
+- split: 分离模式，Planner + Replyer 两次 LLM 调用（推荐，更精细的控制）
 """
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List, Optional
+
+
+class KFCMode(str, Enum):
+    """KFC 工作模式"""
+    
+    # 统一模式：单次 LLM 调用，生成思考 + 回复（类似旧版架构）
+    UNIFIED = "unified"
+    
+    # 分离模式：Planner 生成规划，Replyer 生成回复（推荐）
+    SPLIT = "split"
+    
+    @classmethod
+    def from_str(cls, value: str) -> "KFCMode":
+        """从字符串创建模式"""
+        value = value.lower().strip()
+        if value == "unified":
+            return cls.UNIFIED
+        elif value == "split":
+            return cls.SPLIT
+        else:
+            # 默认使用统一模式
+            return cls.UNIFIED
 
 
 @dataclass
@@ -46,12 +73,6 @@ class ProactiveConfig:
     
     # 关系门槛：最低好感度，达到此值才会主动关心
     min_affinity_for_proactive: float = 0.3
-    
-    # 是否启用早安问候
-    enable_morning_greeting: bool = True
-    
-    # 是否启用晚安问候
-    enable_night_greeting: bool = True
 
 
 @dataclass
@@ -109,6 +130,11 @@ class KokoroFlowChatterConfig:
     # 是否启用
     enabled: bool = True
     
+    # 工作模式：unified（统一模式）或 split（分离模式）
+    # - unified: 单次 LLM 调用完成思考和回复生成（类似旧版架构，更简洁）
+    # - split: Planner + Replyer 两次 LLM 调用（更精细的控制，推荐）
+    mode: KFCMode = KFCMode.UNIFIED
+    
     # 启用的消息源类型（空列表表示全部）
     enabled_stream_types: List[str] = field(default_factory=lambda: ["private"])
     
@@ -165,6 +191,10 @@ def load_config() -> KokoroFlowChatterConfig:
             if hasattr(kfc_cfg, 'debug'):
                 config.debug = kfc_cfg.debug
             
+            # 工作模式配置
+            if hasattr(kfc_cfg, 'mode'):
+                config.mode = KFCMode.from_str(str(kfc_cfg.mode))
+            
             # 等待配置
             if hasattr(kfc_cfg, 'waiting'):
                 wait_cfg = kfc_cfg.waiting
@@ -188,8 +218,6 @@ def load_config() -> KokoroFlowChatterConfig:
                     quiet_hours_end=getattr(pro_cfg, 'quiet_hours_end', "07:00"),
                     trigger_probability=getattr(pro_cfg, 'trigger_probability', 0.3),
                     min_affinity_for_proactive=getattr(pro_cfg, 'min_affinity_for_proactive', 0.3),
-                    enable_morning_greeting=getattr(pro_cfg, 'enable_morning_greeting', True),
-                    enable_night_greeting=getattr(pro_cfg, 'enable_night_greeting', True),
                 )
             
             # 提示词配置

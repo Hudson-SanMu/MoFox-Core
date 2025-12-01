@@ -845,6 +845,202 @@ class PromptBuilder:
             user_name=user_name,
             target_message=target_message or "（无消息内容）",
         )
+    
+    async def build_unified_prompt(
+        self,
+        session: KokoroSession,
+        user_name: str,
+        situation_type: str = "new_message",
+        chat_stream: Optional["ChatStream"] = None,
+        available_actions: Optional[dict] = None,
+        extra_context: Optional[dict] = None,
+    ) -> str:
+        """
+        构建统一模式提示词（单次 LLM 调用完成思考 + 回复生成）
+        
+        与 planner_prompt 的区别：
+        - 使用完整的输出格式（要求填写 content 字段）
+        - 不使用分离的 replyer 提示词
+        
+        Args:
+            session: 会话对象
+            user_name: 用户名称
+            situation_type: 情况类型
+            chat_stream: 聊天流对象
+            available_actions: 可用动作字典
+            extra_context: 额外上下文
+            
+        Returns:
+            完整的统一模式提示词
+        """
+        extra_context = extra_context or {}
+        
+        # 获取 user_id
+        user_id = session.user_id if session else None
+        
+        # 1. 构建人设块
+        persona_block = self._build_persona_block()
+        
+        # 2. 使用 context_builder 获取关系、记忆、表达习惯等
+        context_data = await self._build_context_data(user_name, chat_stream, user_id)
+        relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
+        memory_block = context_data.get("memory_block", "")
+        expression_habits = self._build_combined_expression_block(context_data.get("expression_habits", ""))
+        
+        # 3. 构建活动流
+        activity_stream = await self._build_activity_stream(session, user_name)
+        
+        # 4. 构建当前情况
+        current_situation = await self._build_current_situation(
+            session, user_name, situation_type, extra_context
+        )
+        
+        # 5. 构建聊天历史总览
+        chat_history_block = await self._build_chat_history_block(chat_stream)
+        
+        # 6. 构建可用动作（统一模式强调需要填写 content）
+        actions_block = self._build_unified_actions_block(available_actions)
+        
+        # 7. 获取统一模式输出格式（要求填写 content）
+        output_format = await self._get_unified_output_format()
+        
+        # 8. 使用统一的 prompt 管理系统格式化
+        prompt = await global_prompt_manager.format_prompt(
+            PROMPT_NAMES["main"],
+            user_name=user_name,
+            persona_block=persona_block,
+            relation_block=relation_block,
+            memory_block=memory_block or "（暂无相关记忆）",
+            expression_habits=expression_habits or "（根据自然对话风格回复即可）",
+            activity_stream=activity_stream or "（这是你们第一次聊天）",
+            current_situation=current_situation,
+            chat_history_block=chat_history_block,
+            available_actions=actions_block,
+            output_format=output_format,
+        )
+        
+        return prompt
+    
+    def _build_unified_actions_block(self, available_actions: Optional[dict]) -> str:
+        """
+        构建统一模式的可用动作块
+        
+        与 _build_actions_block 的区别：
+        - 强调 kfc_reply 需要填写 content 字段
+        """
+        if not available_actions:
+            return self._get_unified_default_actions_block()
+        
+        action_blocks = []
+        for action_name, action_info in available_actions.items():
+            block = self._format_unified_action(action_name, action_info)
+            if block:
+                action_blocks.append(block)
+        
+        return "\n".join(action_blocks) if action_blocks else self._get_unified_default_actions_block()
+    
+    def _format_unified_action(self, action_name: str, action_info) -> str:
+        """格式化统一模式的单个动作"""
+        description = getattr(action_info, "description", "") or f"执行 {action_name}"
+        action_require = getattr(action_info, "action_require", []) or []
+        require_text = "\n".join(f"  - {req}" for req in action_require) if action_require else "  - 根据情况使用"
+        
+        # 统一模式要求 kfc_reply 必须填写 content
+        if action_name == "kfc_reply":
+            return f"""### {action_name}
+**描述**: {description}
+
+**使用场景**:
+{require_text}
+
+**示例**:
+```json
+{{
+  "type": "{action_name}",
+  "content": "你要说的话（必填）"
+}}
+```
+"""
+        else:
+            action_parameters = getattr(action_info, "action_parameters", {}) or {}
+            params_example = self._build_params_example(action_parameters)
+            
+            return f"""### {action_name}
+**描述**: {description}
+
+**使用场景**:
+{require_text}
+
+**示例**:
+```json
+{{
+  "type": "{action_name}",
+  {params_example}
+}}
+```
+"""
+    
+    def _get_unified_default_actions_block(self) -> str:
+        """获取统一模式的默认动作列表"""
+        return """### kfc_reply
+**描述**: 发送回复消息
+
+**使用场景**:
+  - 需要回复对方消息时使用
+
+**示例**:
+```json
+{
+  "type": "kfc_reply",
+  "content": "你要说的话（必填）"
+}
+```
+
+
+### do_nothing
+**描述**: 什么都不做
+
+**使用场景**:
+  - 当前不需要回应时使用
+
+**示例**:
+```json
+{
+  "type": "do_nothing"
+}
+```"""
+    
+    async def _get_unified_output_format(self) -> str:
+        """获取统一模式的输出格式模板"""
+        try:
+            prompt = await global_prompt_manager.get_prompt_async(
+                PROMPT_NAMES["unified_output_format"]
+            )
+            return prompt.template
+        except KeyError:
+            # 如果模板未注册，返回默认格式
+            return """请用以下 JSON 格式回复：
+```json
+{
+    "thought": "你脑子里在想什么，越自然越好",
+    "actions": [
+        {"type": "kfc_reply", "content": "你的回复内容"}
+    ],
+    "expected_reaction": "你期待对方的反应是什么",
+    "max_wait_seconds": 等待时间（秒），0 表示不等待
+}
+```
+
+### 字段说明
+- `thought`：你的内心独白，记录你此刻的想法和感受。要自然，不要技术性语言。
+- `actions`：你要执行的动作列表。对于 `kfc_reply` 动作，**必须**填写 `content` 字段，写上你要说的话。
+- `expected_reaction`：你期待对方如何回应（用于判断是否需要等待）
+- `max_wait_seconds`：设定等待时间（秒），0 表示不等待，超时后你会考虑是否要主动说点什么
+
+### 注意事项
+- kfc_reply 的 content 字段是必填的，直接写你要发送的消息内容
+- 即使什么都不想做，也放一个 `{"type": "do_nothing"}`
+- 可以组合多个动作，比如先发消息再发表情"""
 
 
 # 全局单例

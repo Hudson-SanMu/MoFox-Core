@@ -7,6 +7,10 @@ Kokoro Flow Chatter - 主动思考器
 3. 长期沉默后主动发起对话
 
 通过 UnifiedScheduler 定期触发，与 Chatter 解耦
+
+支持两种工作模式（与 Chatter 保持一致）：
+- unified: 单次 LLM 调用完成思考和回复
+- split: Planner + Replyer 两次 LLM 调用
 """
 
 import asyncio
@@ -20,9 +24,8 @@ from src.common.logger import get_logger
 from src.config.config import global_config
 from src.plugin_system.apis.unified_scheduler import TriggerType, unified_scheduler
 
+from .config import KFCMode, get_config
 from .models import EventType, SessionStatus
-from .planner import generate_plan
-from .replyer import _clean_reply_text
 from .session import KokoroSession, get_session_manager
 
 if TYPE_CHECKING:
@@ -44,6 +47,10 @@ class ProactiveThinker:
     - 定期检查所有 WAITING 状态的 Session
     - 触发连续思考或超时决策
     - 定期检查长期沉默的 Session，考虑主动发起
+    
+    支持两种工作模式（与 Chatter 保持一致）：
+    - unified: 单次 LLM 调用
+    - split: Planner + Replyer 两次调用
     """
     
     # 连续思考触发点（等待进度百分比）
@@ -74,10 +81,11 @@ class ProactiveThinker:
     
     def _load_config(self) -> None:
         """加载配置 - 使用统一的配置系统"""
-        from .config import get_config
-        
         config = get_config()
         proactive_cfg = config.proactive
+        
+        # 工作模式
+        self._mode = config.mode
         
         # 等待检查间隔（秒）
         self.waiting_check_interval = 15.0
@@ -92,13 +100,11 @@ class ProactiveThinker:
         self.quiet_hours_end = proactive_cfg.quiet_hours_end
         self.trigger_probability = proactive_cfg.trigger_probability
         self.min_affinity_for_proactive = proactive_cfg.min_affinity_for_proactive
-        self.enable_morning_greeting = proactive_cfg.enable_morning_greeting
-        self.enable_night_greeting = proactive_cfg.enable_night_greeting
     
     async def start(self) -> None:
         """启动主动思考器"""
         if self._running:
-            logger.warning("[ProactiveThinker] 已在运行中")
+            logger.info("已在运行中")
             return
         
         self._running = True
@@ -324,6 +330,7 @@ class ProactiveThinker:
                 return self._get_fallback_thought(elapsed_minutes, progress)
             
             # 使用统一的文本清理函数
+            from .replyer import _clean_reply_text
             thought = _clean_reply_text(raw_response)
             
             logger.debug(f"[ProactiveThinker] LLM 生成等待想法 (model={model_name}): {thought[:50]}...")
@@ -369,7 +376,7 @@ class ProactiveThinker:
             return None
     
     async def _handle_timeout(self, session: KokoroSession) -> None:
-        """处理等待超时"""
+        """处理等待超时 - 支持双模式"""
         self._stats["timeout_decisions"] += 1
         
         # 再次检查 Session 状态，防止在等待过程中被 Chatter 处理
@@ -421,23 +428,36 @@ class ProactiveThinker:
                 "time_since_user_reply_str": self._format_duration(time_since_user_reply) if time_since_user_reply else "未知",
             }
             
-            # 调用 Planner 生成超时决策
-            plan_response = await generate_plan(
-                session=session,
-                user_name=user_name,
-                situation_type="timeout",
-                chat_stream=chat_stream,
-                available_actions=action_manager.get_using_actions(),
-                extra_context=extra_context,
+            # 根据模式选择生成方式
+            if self._mode == KFCMode.UNIFIED:
+                # 统一模式：单次 LLM 调用
+                from .unified import generate_unified_response
+                plan_response = await generate_unified_response(
+                    session=session,
+                    user_name=user_name,
+                    situation_type="timeout",
+                    chat_stream=chat_stream,
+                    available_actions=action_manager.get_using_actions(),
+                )
+            else:
+                # 分离模式：Planner + Replyer
+                from .planner import generate_plan
+                plan_response = await generate_plan(
+                    session=session,
+                    user_name=user_name,
+                    situation_type="timeout",
+                    chat_stream=chat_stream,
+                    available_actions=action_manager.get_using_actions(),
+                    extra_context=extra_context,
             )
-            
-            # 为 kfc_reply 动作注入必要的上下文信息
-            for action in plan_response.actions:
-                if action.type == "kfc_reply":
-                    action.params["user_id"] = session.user_id
-                    action.params["user_name"] = user_name
-                    action.params["thought"] = plan_response.thought
-                    action.params["situation_type"] = "timeout"
+                
+                # 分离模式下需要注入上下文信息
+                for action in plan_response.actions:
+                    if action.type == "kfc_reply":
+                        action.params["user_id"] = session.user_id
+                        action.params["user_name"] = user_name
+                        action.params["thought"] = plan_response.thought
+                        action.params["situation_type"] = "timeout"
                     action.params["extra_context"] = extra_context
             
             # 执行动作（回复生成在 Action.execute() 中完成）
@@ -560,7 +580,7 @@ class ProactiveThinker:
         session: KokoroSession,
         trigger_reason: str,
     ) -> None:
-        """处理主动思考"""
+        """处理主动思考 - 支持双模式"""
         self._stats["proactive_triggered"] += 1
         
         # 再次检查最近活动时间，防止与 Chatter 并发
@@ -571,7 +591,7 @@ class ProactiveThinker:
             )
             return
         
-        logger.info(f"[ProactiveThinker] 主动思考触发: user={session.user_id}, reason={trigger_reason}")
+        logger.info(f"主动思考触发: user={session.user_id}, reason={trigger_reason}")
         
         try:
             # 获取用户名
@@ -601,15 +621,29 @@ class ProactiveThinker:
                 "silence_duration": silence_duration,
             }
             
-            # 调用 Planner
-            plan_response = await generate_plan(
-                session=session,
-                user_name=user_name,
-                situation_type="proactive",
-                chat_stream=chat_stream,
-                available_actions=action_manager.get_using_actions(),
-                extra_context=extra_context,
-            )
+            # 根据模式选择生成方式
+            if self._mode == KFCMode.UNIFIED:
+                # 统一模式：单次 LLM 调用
+                from .unified import generate_unified_response
+                plan_response = await generate_unified_response(
+                    session=session,
+                    user_name=user_name,
+                    situation_type="proactive",
+                    chat_stream=chat_stream,
+                    available_actions=action_manager.get_using_actions(),
+                    extra_context=extra_context,
+                )
+            else:
+                # 分离模式：Planner + Replyer
+                from .planner import generate_plan
+                plan_response = await generate_plan(
+                    session=session,
+                    user_name=user_name,
+                    situation_type="proactive",
+                    chat_stream=chat_stream,
+                    available_actions=action_manager.get_using_actions(),
+                    extra_context=extra_context,
+                )
             
             # 检查是否决定不打扰
             is_do_nothing = (
@@ -618,19 +652,20 @@ class ProactiveThinker:
             )
             
             if is_do_nothing:
-                logger.info(f"[ProactiveThinker] 决定不打扰: user={session.user_id}")
+                logger.info(f"决定不打扰: user={session.user_id}")
                 session.last_proactive_at = time.time()
                 await self.session_manager.save_session(session.user_id)
                 return
             
-            # 为 kfc_reply 动作注入必要的上下文信息
-            for action in plan_response.actions:
-                if action.type == "kfc_reply":
-                    action.params["user_id"] = session.user_id
-                    action.params["user_name"] = user_name
-                    action.params["thought"] = plan_response.thought
-                    action.params["situation_type"] = "proactive"
-                    action.params["extra_context"] = extra_context
+            # 分离模式下需要注入上下文信息
+            if self._mode == KFCMode.SPLIT:
+                for action in plan_response.actions:
+                    if action.type == "kfc_reply":
+                        action.params["user_id"] = session.user_id
+                        action.params["user_name"] = user_name
+                        action.params["thought"] = plan_response.thought
+                        action.params["situation_type"] = "proactive"
+                        action.params["extra_context"] = extra_context
             
             # 执行动作（回复生成在 Action.execute() 中完成）
             for action in plan_response.actions:
