@@ -405,7 +405,8 @@ class VectorStore:
             return None
 
         except Exception as e:
-            logger.error(f"获取节点失败: {e}")
+            # 节点不存在是正常情况，降级为 debug
+            logger.debug(f"获取节点失败（节点可能不存在）: {e}")
             return None
 
     async def delete_node(self, node_id: str) -> None:
