@@ -178,13 +178,16 @@ class KokoroFlowChatter(BaseChatter):
                 # 10. 执行动作
                 exec_results = []
                 has_reply = False
+                
                 for action in plan_response.actions:
+                    action_data = action.params.copy()
+                    
                     result = await self.action_manager.execute_action(
                         action_name=action.type,
                         chat_id=self.stream_id,
                         target_message=target_message,
                         reasoning=plan_response.thought,
-                        action_data=action.params,
+                        action_data=action_data,
                         thinking_id=None,
                         log_prefix="[KFC]",
                     )

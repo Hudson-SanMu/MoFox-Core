@@ -494,6 +494,14 @@ class StreamLoopManager:
                 logger.debug(f"流 {stream_id} 未读消息为空，跳过 chatter 处理")
                 return True  # 返回 True 表示处理完成（虽然没有实际处理）
 
+            # 🔇 静默群组检查：在静默群组中，只有提到 Bot 名字/别名才响应
+            if await self._should_skip_for_mute_group(stream_id, unread_messages):
+                # 清空未读消息，不触发 chatter
+                from .message_manager import message_manager
+                await message_manager.clear_stream_unread_messages(stream_id)
+                logger.debug(f"🔇 流 {stream_id} 在静默列表中且未提及Bot，跳过处理")
+                return True
+
             logger.debug(f"流 {stream_id} 有 {len(unread_messages)} 条未读消息，开始处理")
 
             # 设置触发用户ID，以实现回复保护
@@ -536,6 +544,70 @@ class StreamLoopManager:
 
             # 无论成功或失败，都要设置处理状态为未处理
             self._set_stream_processing_status(stream_id, False)
+
+    async def _should_skip_for_mute_group(self, stream_id: str, unread_messages: list) -> bool:
+        """检查是否应该因静默群组而跳过处理
+        
+        在静默群组中，只有当消息提及 Bot（@、回复、包含名字/别名）时才响应。
+        
+        Args:
+            stream_id: 流ID
+            unread_messages: 未读消息列表
+            
+        Returns:
+            bool: True 表示应该跳过，False 表示正常处理
+        """
+        if global_config is None:
+            return False
+            
+        # 获取静默群组列表
+        mute_group_list = getattr(global_config.message_receive, "mute_group_list", [])
+        if not mute_group_list:
+            return False
+            
+        try:
+            # 获取 chat_stream 来检查群组信息
+            chat_manager = get_chat_manager()
+            chat_stream = await chat_manager.get_stream(stream_id)
+            
+            if not chat_stream or not chat_stream.group_info:
+                # 不是群聊，不适用静默规则
+                return False
+                
+            group_id = str(chat_stream.group_info.group_id)
+            if group_id not in mute_group_list:
+                # 不在静默列表中
+                return False
+                
+            # 在静默列表中，检查是否有消息提及 Bot
+            bot_name = getattr(global_config.bot, "nickname", "")
+            bot_aliases = getattr(global_config.bot, "alias_names", [])
+            bot_qq = str(getattr(global_config.bot, "qq_account", ""))
+            
+            # 构建需要检测的关键词列表
+            mention_keywords = [bot_name] + list(bot_aliases) if bot_name else list(bot_aliases)
+            mention_keywords = [k for k in mention_keywords if k]  # 过滤空字符串
+            
+            for msg in unread_messages:
+                # 检查是否被 @ 或回复
+                if getattr(msg, "is_at", False) or getattr(msg, "is_mentioned", False):
+                    logger.debug(f"🔇 静默群组 {group_id}: 消息被@或回复，允许响应")
+                    return False
+                    
+                # 检查消息内容是否包含 Bot 名字或别名
+                content = getattr(msg, "processed_plain_text", "") or getattr(msg, "display_message", "") or ""
+                for keyword in mention_keywords:
+                    if keyword and keyword in content:
+                        logger.debug(f"🔇 静默群组 {group_id}: 消息包含关键词 '{keyword}'，允许响应")
+                        return False
+            
+            # 没有任何消息提及 Bot
+            logger.debug(f"🔇 静默群组 {group_id}: {len(unread_messages)} 条消息均未提及Bot，跳过")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"检查静默群组时出错: {stream_id}, error={e}")
+            return False
 
     def _set_stream_processing_status(self, stream_id: str, is_processing: bool) -> None:
         """设置流的处理状态"""
@@ -642,6 +714,18 @@ class StreamLoopManager:
         """
         if global_config is None:
             raise RuntimeError("Global config is not initialized")
+
+        # 私聊使用最小间隔，快速响应
+        try:
+            chat_manager = get_chat_manager()
+            chat_stream = await chat_manager.get_stream(stream_id)
+            if chat_stream and not chat_stream.group_info:
+                # 私聊：有消息时几乎立即响应，空转时稍微等待
+                min_interval = 0.1 if has_messages else 3.0
+                logger.debug(f"流 {stream_id} 私聊模式，使用最小间隔: {min_interval:.2f}s")
+                return min_interval
+        except Exception as e:
+            logger.debug(f"检查流 {stream_id} 是否为私聊失败: {e}")
 
         # 基础间隔
         base_interval = getattr(global_config.chat, "distribution_interval", 5.0)

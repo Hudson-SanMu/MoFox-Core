@@ -180,13 +180,24 @@ def build_actions_module(available_actions: Optional[dict[str, ActionInfo]] = No
     if not available_actions:
         return _get_default_actions_block()
     
-    action_blocks = []
+    # 核心限制说明（放在最前面）
+    action_blocks = [
+        """⚠️ **输出限制（必须遵守）**：
+1. `actions` 数组里**只能有一个** `kfc_reply`，不能写多个
+2. `kfc_reply` 的 `content` 要简洁，像发微信一样，**不要写长篇大论**
+3. 系统会自动把你的回复拆分成多条消息发送，你不需要自己分段
+"""
+    ]
     
     for action_name, action_info in available_actions.items():
         description = action_info.description or f"执行 {action_name}"
         
         # 构建动作块
         action_block = f"### `{action_name}` - {description}"
+        
+        # 对 kfc_reply 特殊处理，再次强调限制
+        if action_name == "kfc_reply":
+            action_block += "\n（只能有一个，内容写完整）"
         
         # 参数说明（如果有）
         if action_info.action_parameters:
@@ -213,26 +224,22 @@ def build_actions_module(available_actions: Optional[dict[str, ActionInfo]] = No
 
 def _get_default_actions_block() -> str:
     """获取默认的内置动作描述块"""
-    return """### `kfc_reply` - 发消息
-发送文字回复。**注意：只能有一个 kfc_reply 动作，把你想说的话都写在一条消息里。**
+    return """⚠️ **输出限制（必须遵守）**：
+1. `actions` 数组里**只能有一个** `kfc_reply`，不能写多个
+2. `kfc_reply` 的 `content` 要简洁，像发微信一样，**不要写长篇大论**
+3. 系统会自动把你的回复拆分成多条消息发送，你不需要自己分段
+
+### `kfc_reply` - 发消息
 ```json
-{"type": "kfc_reply", "content": "你要说的话，全部写在这里"}
+{"type": "kfc_reply", "content": "你想说的话"}
 ```
 
 ### `poke_user` - 戳一戳
-戳对方一下
 ```json
 {"type": "poke_user"}
 ```
 
-### `update_internal_state` - 更新你的心情
-更新你现在的心情状态
-```json
-{"type": "update_internal_state", "mood": "开心"}
-```
-
 ### `do_nothing` - 不做任何事
-想了想，决定现在不作回应
 ```json
 {"type": "do_nothing"}
 ```"""
@@ -262,13 +269,16 @@ def build_output_module(context_data: Optional[dict[str, str]] = None) -> str:
     
     # JSON 输出格式说明（更自然的思考引导）
     json_format = """### 输出格式（JSON）
+
+⚠️ **核心规则**：actions 中只能有**一个** `kfc_reply`动作！不能有多个`kfc_reply`动作！想说的话全写在一条消息里，系统会自动拆分发送。
+
 ```json
 {
   "thought": "你心里的真实想法，像日记一样自然",
   "expected_user_reaction": "猜猜对方看到会怎么想",
   "max_wait_seconds": "预估的等待时间（秒）",
   "actions": [
-    {"type": "kfc_reply", "content": "你要说的话"}
+    {"type": "kfc_reply", "content": "你想说的所有话，写在这里面"}
   ]
 }
 ```
@@ -280,7 +290,7 @@ def build_output_module(context_data: Optional[dict[str, str]] = None) -> str:
 
 关于 thought（内心想法）：
 - 写你真正在想的，不是在分析任务
-- 像心里嘀咕一样，比如"这家伙又来撒娇了~" "有点困了但还想再聊会儿"
+- 像心里嘀咕一样，比如"这家伙又来撒娇了" "有点困了但还想再聊会儿"
 - 不要写"根据设定""我需要""我应该"这种规划性的话
 - 就是你作为这个人，此刻心里在想什么
 
@@ -350,10 +360,10 @@ def build_system_prompt(
         "## 3. 现在的情况",
         build_context_module(session, chat_stream, context_data),
         "",
-        "## 5. 你能做的事",
+        "## 4. 你能做的事",
         build_actions_module(available_actions),
         "",
-        "## 6. 怎么回复",
+        "## 5. 怎么回复",
         build_output_module(context_data),
     ]
     
