@@ -39,7 +39,7 @@ class ExaSearchEngine(BaseSearchEngine):
         return self.api_manager.is_available()
 
     async def search(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        """执行优化的Exa搜索（使用新的search API）"""
+        """执行优化的Exa搜索（使用 search_and_contents API）"""
         if not self.is_available():
             return []
 
@@ -47,13 +47,12 @@ class ExaSearchEngine(BaseSearchEngine):
         num_results = min(args.get("num_results", 5), 5)  # 默认5个结果，但限制最多5个
         time_range = args.get("time_range", "any")
 
-        # 使用新的搜索参数格式
+        # 使用 search_and_contents 的参数格式
         exa_args = {
+            "query": query,
             "num_results": num_results,
-            "contents": {
-                "text": True,
-                "summary": True,  # 启用自动摘要
-            },
+            "type": "auto",
+            "highlights": True,  # 获取高亮片段
         }
 
         # 时间范围过滤
@@ -70,20 +69,20 @@ class ExaSearchEngine(BaseSearchEngine):
                 return []
 
             loop = asyncio.get_running_loop()
-            # 使用新的search方法
-            func = functools.partial(exa_client.search, query, **exa_args)
+            # 使用 search_and_contents 方法
+            func = functools.partial(exa_client.search_and_contents, **exa_args)
             search_response = await loop.run_in_executor(None, func)
 
             # 优化结果处理 - 更注重答案质量
             results = []
             for res in search_response.results:
-                # 获取最佳内容片段
-                summary = getattr(res, "summary", "")
+                # 获取高亮内容或文本
+                highlights = getattr(res, "highlights", [])
                 text = getattr(res, "text", "")
 
-                # 智能内容选择：摘要 > 文本开头
-                if summary and len(summary) > 50:
-                    snippet = summary.strip()
+                # 智能内容选择：高亮 > 文本开头
+                if highlights and len(highlights) > 0:
+                    snippet = " ".join(highlights[:3]).strip()
                 elif text:
                     snippet = text[:300] + "..." if len(text) > 300 else text
                 else:
@@ -114,13 +113,12 @@ class ExaSearchEngine(BaseSearchEngine):
         query = args["query"]
         num_results = min(args.get("num_results", 3), 3)  # answer模式默认3个结果，专注质量
 
-        # 精简的搜索参数 - 专注快速答案
+        # 精简的搜索参数 - 使用 search_and_contents
         exa_args = {
+            "query": query,
             "num_results": num_results,
-            "contents": {
-                "text": False,  # 不需要全文
-                "summary": True,  # 优先摘要
-            },
+            "type": "auto",
+            "highlights": True,
         }
 
         try:
@@ -129,16 +127,16 @@ class ExaSearchEngine(BaseSearchEngine):
                 return []
 
             loop = asyncio.get_running_loop()
-            func = functools.partial(exa_client.search, query, **exa_args)
+            func = functools.partial(exa_client.search_and_contents, **exa_args)
             search_response = await loop.run_in_executor(None, func)
 
             # 极简结果处理 - 只保留最核心信息
             results = []
             for res in search_response.results:
-                summary = getattr(res, "summary", "")
+                highlights = getattr(res, "highlights", [])
 
-                # 使用摘要作为答案
-                answer_text = summary.strip() if summary else ""
+                # 使用高亮作为答案
+                answer_text = " ".join(highlights[:2]).strip() if highlights else ""
 
                 if answer_text and len(answer_text) > 20:
                     results.append({
