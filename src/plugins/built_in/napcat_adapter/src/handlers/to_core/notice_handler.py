@@ -9,7 +9,7 @@ from mofox_wire import MessageBuilder, SegPayload, UserInfoPayload
 from src.common.logger import get_logger
 from src.plugin_system.apis import config_api
 
-from ...event_models import ACCEPT_FORMAT, NoticeType, QQ_FACE, PLUGIN_NAME
+from ...event_models import ACCEPT_FORMAT, NoticeType, QQ_FACE, PLUGIN_NAME, RealMessageType
 from ..utils import get_group_info, get_member_info, get_self_info, get_stranger_info, get_message_detail
 
 if TYPE_CHECKING:
@@ -106,6 +106,10 @@ class NoticeHandler:
 
             case NoticeType.group_msg_emoji_like:
                 if self._get_config("features.enable_emoji_like", True):
+                    # 过滤机器人自己贴表情的回声，避免重复动作
+                    if str(user_id) == str(self_id):
+                        logger.debug("忽略机器人自己贴表情的notice回声")
+                        return None
                     logger.debug("处理群聊表情回复")
                     handled_segment, user_info = await self._handle_group_emoji_like_notify(
                         raw, group_id, user_id
@@ -328,15 +332,11 @@ class NoticeHandler:
         from ...event_types import NapcatEvent
 
         target_message = await get_message_detail(raw.get("message_id", ""))
-        target_message_text = ""
-        if target_message:
-            target_message_text = target_message.get("raw_message", "")
-        else:
+        if not target_message:
             logger.error("未找到对应消息")
             return None, None
 
-        if len(target_message_text) > 15:
-            target_message_text = target_message_text[:15] + "..."
+        target_message_text = await self._extract_message_preview(target_message)
 
         user_info: UserInfoPayload = {
             "platform": "qq",
@@ -366,6 +366,48 @@ class NoticeHandler:
             "data": f"{user_name}使用Emoji表情{emoji_text}回应了消息[{target_message_text}]",
         }
         return seg_data, user_info
+
+    async def _extract_message_preview(self, message_detail: Dict[str, Any], depth: int = 0) -> str:
+        """提取被表情回应消息的可读摘要，支持多层嵌套"""
+        if depth > 3:
+            return "..."
+
+        preview_parts: List[str] = []
+        for seg in message_detail.get("message", []):
+            seg_type = seg.get("type")
+            seg_data = seg.get("data", {})
+
+            if seg_type == RealMessageType.text:
+                preview_parts.append(seg_data.get("text", ""))
+            elif seg_type == RealMessageType.face:
+                face_id = str(seg_data.get("id", ""))
+                preview_parts.append(QQ_FACE.get(face_id, f"[表情{face_id}]"))
+            elif seg_type == RealMessageType.image:
+                preview_parts.append("[图片]" if seg_data.get("sub_type") == 0 else "[表情包]")
+            elif seg_type == RealMessageType.at:
+                at_name = seg_data.get("text") or seg_data.get("qq") or "未知对象"
+                preview_parts.append(f"@{at_name}")
+            elif seg_type == RealMessageType.reply:
+                reply_id = seg_data.get("id")
+                if reply_id:
+                    reply_detail = await get_message_detail(reply_id)
+                    nested_preview = await self._extract_message_preview(reply_detail or {}, depth + 1)
+                    preview_parts.append(f"[回复:{nested_preview}]")
+            elif seg_type == RealMessageType.forward:
+                preview_parts.append("[转发消息]")
+            elif seg_type == RealMessageType.file:
+                file_name = seg_data.get("file") or seg_data.get("name") or "文件"
+                preview_parts.append(f"[文件:{file_name}]")
+            elif seg_type == RealMessageType.json:
+                preview_parts.append("[卡片消息]")
+            elif seg_type:
+                preview_parts.append(f"[{seg_type}]")
+
+        preview = "".join(preview_parts).strip() or "[消息]"
+        max_length = 60
+        if len(preview) > max_length:
+            preview = preview[:max_length] + "..."
+        return preview
 
     async def _handle_group_upload_notify(
         self, raw: Dict[str, Any], group_id: Any, user_id: Any, self_id: Any
