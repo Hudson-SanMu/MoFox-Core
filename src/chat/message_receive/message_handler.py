@@ -470,8 +470,8 @@ class MessageHandler:
 
             # 过滤检查
             raw_text = message.display_message or message.processed_plain_text or ""
-            if _check_ban_words(processed_text, chat, user_info) or _check_ban_regex(
-                raw_text, chat, user_info
+            if _check_ban_words(processed_text, chat, message.user_info) or _check_ban_regex(
+                raw_text, chat, message.user_info
             ):
                 return None
 

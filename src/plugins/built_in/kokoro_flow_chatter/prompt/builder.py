@@ -69,6 +69,9 @@ class PromptBuilder:
         # 1. 构建人设块
         persona_block = self._build_persona_block()
         
+        # 1.5. 构建安全互动准则块
+        safety_guidelines_block = self._build_safety_guidelines_block()
+        
         # 2. 使用 context_builder 获取关系、记忆、表达习惯等
         context_data = await self._build_context_data(user_name, chat_stream, user_id)
         relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
@@ -97,6 +100,7 @@ class PromptBuilder:
             PROMPT_NAMES["main"],
             user_name=user_name,
             persona_block=persona_block,
+            safety_guidelines_block=safety_guidelines_block,
             relation_block=relation_block,
             memory_block=memory_block or "（暂无相关记忆）",
             expression_habits=expression_habits or "（根据自然对话风格回复即可）",
@@ -140,6 +144,9 @@ class PromptBuilder:
         # 1. 构建人设块
         persona_block = self._build_persona_block()
         
+        # 1.5. 构建安全互动准则块
+        safety_guidelines_block = self._build_safety_guidelines_block()
+        
         # 2. 使用 context_builder 获取关系、记忆、表达习惯等
         context_data = await self._build_context_data(user_name, chat_stream, user_id)
         relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
@@ -167,6 +174,7 @@ class PromptBuilder:
             PROMPT_NAMES["replyer"],
             user_name=user_name,
             persona_block=persona_block,
+            safety_guidelines_block=safety_guidelines_block,
             relation_block=relation_block,
             memory_block=memory_block or "（暂无相关记忆）",
             activity_stream=activity_stream or "（这是你们第一次聊天）",
@@ -197,6 +205,24 @@ class PromptBuilder:
             parts.append(personality.identity)
         
         return "\n\n".join(parts) if parts else "你是一个温暖、真诚的人。"
+    
+    def _build_safety_guidelines_block(self) -> str:
+        """
+        构建安全互动准则块
+        
+        从配置中读取 safety_guidelines，构建成提示词格式
+        """
+        if global_config is None:
+            return ""
+        
+        safety_guidelines = global_config.personality.safety_guidelines
+        if not safety_guidelines:
+            return ""
+        
+        guidelines_text = "\n".join(f"{i + 1}. {line}" for i, line in enumerate(safety_guidelines))
+        return f"""在任何情况下，你都必须遵守以下由你的设定者为你定义的原则：
+{guidelines_text}
+如果遇到违反上述原则的请求，请在保持你核心人设的同时，以合适的方式进行回应。"""
     
     def _build_combined_expression_block(self, learned_habits: str) -> str:
         """
@@ -881,6 +907,9 @@ class PromptBuilder:
         # 1. 构建人设块
         persona_block = self._build_persona_block()
         
+        # 1.5. 构建安全互动准则块
+        safety_guidelines_block = self._build_safety_guidelines_block()
+        
         # 2. 使用 context_builder 获取关系、记忆、表达习惯等
         context_data = await self._build_context_data(user_name, chat_stream, user_id)
         relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
@@ -909,6 +938,7 @@ class PromptBuilder:
             PROMPT_NAMES["main"],
             user_name=user_name,
             persona_block=persona_block,
+            safety_guidelines_block=safety_guidelines_block,
             relation_block=relation_block,
             memory_block=memory_block or "（暂无相关记忆）",
             expression_habits=expression_habits or "（根据自然对话风格回复即可）",

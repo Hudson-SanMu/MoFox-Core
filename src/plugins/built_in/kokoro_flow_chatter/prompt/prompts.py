@@ -17,6 +17,9 @@ kfc_MAIN_PROMPT = Prompt(
 ## 人设
 {persona_block}
 
+## 安全互动准则
+{safety_guidelines_block}
+
 ## 你与 {user_name} 的关系
 {relation_block}
 
@@ -271,6 +274,9 @@ kfc_REPLYER_PROMPT = Prompt(
 
 ## 人设
 {persona_block}
+
+## 安全互动准则
+{safety_guidelines_block}
 
 ## 你与 {user_name} 的关系
 {relation_block}
