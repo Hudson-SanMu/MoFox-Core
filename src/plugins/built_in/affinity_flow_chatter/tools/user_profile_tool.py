@@ -43,29 +43,27 @@ class UserProfileTool(BaseTool):
     """
 
     name = "update_user_profile"
-    description = """记录你对某个人的重要认识。【不要频繁调用】
-只在以下情况使用：
-1. TA首次告诉你【具体的个人信息】：生日日期、职业、所在城市、真实姓名等 → 必填 key_info_type 和 key_info_value
-2. 你对TA产生了【显著的、值得长期记住的】新印象（不是每次聊天都要记）
-3. 你们的关系有了【实质性变化】
+    description = """记录或更新你对某个人的认识。可以经常调用来保持印象的实时性。
 
-【不要调用的情况】：
-- 普通的日常对话、闲聊
-- 只是聊得开心但没有实质性新认识
-- TA只是表达了一下情绪或感受
-- 你已经记录过类似的印象
-此工具会在后台异步执行，不会阻塞你的回复。"""
+使用场景：
+1. TA告诉你个人信息（生日、职业、城市等）→ 填 key_info_type 和 key_info_value
+2. TA的信息有变化（搬家、换工作等）→ 会自动更新旧信息
+3. 你对TA有了新的认识或感受
+4. 想更新对TA的印象
+
+⚠️ 注意：TA讲的游戏剧情/故事不是TA本人的信息，不要记录虚构内容。
+此工具在后台异步执行，不影响回复速度。"""
     parameters = [
         ("target_user_id", ToolParamType.STRING, "目标用户的ID（必须）", True, None),
-        ("target_user_name", ToolParamType.STRING, "目标用户的名字/昵称（必须，用于生成印象时称呼）", True, None),
-        ("user_aliases", ToolParamType.STRING, "TA的其他昵称或别名，多个用逗号分隔（可选）", False, None),
-        ("impression_hint", ToolParamType.STRING, "【简要描述】你观察到的关于TA的要点，如'很健谈，喜欢聊游戏，有点害羞'（可选，只填显著的新认识）", False, None),
-        ("preference_keywords", ToolParamType.STRING, "TA的兴趣爱好关键词，如'编程,游戏,音乐'，用逗号分隔（可选）", False, None),
-        ("key_info_type", ToolParamType.STRING, "【重要信息类型】birthday(生日日期)/job(职业)/location(城市)/dream(人生理想)/family(家庭成员)/pet(宠物名字)。只有TA告诉你这些【具体事实】时才填，不要用other！", False, None),
-        ("key_info_value", ToolParamType.STRING, "【重要信息内容】如'11月23日'、'程序员'、'北京'。必须是具体的事实信息！", False, None),
+        ("target_user_name", ToolParamType.STRING, "目标用户的名字/昵称（必须）", True, None),
+        ("user_aliases", ToolParamType.STRING, "TA的其他昵称或别名（可选）", False, None),
+        ("impression_hint", ToolParamType.STRING, "你观察到的关于TA的要点（可选）", False, None),
+        ("preference_keywords", ToolParamType.STRING, "TA的兴趣爱好关键词（可选）", False, None),
+        ("key_info_type", ToolParamType.STRING, "信息类型：birthday/job/location/dream/family/pet（可选）", False, None),
+        ("key_info_value", ToolParamType.STRING, "信息内容，如'11月23日'、'上海'（可选）", False, None),
     ]
     available_for_llm = True
-    history_ttl = 5
+    history_ttl = 1
 
     async def execute(self, function_args: dict[str, Any]) -> dict[str, Any]:
         """执行用户画像更新（异步后台执行，不阻塞回复）
@@ -269,7 +267,7 @@ class UserProfileTool(BaseTool):
             logger.error(f"保存关键信息失败: {e}")
             # 不抛出异常，因为这是后台任务
 
-    async def _get_recent_chat_history(self, target_user_id: str, max_messages: int = 40) -> str:
+    async def _get_recent_chat_history(self, target_user_id: str, max_messages: int = 50) -> str:
         """获取最近的聊天记录
         
         Args:
@@ -406,33 +404,77 @@ class UserProfileTool(BaseTool):
 ## 当前好感度
 {current_score:.2f} (范围0-1，0.3=普通认识，0.5=朋友，0.7=好友，0.9=挚友)
 
+## ⚠️ 重要：区分虚构内容和真实信息
+- 如果{target_user_name}在讲述**游戏剧情、小说情节、动漫故事、角色扮演**等虚构内容，这些是**TA分享的内容**，不是TA本人的特质
+- 印象应该记录的是**{target_user_name}这个人**的特点，比如：
+  - TA喜欢玩什么游戏、看什么动漫（兴趣）
+  - TA讲故事时的语气和热情（性格）
+  - TA和你交流时的方式（互动风格）
+- **不要**把游戏里的角色、剧情、NPC的特点当成{target_user_name}本人的特点
+- 例如：如果TA在讲游戏里的剧情，记录的应该是"TA很喜欢这个游戏/对剧情很有感触"
+
 ## 任务
 1. 根据聊天记录判断{target_user_name}的性别（男用"他"，女用"她"，无法判断用名字）
 2. {"写下你对这个人的第一印象" if is_first_impression else "在原有印象基础上，融入新的观察"}
 3. 决定好感度是否需要变化（大多数情况不需要）
 
-## 印象写作要求
-- 用第一人称"我"来写
-- 根据判断的性别使用"他/她"，或者直接用"{target_user_name}"
-- {"第一印象可以短一些，50-150字，写下初步感受" if is_first_impression else "在原有印象基础上补充新认识，150-300字"}
-- {"不要假装很熟，你们才刚认识" if is_first_impression else "体现出你们相处时间的积累"}
-- 写出这个人的特点、性格、给你的感觉
+## 印象写作要求（重要！）
+这是**长期印象**，不是某次聊天的记录！
 
-## 好感度变化规则（极度严格！）
-- 范围：-0.03 到 +0.03，**但默认是0，90%以上的对话好感度应该不变**
-- 好感度是长期积累的结果，不是短短几句话就能改变的
-- **绝对不变(=0)的情况**：
-  - 普通聊天、日常问候、闲聊
-  - 正常的交流，即使聊得很开心
-  - 分享日常、讨论话题
-  - 简单的互相关心
-- **可能微涨(+0.01)的情况**（很少见）：
-  - 对方真正信任你，分享了很私密的心事或秘密
-  - 在你困难时主动帮助
-- **可能涨(+0.02~0.03)的情况**（非常罕见）：
-  - 真正触动内心的深度交流
-  - 长期相处后的重要情感突破
-- 记住：聊得好≠好感度增加，好感是需要长时间培养的
+**应该写的（泛化、抽象）：**
+- TA是什么样的人（性格特点）
+- TA给你的整体感觉
+- TA的说话风格、互动方式
+- TA的兴趣爱好类型
+- 你们关系的整体状态
+
+**不要写的（太具体、太短期）：**
+- ❌ "今天TA跟我聊了xxx"
+- ❌ "TA刚才说了xxx"
+- ❌ 具体的某一次对话内容
+- ❌ 某个具体事件的细节
+- ❌ 时间词如"刚才"、"今天"、"最近一次"
+
+**格式要求：**
+- 用第一人称"我"来写
+- 根据判断的性别使用"他/她"
+- {"第一印象50-150字" if is_first_impression else "150-300字，在原有基础上补充"}
+- 写出这个人的**整体特质**，而不是某次聊天的具体内容
+
+## 好感度变化规则（极其严格！99%的对话好感度不变！）
+
+**核心原则：好感度是长期关系的体现，不是单次对话能改变的。**
+
+- 范围：-0.02 到 +0.02，**但绝大多数情况应该是 0**
+- 好感度会自然波动，即使很高也可能因为疏远、冷淡、误解而下降
+
+**好感度 = 0（不变）的情况（这是默认值！）：**
+- 普通聊天、日常问候、闲聊 → 0
+- 聊得很开心、话题很有趣 → 0（开心≠好感增加）
+- 讨论游戏、分享故事、聊兴趣 → 0
+- 对方表达喜欢你、夸你 → 0（嘴上说的不算数）
+- 简单的关心、问候 → 0
+- 友好的互动 → 0（友好是正常的，不是加分项）
+
+**好感度 = +0.01（微涨）的情况（非常罕见）：**
+- 对方在真正困难时向你倾诉，展现了深层信任
+- 经过很长时间的相处，关系有了质的突破
+
+**好感度 = +0.02（涨）的情况（极其罕见，几乎不会发生）：**
+- 对方为你做出了实质性的牺牲或帮助
+- 你们之间发生了真正改变关系的重大事件
+
+**好感度 = -0.01 到 -0.02（下降）的情况：**
+- 对方明显冷淡、敷衍
+- 发生了误解或小冲突
+- 长时间不联系后的疏远感
+
+**记住：**
+1. 聊得开心 ≠ 好感增加
+2. 话题友好 ≠ 好感增加  
+3. 对方说喜欢你 ≠ 好感增加
+4. 好感是需要很长时间才能培养的
+5. 如果你不确定，就填 0
 
 请严格按照以下JSON格式输出：
 {{
@@ -466,8 +508,8 @@ class UserProfileTool(BaseTool):
                 change_reason = result.get("change_reason", "")
                 detected_gender = result.get("gender", "unknown")
                 
-                # 限制好感度变化范围（严格：-0.03 到 +0.03）
-                affection_change = max(-0.03, min(0.03, affection_change))
+                # 限制好感度变化范围（极严格：-0.02 到 +0.02）
+                affection_change = max(-0.02, min(0.02, affection_change))
                 
                 # 如果印象为空或太短，回退到hint
                 if not impression or len(impression) < 10:
