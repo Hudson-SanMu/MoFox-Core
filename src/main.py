@@ -678,9 +678,16 @@ async def main() -> None:
         await system.schedule_tasks()
     except KeyboardInterrupt:
         logger.info("收到键盘中断信号")
+    except asyncio.CancelledError:
+        logger.info("主任务被取消")
     except Exception as e:
-        logger.error(f"主函数执行失败: {e}")
-        logger.error(traceback.format_exc())
+        error_msg = traceback.format_exc()
+        logger.critical(f"主函数执行失败:\n{error_msg}")
+        # 同时输出到 stderr 确保即使日志系统异常也能看到
+        import sys
+        print(f"\n主函数致命错误:\n{error_msg}", file=sys.stderr)
+        sys.stderr.flush()
+        raise  # 重新抛出以便上层处理
     finally:
         await system.shutdown()
 
@@ -691,6 +698,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("程序被用户中断")
     except Exception as e:
-        logger.error(f"程序执行失败: {e}")
-        logger.error(traceback.format_exc())
+        error_msg = traceback.format_exc()
+        logger.critical(f"程序执行失败:\n{error_msg}")
+        import sys
+        print(f"\n程序致命错误:\n{error_msg}", file=sys.stderr)
+        sys.stderr.flush()
         sys.exit(1)

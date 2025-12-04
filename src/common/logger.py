@@ -1307,12 +1307,25 @@ def shutdown_logging():
     """优雅关闭日志系统，释放所有文件句柄"""
     logger = get_logger("logger")
     logger.info("正在关闭日志系统...")
+    
+    # 给日志队列一点时间来刷新
+    import time
+    time.sleep(0.1)
+
+    # 停止队列监听器（这会等待队列清空）
+    _stop_queue_logging()
 
     # 关闭所有handler
     root_logger = logging.getLogger()
     for handler in root_logger.handlers[:]:
-        if hasattr(handler, "close"):
-            handler.close()
+        try:
+            # 先刷新 handler
+            if hasattr(handler, "flush"):
+                handler.flush()
+            if hasattr(handler, "close"):
+                handler.close()
+        except Exception as e:
+            print(f"[日志系统] 关闭 handler 时出错: {e}")
         root_logger.removeHandler(handler)
 
     # 关闭全局handler
@@ -1323,8 +1336,14 @@ def shutdown_logging():
     for logger_obj in logger_dict.values():
         if isinstance(logger_obj, logging.Logger):
             for handler in logger_obj.handlers[:]:
-                if hasattr(handler, "close"):
-                    handler.close()
+                try:
+                    if hasattr(handler, "flush"):
+                        handler.flush()
+                    if hasattr(handler, "close"):
+                        handler.close()
+                except Exception as e:
+                    print(f"[日志系统] 关闭 logger handler 时出错: {e}")
                 logger_obj.removeHandler(handler)
 
-    logger.info("日志系统已关闭")
+    # 最终输出（直接到 stderr 因为日志系统已关闭）
+    print("[日志系统] 日志系统已关闭")

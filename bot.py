@@ -1,11 +1,16 @@
 import asyncio
+import faulthandler
 import os
 import platform
 import sys
+import threading
 import time
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# 启用 faulthandler 以便在段错误等致命错误时打印 traceback
+faulthandler.enable()
 
 # 初始化基础工具
 from colorama import Fore, init
@@ -19,6 +24,88 @@ from src.common.logger import get_logger, initialize_logging, shutdown_logging
 initialize_logging()
 logger = get_logger("main")
 install(extra_lines=3)
+
+
+# ============= 全局异常捕获系统 =============
+def _global_exception_handler(exc_type, exc_value, exc_tb):
+    """全局异常处理器 - 捕获主线程中未处理的异常"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        # 对 Ctrl+C 使用默认处理
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    
+    # 格式化异常信息
+    error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    
+    # 尝试通过日志系统记录
+    try:
+        logger.critical(f"未捕获的致命异常:\n{error_msg}")
+    except Exception:
+        pass
+    
+    # 同时直接输出到 stderr，确保即使日志系统失败也能看到错误
+    print(f"\n{'='*60}", file=sys.stderr)
+    print("致命错误 - 未捕获的异常:", file=sys.stderr)
+    print(f"{'='*60}", file=sys.stderr)
+    print(error_msg, file=sys.stderr)
+    print(f"{'='*60}\n", file=sys.stderr)
+    sys.stderr.flush()
+
+
+def _thread_exception_handler(args):
+    """线程异常处理器 - 捕获子线程中未处理的异常"""
+    exc_type = args.exc_type
+    exc_value = args.exc_value
+    exc_tb = args.exc_traceback
+    thread = args.thread
+    
+    if issubclass(exc_type, SystemExit):
+        return
+    
+    thread_name = thread.name if thread else "Unknown"
+    error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    
+    # 尝试通过日志系统记录
+    try:
+        logger.critical(f"线程 '{thread_name}' 中发生未捕获的异常:\n{error_msg}")
+    except Exception:
+        pass
+    
+    # 同时直接输出到 stderr
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"致命错误 - 线程 '{thread_name}' 中未捕获的异常:", file=sys.stderr)
+    print(f"{'='*60}", file=sys.stderr)
+    print(error_msg, file=sys.stderr)
+    print(f"{'='*60}\n", file=sys.stderr)
+    sys.stderr.flush()
+
+
+def _unraisable_exception_handler(unraisable):
+    """不可抛出异常处理器 - 捕获 __del__ 等中的异常"""
+    exc_type = unraisable.exc_type
+    exc_value = unraisable.exc_value
+    exc_tb = unraisable.exc_traceback
+    obj = unraisable.object
+    
+    error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    obj_repr = repr(obj) if obj else "N/A"
+    
+    # 尝试通过日志系统记录
+    try:
+        logger.error(f"不可抛出的异常 (对象: {obj_repr}):\n{error_msg}")
+    except Exception:
+        pass
+    
+    # 输出到 stderr
+    print(f"\n警告 - 不可抛出的异常 (对象: {obj_repr}):", file=sys.stderr)
+    print(error_msg, file=sys.stderr)
+    sys.stderr.flush()
+
+
+# 安装全局异常处理器
+sys.excepthook = _global_exception_handler
+threading.excepthook = _thread_exception_handler
+sys.unraisablehook = _unraisable_exception_handler
 
 # 常量定义
 SUPPORTED_DATABASES = ["sqlite", "mysql", "postgresql"]
@@ -260,6 +347,31 @@ async def create_event_loop_context():
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        
+        # 设置 asyncio 异常处理器
+        def asyncio_exception_handler(loop, context):
+            """asyncio 异常处理器 - 捕获事件循环中未处理的异常"""
+            exception = context.get("exception")
+            message = context.get("message", "")
+            
+            if exception:
+                error_msg = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+                try:
+                    logger.error(f"asyncio 未处理异常: {message}\n{error_msg}")
+                except Exception:
+                    pass
+                print(f"\nasyncio 未处理异常: {message}", file=sys.stderr)
+                print(error_msg, file=sys.stderr)
+                sys.stderr.flush()
+            else:
+                try:
+                    logger.error(f"asyncio 错误: {message}")
+                except Exception:
+                    pass
+                print(f"\nasyncio 错误: {message}", file=sys.stderr)
+                sys.stderr.flush()
+        
+        loop.set_exception_handler(asyncio_exception_handler)
         yield loop
     except Exception as e:
         logger.error(f"创建事件循环失败: {e}")
@@ -267,9 +379,13 @@ async def create_event_loop_context():
     finally:
         if loop and not loop.is_closed():
             try:
-                await ShutdownManager.graceful_shutdown(loop)
+                # 执行优雅关闭
+                # 注意：在 finally 中不能直接 await，需要使用 loop.run_until_complete
+                shutdown_coro = ShutdownManager.graceful_shutdown(loop)
+                loop.run_until_complete(shutdown_coro)
             except Exception as e:
                 logger.error(f"关闭事件循环时出错: {e}")
+                print(f"关闭事件循环时出错: {e}", file=sys.stderr)
             finally:
                 try:
                     loop.close()
@@ -627,11 +743,18 @@ async def main_async():
     exit_code = 0
     main_task = None
 
+    # 在进入事件循环上下文之前先进行基本检查
+    try:
+        ConfigManager.ensure_env_file()
+    except Exception as e:
+        logger.critical(f"环境文件检查失败: {e}")
+        print(f"致命错误 - 环境文件检查失败: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return 1
+
     async with create_event_loop_context():
         try:
-            # 确保环境文件存在
-            ConfigManager.ensure_env_file()
-
             # 启动 WebUI 开发服务器（成功/失败都继续后续步骤）
             webui_ok = await WebUIManager.start_dev_server(timeout=60)
             if webui_ok:
@@ -654,6 +777,14 @@ async def main_async():
             # 使用wait等待任意一个任务完成
             done, _pending = await asyncio.wait([main_task, user_input_done], return_when=asyncio.FIRST_COMPLETED)
 
+            # 检查已完成的任务是否有异常
+            for task in done:
+                exc = task.exception()
+                if exc is not None:
+                    error_msg = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+                    logger.error(f"任务异常退出:\n{error_msg}")
+                    exit_code = 1
+
             # 如果用户输入任务完成（用户按了Ctrl+C），取消主任务
             if user_input_done in done and main_task not in done:
                 logger.info("用户请求退出，正在取消主任务...")
@@ -669,9 +800,14 @@ async def main_async():
             logger.warning("收到中断信号，正在优雅关闭...")
             if main_task and not main_task.done():
                 main_task.cancel()
+        except asyncio.CancelledError:
+            logger.info("主异步任务被取消")
         except Exception as e:
-            logger.error(f"主程序发生异常: {e}")
-            logger.debug(f"异常详情: {traceback.format_exc()}")
+            error_msg = traceback.format_exc()
+            logger.critical(f"主程序发生异常:\n{error_msg}")
+            # 同时输出到 stderr 确保可见
+            print(f"\n主程序异常:\n{error_msg}", file=sys.stderr)
+            sys.stderr.flush()
             exit_code = 1
 
     return exit_code
@@ -684,14 +820,40 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("程序被用户中断")
         exit_code = 130
-    except Exception as e:
-        logger.error(f"程序启动失败: {e}")
+    except SystemExit as e:
+        # 保留 SystemExit 的退出码
+        exit_code = e.code if isinstance(e.code, int) else 1
+        if exit_code != 0:
+            logger.warning(f"程序通过 SystemExit 退出，退出码: {exit_code}")
+    except BaseException as e:
+        # 捕获所有异常，包括 Exception 和其他 BaseException 子类
+        error_msg = traceback.format_exc()
+        try:
+            logger.critical(f"程序启动失败 - 致命异常:\n{error_msg}")
+        except Exception:
+            pass
+        # 确保错误被输出到 stderr
+        print(f"\n{'='*60}", file=sys.stderr)
+        print("致命错误 - 程序启动失败:", file=sys.stderr)
+        print(f"{'='*60}", file=sys.stderr)
+        print(error_msg, file=sys.stderr)
+        print(f"{'='*60}\n", file=sys.stderr)
+        sys.stderr.flush()
         exit_code = 1
     finally:
-        # 确保日志系统正确关闭
+        # 确保日志系统正确关闭，并给日志队列时间刷新
         try:
+            # 给日志队列一点时间来刷新
+            time.sleep(0.2)
             shutdown_logging()
         except Exception as e:
-            print(f"关闭日志系统时出错: {e}")
+            print(f"关闭日志系统时出错: {e}", file=sys.stderr)
+        
+        # 最后刷新标准输出和错误输出
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
 
     sys.exit(exit_code)
