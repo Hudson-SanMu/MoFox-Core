@@ -296,7 +296,7 @@ class DatabaseManager:
             # 使用线程执行器运行潜在的阻塞操作
             await initialize_sql_database()
             elapsed_time = time.time() - start_time
-            
+
             db_type = global_config.database.database_type if global_config else "unknown"
             logger.info(
                 f"数据库连接初始化成功，使用 {db_type} 数据库，耗时: {elapsed_time:.2f}秒"
@@ -610,9 +610,9 @@ async def wait_for_user_input():
     try:
         if os.getenv("ENVIRONMENT") != "production":
             logger.info("程序执行完成，按 Ctrl+C 退出...")
-            # 使用非阻塞循环
-            while True:
-                await asyncio.sleep(0.1)
+            # 使用 asyncio.Event 而不是 sleep 循环
+            shutdown_event = asyncio.Event()
+            await shutdown_event.wait()
     except KeyboardInterrupt:
         logger.info("用户中断程序")
         return True
@@ -652,7 +652,7 @@ async def main_async():
             user_input_done = asyncio.create_task(wait_for_user_input())
 
             # 使用wait等待任意一个任务完成
-            done, pending = await asyncio.wait([main_task, user_input_done], return_when=asyncio.FIRST_COMPLETED)
+            done, _pending = await asyncio.wait([main_task, user_input_done], return_when=asyncio.FIRST_COMPLETED)
 
             # 如果用户输入任务完成（用户按了Ctrl+C），取消主任务
             if user_input_done in done and main_task not in done:
