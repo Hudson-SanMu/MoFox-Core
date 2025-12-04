@@ -21,7 +21,7 @@ logger = get_logger("main")
 install(extra_lines=3)
 
 # 常量定义
-SUPPORTED_DATABASES = ["sqlite", "mysql", "postgresql"]
+SUPPORTED_DATABASES = ["sqlite", "postgresql"]
 SHUTDOWN_TIMEOUT = 10.0
 EULA_CHECK_INTERVAL = 2
 MAX_EULA_CHECK_ATTEMPTS = 30

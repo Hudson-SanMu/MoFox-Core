@@ -5,7 +5,6 @@
 
 支持的数据库类型：
 - SQLite: 使用 Text 类型
-- MySQL: 使用 VARCHAR(max_length) 用于索引字段
 - PostgreSQL: 使用 Text 类型（PostgreSQL 的 Text 类型性能与 VARCHAR 相当）
 
 所有模型使用统一的类型注解风格：
@@ -31,12 +30,11 @@ def get_string_field(max_length=255, **kwargs):
     根据数据库类型返回合适的字符串字段类型
 
     对于需要索引的字段：
-    - MySQL: 必须使用 VARCHAR(max_length)，因为索引需要指定长度
     - PostgreSQL: 可以使用 Text，但为了兼容性使用 VARCHAR
     - SQLite: 可以使用 Text，无长度限制
 
     Args:
-        max_length: 最大长度（对于 MySQL 是必需的）
+        max_length: 最大长度
         **kwargs: 传递给 String/Text 的额外参数
 
     Returns:
@@ -47,11 +45,8 @@ def get_string_field(max_length=255, **kwargs):
     assert global_config is not None
     db_type = global_config.database.database_type
 
-    # MySQL 索引需要指定长度的 VARCHAR
-    if db_type == "mysql":
-        return String(max_length, **kwargs)
     # PostgreSQL 可以使用 Text，但为了跨数据库迁移兼容性，使用 VARCHAR
-    elif db_type == "postgresql":
+    if db_type == "postgresql":
         return String(max_length, **kwargs)
     # SQLite 使用 Text（无长度限制）
     else:

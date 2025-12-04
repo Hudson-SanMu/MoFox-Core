@@ -1,10 +1,8 @@
 aiosqlite
 aiofiles
-aiomysql
 asyncpg
 psycopg[binary]
 psycopg2-binary
-PyMySQL
 APScheduler
 aiohttp
 aiohttp-cors

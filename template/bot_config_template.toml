@@ -1,5 +1,5 @@
 [inner]
-version = "7.9.5"
+version = "7.9.6"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -12,29 +12,10 @@ version = "7.9.5"
 #----以上是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 
 [database]# 数据库配置
-database_type = "sqlite" # 数据库类型，支持 "sqlite"、"mysql" 或 "postgresql"
+database_type = "sqlite" # 数据库类型，支持 "sqlite" 或 "postgresql"
 
 # SQLite 配置（当 database_type = "sqlite" 时使用）
 sqlite_path = "data/MaiBot.db" # SQLite数据库文件路径
-
-# MySQL 配置（当 database_type = "mysql" 时使用）
-mysql_host = "localhost" # MySQL服务器地址
-mysql_port = 3306 # MySQL服务器端口
-mysql_database = "maibot" # MySQL数据库名
-mysql_user = "root" # MySQL用户名
-mysql_password = "" # MySQL密码
-mysql_charset = "utf8mb4" # MySQL字符集
-mysql_unix_socket = "" # MySQL Unix套接字路径（可选，用于本地连接，优先于host/port）
-
-# MySQL SSL 配置
-mysql_ssl_mode = "DISABLED" # SSL模式: DISABLED, PREFERRED, REQUIRED, VERIFY_CA, VERIFY_IDENTITY
-mysql_ssl_ca = "" # SSL CA证书路径
-mysql_ssl_cert = "" # SSL客户端证书路径
-mysql_ssl_key = "" # SSL客户端密钥路径
-
-# MySQL 高级配置
-mysql_autocommit = true # 自动提交事务
-mysql_sql_mode = "TRADITIONAL" # SQL模式
 
 # PostgreSQL 配置（当 database_type = "postgresql" 时使用）
 postgresql_host = "localhost" # PostgreSQL服务器地址
@@ -50,7 +31,7 @@ postgresql_ssl_ca = "" # SSL CA证书路径
 postgresql_ssl_cert = "" # SSL客户端证书路径
 postgresql_ssl_key = "" # SSL客户端密钥路径
 
-# 连接池配置（MySQL 和 PostgreSQL 有效）
+# 连接池配置（PostgreSQL 有效）
 connection_pool_size = 10 # 连接池大小
 connection_timeout = 10 # 连接超时时间（秒）
 
@@ -131,7 +112,7 @@ safety_guidelines = [
 ]
 
 compress_personality = false # 是否压缩人格，压缩后会精简人格信息，节省token消耗并提高回复性能，但是会丢失一些信息，如果人设不长，可以关闭
-compress_identity = true # 是否压缩身份，压缩后会精简身份信息，节省token消耗并提高回复性能，但是会丢失一些信息，如果不长，可以关闭
+compress_identity = false # 是否压缩身份，压缩后会精简身份信息，节省token消耗并提高回复性能，但是会丢失一些信息，如果不长，可以关闭
 
 [expression]
 # 表达学习配置
@@ -283,7 +264,7 @@ path_expansion_path_score_weight = 0.50 # 路径分数在最终评分中的权�
 path_expansion_importance_weight = 0.30 # 重要性在最终评分中的权重
 path_expansion_recency_weight = 0.20 # 时效性在最终评分中的权重
 
-# 🆕 路径扩展 - 记忆去重配置
+# 路径扩展 - 记忆去重配置
 enable_memory_deduplication = true # 启用检索结果去重（合并相似记忆）
 memory_deduplication_threshold = 0.85 # 记忆相似度阈值（0.85表示85%相似即合并）
 

@@ -2,7 +2,6 @@
 
 提供跨数据库兼容性支持，处理不同数据库之间的差异：
 - SQLite: 轻量级本地数据库
-- MySQL: 高性能关系型数据库
 - PostgreSQL: 功能丰富的开源数据库
 
 主要职责：
@@ -23,7 +22,6 @@ class DatabaseDialect(Enum):
     """数据库方言枚举"""
 
     SQLITE = "sqlite"
-    MYSQL = "mysql"
     POSTGRESQL = "postgresql"
 
 
@@ -68,20 +66,6 @@ DIALECT_CONFIGS: dict[DatabaseDialect, DialectConfig] = {
             }
         },
     ),
-    DatabaseDialect.MYSQL: DialectConfig(
-        dialect=DatabaseDialect.MYSQL,
-        ping_query="SELECT 1",
-        supports_returning=False,  # MySQL 8.0.21+ 有限支持
-        supports_native_json=True,  # MySQL 5.7+
-        supports_arrays=False,
-        requires_length_for_index=True,  # MySQL 索引需要指定长度
-        default_string_length=255,
-        isolation_level="READ COMMITTED",
-        engine_kwargs={
-            "pool_pre_ping": True,
-            "pool_recycle": 3600,
-        },
-    ),
     DatabaseDialect.POSTGRESQL: DialectConfig(
         dialect=DatabaseDialect.POSTGRESQL,
         ping_query="SELECT 1",
@@ -113,13 +97,13 @@ class DialectAdapter:
         """初始化适配器
 
         Args:
-            db_type: 数据库类型字符串 ("sqlite", "mysql", "postgresql")
+            db_type: 数据库类型字符串 ("sqlite", "postgresql")
         """
         try:
             cls._current_dialect = DatabaseDialect(db_type.lower())
             cls._config = DIALECT_CONFIGS[cls._current_dialect]
         except ValueError:
-            raise ValueError(f"不支持的数据库类型: {db_type}，支持的类型: sqlite, mysql, postgresql")
+            raise ValueError(f"不支持的数据库类型: {db_type}，支持的类型: sqlite, postgresql")
 
     @classmethod
     def get_dialect(cls) -> DatabaseDialect:
@@ -153,15 +137,10 @@ class DialectAdapter:
         """
         config = cls.get_config()
 
-        # MySQL 索引列需要指定长度
-        if config.requires_length_for_index and indexed:
-            return String(max_length)
-
         # SQLite 和 PostgreSQL 可以使用 Text
         if config.dialect in (DatabaseDialect.SQLITE, DatabaseDialect.POSTGRESQL):
             return Text() if not indexed else String(max_length)
 
-        # MySQL 使用 VARCHAR
         return String(max_length)
 
     @classmethod
@@ -190,11 +169,6 @@ class DialectAdapter:
         return cls.get_dialect() == DatabaseDialect.SQLITE
 
     @classmethod
-    def is_mysql(cls) -> bool:
-        """是否为 MySQL"""
-        return cls.get_dialect() == DatabaseDialect.MYSQL
-
-    @classmethod
     def is_postgresql(cls) -> bool:
         """是否为 PostgreSQL"""
         return cls.get_dialect() == DatabaseDialect.POSTGRESQL
@@ -211,7 +185,7 @@ def get_indexed_string_field(max_length: int = 255) -> TypeEngine:
     这是一个便捷函数，用于在模型定义中获取适合当前数据库的字符串类型
 
     Args:
-        max_length: 最大长度（对于 MySQL 是必需的）
+        max_length: 最大长度
 
     Returns:
         SQLAlchemy 类型

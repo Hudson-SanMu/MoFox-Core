@@ -2,14 +2,12 @@
 """数据库迁移脚本
 
 支持在不同数据库之间迁移数据：
-- SQLite <-> MySQL
 - SQLite <-> PostgreSQL
-- MySQL <-> PostgreSQL
 
 使用方法:
     python scripts/migrate_database.py --help
     python scripts/migrate_database.py --source sqlite --target postgresql
-    python scripts/migrate_database.py --source mysql --target postgresql --batch-size 5000
+    python scripts/migrate_database.py --source postgresql --target sqlite --batch-size 5000
     
     # 交互式向导模式（推荐）
     python scripts/migrate_database.py
@@ -25,7 +23,7 @@
 实现细节:
 - 使用 SQLAlchemy 进行数据库连接和元数据管理
 - 采用流式迁移，避免一次性加载过多数据
-- 支持 SQLite、MySQL、PostgreSQL 之间的互相迁移
+- 支持 SQLite、PostgreSQL 之间的互相迁移
 - 批量插入失败时自动降级为逐行插入，最大程度保留数据
 """
 
@@ -124,7 +122,7 @@ def get_database_config_from_toml(db_type: str) -> dict | None:
     """从 bot_config.toml 中读取数据库配置
 
     Args:
-        db_type: 数据库类型，支持 "sqlite"、"mysql"、"postgresql"
+        db_type: 数据库类型，支持 "sqlite"、"postgresql"
 
     Returns:
         dict: 数据库配置字典，如果对应配置不存在则返回 None
@@ -147,28 +145,6 @@ def get_database_config_from_toml(db_type: str) -> dict | None:
         if not os.path.isabs(sqlite_path):
             sqlite_path = os.path.join(PROJECT_ROOT, sqlite_path)
         return {"path": sqlite_path}
-
-    elif db_type == "mysql":
-        return {
-            "host": db_config.get("mysql_host")
-            or config_data.get("mysql_host")
-            or "localhost",
-            "port": db_config.get("mysql_port")
-            or config_data.get("mysql_port")
-            or 3306,
-            "database": db_config.get("mysql_database")
-            or config_data.get("mysql_database")
-            or "maibot",
-            "user": db_config.get("mysql_user")
-            or config_data.get("mysql_user")
-            or "root",
-            "password": db_config.get("mysql_password")
-            or config_data.get("mysql_password")
-            or "",
-            "charset": db_config.get("mysql_charset")
-            or config_data.get("mysql_charset")
-            or "utf8mb4",
-        }
 
     elif db_type == "postgresql":
         return {
@@ -257,7 +233,7 @@ def create_engine_by_type(db_type: str, config: dict) -> Engine:
     """根据数据库类型创建对应的 SQLAlchemy Engine
 
     Args:
-        db_type: 数据库类型，支持 sqlite/mysql/postgresql
+        db_type: 数据库类型，支持 sqlite/postgresql
         config: 配置字典
 
     Returns:
@@ -266,15 +242,6 @@ def create_engine_by_type(db_type: str, config: dict) -> Engine:
     db_type = db_type.lower()
     if db_type == "sqlite":
         return create_sqlite_engine(config["path"])
-    elif db_type == "mysql":
-        return create_mysql_engine(
-            host=config["host"],
-            port=config["port"],
-            database=config["database"],
-            user=config["user"],
-            password=config["password"],
-            charset=config.get("charset", "utf8mb4"),
-        )
     elif db_type == "postgresql":
         return create_postgresql_engine(
             host=config["host"],
@@ -512,7 +479,7 @@ def migrate_table_data(
         source_table: 源表对象
         target_table: 目标表对象
         batch_size: 每批次处理大小
-        target_dialect: 目标数据库方言 (sqlite/mysql/postgresql)
+        target_dialect: 目标数据库方言 (sqlite/postgresql)
         row_limit: 最大迁移行数限制，None 表示不限制
 
     Returns:
@@ -738,7 +705,7 @@ class DatabaseMigrator:
 
     def _validate_database_types(self):
         """验证数据库类型"""
-        supported_types = {"sqlite", "mysql", "postgresql"}
+        supported_types = {"sqlite", "postgresql"}
         if self.source_type not in supported_types:
             raise ValueError(f"不支持的源数据库类型: {self.source_type}")
         if self.target_type not in supported_types:
@@ -995,7 +962,7 @@ class DatabaseMigrator:
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description="数据库迁移工具 - 在 SQLite、MySQL、PostgreSQL 之间迁移数据",
+        description="数据库迁移工具 - 在 SQLite、PostgreSQL 之间迁移数据",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""示例:
   # 从 SQLite 迁移到 PostgreSQL
@@ -1008,15 +975,16 @@ def parse_args():
     --target-user postgres \
     --target-password your_password
 
-  # 从 SQLite 迁移到 MySQL
+  # 从 PostgreSQL 迁移到 SQLite
   python scripts/migrate_database.py \
-    --source sqlite \
-    --target mysql \
-    --target-host localhost \
-    --target-port 3306 \
-    --target-database maibot \
-    --target-user root \
-    --target-password your_password
+    --source postgresql \
+    --source-host localhost \
+    --source-port 5432 \
+    --source-database maibot \
+    --source-user postgres \
+    --source-password your_password \
+    --target sqlite \
+    --target-path data/MaiBot_backup.db
 
   # 使用交互式向导模式（推荐）
   python scripts/migrate_database.py
@@ -1028,13 +996,13 @@ def parse_args():
     parser.add_argument(
         "--source",
         type=str,
-        choices=["sqlite", "mysql", "postgresql"],
+        choices=["sqlite", "postgresql"],
         help="源数据库类型（不指定时，在交互模式中选择）",
     )
     parser.add_argument(
         "--target",
         type=str,
-        choices=["sqlite", "mysql", "postgresql"],
+        choices=["sqlite", "postgresql"],
         help="目标数据库类型（不指定时，在交互模式中选择）",
     )
     parser.add_argument(
@@ -1053,8 +1021,8 @@ def parse_args():
     # 源数据库参数（可选，默认从 bot_config.toml 读取）
     source_group = parser.add_argument_group("源数据库配置（可选，默认从 bot_config.toml 读取）")
     source_group.add_argument("--source-path", type=str, help="SQLite 数据库路径")
-    source_group.add_argument("--source-host", type=str, help="MySQL/PostgreSQL 主机")
-    source_group.add_argument("--source-port", type=int, help="MySQL/PostgreSQL 端口")
+    source_group.add_argument("--source-host", type=str, help="PostgreSQL 主机")
+    source_group.add_argument("--source-port", type=int, help="PostgreSQL 端口")
     source_group.add_argument("--source-database", type=str, help="数据库名")
     source_group.add_argument("--source-user", type=str, help="用户名")
     source_group.add_argument("--source-password", type=str, help="密码")
@@ -1062,13 +1030,12 @@ def parse_args():
     # 目标数据库参数
     target_group = parser.add_argument_group("目标数据库配置")
     target_group.add_argument("--target-path", type=str, help="SQLite 数据库路径")
-    target_group.add_argument("--target-host", type=str, help="MySQL/PostgreSQL 主机")
-    target_group.add_argument("--target-port", type=int, help="MySQL/PostgreSQL 端口")
+    target_group.add_argument("--target-host", type=str, help="PostgreSQL 主机")
+    target_group.add_argument("--target-port", type=int, help="PostgreSQL 端口")
     target_group.add_argument("--target-database", type=str, help="数据库名")
     target_group.add_argument("--target-user", type=str, help="用户名")
     target_group.add_argument("--target-password", type=str, help="密码")
     target_group.add_argument("--target-schema", type=str, default="public", help="PostgreSQL schema")
-    target_group.add_argument("--target-charset", type=str, default="utf8mb4", help="MySQL 字符集")
 
     # 跳过表参数
     parser.add_argument(
@@ -1113,23 +1080,19 @@ def build_config_from_args(args, prefix: str, db_type: str) -> dict | None:
             return {"path": path}
         return None
 
-    elif db_type in ("mysql", "postgresql"):
+    elif db_type == "postgresql":
         host = getattr(args, f"{prefix}_host", None)
         if not host:
             return None
 
         config = {
             "host": host,
-            "port": getattr(args, f"{prefix}_port") or (3306 if db_type == "mysql" else 5432),
+            "port": getattr(args, f"{prefix}_port") or 5432,
             "database": getattr(args, f"{prefix}_database") or "maibot",
-            "user": getattr(args, f"{prefix}_user") or ("root" if db_type == "mysql" else "postgres"),
+            "user": getattr(args, f"{prefix}_user") or "postgres",
             "password": getattr(args, f"{prefix}_password") or "",
+            "schema": getattr(args, f"{prefix}_schema", "public"),
         }
-
-        if db_type == "mysql":
-            config["charset"] = getattr(args, f"{prefix}_charset", "utf8mb4")
-        elif db_type == "postgresql":
-            config["schema"] = getattr(args, f"{prefix}_schema", "public")
 
         return config
 
@@ -1201,14 +1164,14 @@ def interactive_setup() -> dict:
     print("只需回答几个问题，我会帮你构造迁移配置。")
     print("=" * 60)
 
-    db_types = ["sqlite", "mysql", "postgresql"]
+    db_types = ["sqlite", "postgresql"]
 
     # 选择源数据库
     source_type = _ask_choice("请选择【源数据库类型】:", db_types, default_index=0)
 
     # 选择目标数据库（不能与源相同）
     while True:
-        default_idx = 2 if len(db_types) >= 3 else 0
+        default_idx = 1 if len(db_types) >= 2 else 0
         target_type = _ask_choice("请选择【目标数据库类型】:", db_types, default_index=default_idx)
         if target_type != source_type:
             break
@@ -1231,8 +1194,8 @@ def interactive_setup() -> dict:
             source_path = _ask_str("源 SQLite 文件路径", default="data/MaiBot.db")
             source_config = {"path": source_path}
         else:
-            port_default = 3306 if source_type == "mysql" else 5432
-            user_default = "root" if source_type == "mysql" else "postgres"
+            port_default = 5432
+            user_default = "postgres"
             host = _ask_str("源数据库 host", default="localhost")
             port = _ask_int("源数据库 port", default=port_default)
             database = _ask_str("源数据库名", default="maibot")
@@ -1245,9 +1208,7 @@ def interactive_setup() -> dict:
                 "user": user,
                 "password": password,
             }
-            if source_type == "mysql":
-                source_config["charset"] = _ask_str("源数据库字符集", default="utf8mb4")
-            elif source_type == "postgresql":
+            if source_type == "postgresql":
                 source_config["schema"] = _ask_str("源数据库 schema", default="public")
 
     # 目标数据库配置（必须显式确认）
@@ -1260,8 +1221,8 @@ def interactive_setup() -> dict:
         )
         target_config = {"path": target_path}
     else:
-        port_default = 3306 if target_type == "mysql" else 5432
-        user_default = "root" if target_type == "mysql" else "postgres"
+        port_default = 5432
+        user_default = "postgres"
         host = _ask_str("目标数据库 host", default="localhost")
         port = _ask_int("目标数据库 port", default=port_default)
         database = _ask_str("目标数据库名", default="maibot")
@@ -1275,9 +1236,7 @@ def interactive_setup() -> dict:
             "user": user,
             "password": password,
         }
-        if target_type == "mysql":
-            target_config["charset"] = _ask_str("目标数据库字符集", default="utf8mb4")
-        elif target_type == "postgresql":
+        if target_type == "postgresql":
             target_config["schema"] = _ask_str("目标数据库 schema", default="public")
 
     print()

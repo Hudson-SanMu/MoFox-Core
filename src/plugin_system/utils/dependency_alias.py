@@ -61,7 +61,6 @@ INSTALL_NAME_TO_IMPORT_NAME = {
     "passlib": "passlib",  # 密码哈希库
     "bcrypt": "bcrypt",  # Bcrypt密码哈希
     # ============== 数据库 (Database) ==============
-    "mysql-connector-python": "mysql.connector",  # MySQL官方驱动
     "psycopg2-binary": "psycopg2",  # PostgreSQL驱动 (二进制)
     "pymongo": "pymongo",  # MongoDB驱动
     "redis": "redis",  # Redis客户端

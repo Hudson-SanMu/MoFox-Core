@@ -126,7 +126,6 @@ class ChatStreamImpressionTool(BaseTool):
                 updates.append(f"兴趣分: {final_impression['stream_interest_score']:.2f}")
 
             result_text = f"已更新聊天流 {stream_id} 的印象：\n" + "\n".join(updates)
-            logger.info(f"聊天流印象更新成功: {stream_id}")
 
             return {"type": "chat_stream_impression_update", "id": stream_id, "content": result_text}
 
@@ -214,7 +213,7 @@ class ChatStreamImpressionTool(BaseTool):
                 await cache.delete(generate_cache_key("stream_impression", stream_id))
                 await cache.delete(generate_cache_key("chat_stream", stream_id))
 
-                logger.info(f"聊天流印象已更新到数据库: {stream_id}")
+                logger.debug(f"聊天流印象已更新到数据库: {stream_id}")
             else:
                 error_msg = f"聊天流 {stream_id} 不存在于数据库中，无法更新印象"
                 logger.error(error_msg)

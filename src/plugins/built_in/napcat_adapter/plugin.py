@@ -88,6 +88,93 @@ class NapcatAdapter(BaseAdapter):
         # 注册 utils 内部使用的适配器实例，便于工具方法自动获取 WS
         handler_utils.register_adapter(self)
 
+    def _should_process_event(self, raw: Dict[str, Any]) -> bool:
+        """
+        检查事件是否应该被处理（黑白名单过滤）
+        
+        此方法在 from_platform_message 顶层调用，对所有类型的事件（消息、通知、元事件）进行过滤。
+
+        Args:
+            raw: OneBot 原始事件数据
+
+        Returns:
+            bool: True表示应该处理，False表示应该过滤
+        """
+        if not self.plugin:
+            return True
+        
+        plugin_config = self.plugin.config
+        if not plugin_config:
+            return True  # 如果没有配置，默认处理所有事件
+
+        features_config = plugin_config.get("features", {})
+        post_type = raw.get("post_type")
+
+        # 获取用户信息（根据事件类型从不同字段获取）
+        user_id: str = ""
+        if post_type == "message":
+            sender_info = raw.get("sender", {})
+            user_id = str(sender_info.get("user_id", ""))
+        elif post_type == "notice":
+            user_id = str(raw.get("user_id", ""))
+        else:
+            # 元事件或其他类型不需要过滤
+            return True
+
+        # 检查全局封禁用户列表
+        ban_user_ids = [str(item) for item in features_config.get("ban_user_id", [])]
+        if user_id and user_id in ban_user_ids:
+            logger.debug(f"用户 {user_id} 在全局封禁列表中，事件被过滤")
+            return False
+
+        # 检查是否屏蔽其他QQ机器人（仅对消息事件生效）
+        if post_type == "message" and features_config.get("ban_qq_bot", False):
+            sender_info = raw.get("sender", {})
+            role = sender_info.get("role", "")
+            if role == "admin" or "bot" in str(sender_info).lower():
+                logger.debug(f"检测到机器人消息 {user_id}，事件被过滤")
+                return False
+
+        # 获取消息类型（消息事件使用 message_type，通知事件根据 group_id 判断）
+        message_type = raw.get("message_type")
+        group_id = raw.get("group_id")
+        
+        # 如果是通知事件，根据是否有 group_id 判断是群通知还是私聊通知
+        if post_type == "notice":
+            message_type = "group" if group_id else "private"
+
+        # 群聊/群通知过滤
+        if message_type == "group" and group_id:
+            group_id_str = str(group_id)
+            group_list_type = features_config.get("group_list_type", "blacklist")
+            group_list = [str(item) for item in features_config.get("group_list", [])]
+
+            if group_list_type == "blacklist":
+                if group_id_str in group_list:
+                    logger.debug(f"群聊 {group_id_str} 在黑名单中，事件被过滤")
+                    return False
+            else:  # whitelist
+                if group_id_str not in group_list:
+                    logger.debug(f"群聊 {group_id_str} 不在白名单中，事件被过滤")
+                    return False
+
+        # 私聊/私聊通知过滤
+        elif message_type == "private":
+            private_list_type = features_config.get("private_list_type", "blacklist")
+            private_list = [str(item) for item in features_config.get("private_list", [])]
+
+            if private_list_type == "blacklist":
+                if user_id in private_list:
+                    logger.debug(f"私聊用户 {user_id} 在黑名单中，事件被过滤")
+                    return False
+            else:  # whitelist
+                if user_id not in private_list:
+                    logger.debug(f"私聊用户 {user_id} 不在白名单中，事件被过滤")
+                    return False
+
+        # 通过所有过滤条件
+        return True
+
     async def on_adapter_loaded(self) -> None:
         """适配器加载时的初始化"""
         logger.info("Napcat 适配器正在启动...")
@@ -161,6 +248,8 @@ class NapcatAdapter(BaseAdapter):
         - notice 事件 → 通知（戳一戳、表情回复等）
         - meta_event 事件 → 元事件（心跳、生命周期）
         - API 响应 → 存入响应池
+        
+        注意：黑白名单等过滤机制在此方法最开始执行，确保所有类型的事件都能被过滤。
         """
         post_type = raw.get("post_type")
 
@@ -171,6 +260,11 @@ class NapcatAdapter(BaseAdapter):
                 future = self._response_pool[echo]
                 if not future.done():
                     future.set_result(raw)
+            return None
+
+        # 顶层过滤：黑白名单等过滤机制
+        if not self._should_process_event(raw):
+            return None
 
         try:
             # 消息事件

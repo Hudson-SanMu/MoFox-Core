@@ -16,25 +16,8 @@ from src.config.config_base import ValidatedConfigBase
 class DatabaseConfig(ValidatedConfigBase):
     """数据库配置类"""
 
-    database_type: Literal["sqlite", "mysql", "postgresql"] = Field(default="sqlite", description="数据库类型")
+    database_type: Literal["sqlite", "postgresql"] = Field(default="sqlite", description="数据库类型")
     sqlite_path: str = Field(default="data/MaiBot.db", description="SQLite数据库文件路径")
-
-    # MySQL 配置
-    mysql_host: str = Field(default="localhost", description="MySQL服务器地址")
-    mysql_port: int = Field(default=3306, ge=1, le=65535, description="MySQL服务器端口")
-    mysql_database: str = Field(default="maibot", description="MySQL数据库名")
-    mysql_user: str = Field(default="root", description="MySQL用户名")
-    mysql_password: str = Field(default="", description="MySQL密码")
-    mysql_charset: str = Field(default="utf8mb4", description="MySQL字符集")
-    mysql_unix_socket: str = Field(default="", description="MySQL Unix套接字路径")
-    mysql_ssl_mode: Literal["DISABLED", "PREFERRED", "REQUIRED", "VERIFY_CA", "VERIFY_IDENTITY"] = Field(
-        default="DISABLED", description="SSL模式"
-    )
-    mysql_ssl_ca: str = Field(default="", description="SSL CA证书路径")
-    mysql_ssl_cert: str = Field(default="", description="SSL客户端证书路径")
-    mysql_ssl_key: str = Field(default="", description="SSL密钥路径")
-    mysql_autocommit: bool = Field(default=True, description="自动提交事务")
-    mysql_sql_mode: str = Field(default="TRADITIONAL", description="SQL模式")
 
     # PostgreSQL 配置
     postgresql_host: str = Field(default="localhost", description="PostgreSQL服务器地址")

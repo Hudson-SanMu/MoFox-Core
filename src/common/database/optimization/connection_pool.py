@@ -128,7 +128,7 @@ class ConnectionPoolManager:
         - 正常退出时自动提交事务
         - 发生异常时自动回滚事务
         - 如果用户代码已手动调用 commit/rollback，再次调用是安全的（空操作）
-        - 支持所有数据库类型：SQLite、MySQL、PostgreSQL
+        - 支持所有数据库类型：SQLite、PostgreSQL
         """
         connection_info = None
 
@@ -158,7 +158,7 @@ class ConnectionPoolManager:
             yield connection_info.session
 
             # 🔧 正常退出时提交事务
-            # 这对所有数据库（SQLite、MySQL、PostgreSQL）都很重要
+            # 这对所有数据库（SQLite、PostgreSQL）都很重要
             # 因为 SQLAlchemy 默认使用事务模式，不会自动提交
             # 注意：如果用户代码已调用 commit()，这里的 commit() 是安全的空操作
             if connection_info and connection_info.session:

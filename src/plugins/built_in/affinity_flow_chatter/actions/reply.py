@@ -96,7 +96,6 @@ class ReplyAction(BaseAction):
             # 发送回复
             reply_text = await self._send_response(response_set)
             
-            logger.info(f"{self.log_prefix} reply 动作执行成功")
             return True, reply_text
             
         except asyncio.CancelledError:
@@ -218,8 +217,7 @@ class RespondAction(BaseAction):
             
             # 发送回复（respond 默认不引用）
             reply_text = await self._send_response(response_set)
-            
-            logger.info(f"{self.log_prefix} respond 动作执行成功")
+
             return True, reply_text
             
         except asyncio.CancelledError:
