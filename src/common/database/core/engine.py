@@ -4,7 +4,6 @@
 
 支持的数据库类型：
 - SQLite: 轻量级本地数据库，使用 aiosqlite 驱动
-- MySQL: 高性能关系型数据库，使用 aiomysql 驱动
 - PostgreSQL: 功能丰富的开源数据库，使用 asyncpg 驱动
 """
 
@@ -66,9 +65,7 @@ async def get_engine() -> AsyncEngine:
             logger.info(f"正在初始化 {db_type.upper()} 数据库引擎...")
 
             # 根据数据库类型构建URL和引擎参数
-            if db_type == "mysql":
-                url, engine_kwargs = _build_mysql_config(config)
-            elif db_type == "postgresql":
+            if db_type == "postgresql":
                 url, engine_kwargs = _build_postgresql_config(config)
             else:
                 url, engine_kwargs = _build_sqlite_config(config)
@@ -120,55 +117,6 @@ def _build_sqlite_config(config) -> tuple[str, dict]:
     }
 
     logger.info(f"SQLite配置: {db_path}")
-    return url, engine_kwargs
-
-
-def _build_mysql_config(config) -> tuple[str, dict]:
-    """构建 MySQL 配置
-
-    Args:
-        config: 数据库配置对象
-
-    Returns:
-        (url, engine_kwargs) 元组
-    """
-    encoded_user = quote_plus(config.mysql_user)
-    encoded_password = quote_plus(config.mysql_password)
-
-    if config.mysql_unix_socket:
-        # Unix socket连接
-        encoded_socket = quote_plus(config.mysql_unix_socket)
-        url = (
-            f"mysql+aiomysql://{encoded_user}:{encoded_password}"
-            f"@/{config.mysql_database}"
-            f"?unix_socket={encoded_socket}&charset={config.mysql_charset}"
-        )
-    else:
-        # TCP连接
-        url = (
-            f"mysql+aiomysql://{encoded_user}:{encoded_password}"
-            f"@{config.mysql_host}:{config.mysql_port}/{config.mysql_database}"
-            f"?charset={config.mysql_charset}"
-        )
-
-    engine_kwargs = {
-        "echo": False,
-        "future": True,
-        "pool_size": config.connection_pool_size,
-        "max_overflow": config.connection_pool_size * 2,
-        "pool_timeout": config.connection_timeout,
-        "pool_recycle": 3600,
-        "pool_pre_ping": True,
-        "connect_args": {
-            "autocommit": config.mysql_autocommit,
-            "charset": config.mysql_charset,
-            "connect_timeout": config.connection_timeout,
-        },
-    }
-
-    logger.info(
-        f"MySQL配置: {config.mysql_user}@{config.mysql_host}:{config.mysql_port}/{config.mysql_database}"
-    )
     return url, engine_kwargs
 
 

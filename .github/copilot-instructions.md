@@ -157,7 +157,7 @@ python __main__.py         # 备用入口
 **调试技巧**:
 - 检查 `logs/app_*.jsonl` 结构化日志
 - 使用 `get_errors()` 工具查看编译错误
-- 数据库问题：查看 `data/MaiBot.db`（SQLite）或 MySQL 连接
+- 数据库问题：查看 `data/MaiBot.db`（SQLite）或 PostgreSQL 连接
 
 ## 📋 关键约定与模式
 
@@ -165,7 +165,7 @@ python __main__.py         # 备用入口
 **全局配置**: `src/config/config.py` 的 `global_config` 单例
 - 通过 TOML 文件驱动（`config/bot_config.toml`）
 - 支持环境变量覆盖（`.env`）
-- 数据库类型切换：`database.database_type = "sqlite" | "mysql"`
+- 数据库类型切换：`database.database_type = "sqlite" | "postgresql"`
 
 ### 事件系统
 **Event Manager** (`src/plugin_system/core/event_manager.py`):

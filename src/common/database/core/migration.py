@@ -119,9 +119,6 @@ async def check_and_migrate_database(existing_engine=None):
                                 ):
                                     # SQLite 将布尔值存储为 0 或 1
                                     default_value = "1" if default_arg else "0"
-                                elif dialect.name == "mysql" and isinstance(default_arg, bool):
-                                    # MySQL 也使用 1/0 表示布尔值
-                                    default_value = "1" if default_arg else "0"
                                 elif isinstance(default_arg, bool):
                                     # PostgreSQL 使用 TRUE/FALSE
                                     default_value = "TRUE" if default_arg else "FALSE"

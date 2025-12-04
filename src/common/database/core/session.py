@@ -4,7 +4,6 @@
 
 支持的数据库类型：
 - SQLite: 设置 PRAGMA 参数优化并发
-- MySQL: 无特殊会话设置
 - PostgreSQL: 可选设置 schema 搜索路径
 """
 
@@ -79,7 +78,6 @@ async def _apply_session_settings(session: AsyncSession, db_type: str) -> None:
             schema = global_config.database.postgresql_schema
             if schema and schema != "public":
                 await session.execute(text(f"SET search_path TO {schema}"))
-        # MySQL 通常不需要会话级别的特殊设置
     except Exception:
         # 复用连接时设置可能已存在，忽略错误
         pass
@@ -93,7 +91,6 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
     支持的数据库：
     - SQLite: 自动设置 busy_timeout 和外键约束
-    - MySQL: 直接使用，无特殊设置
     - PostgreSQL: 支持自定义 schema
 
     使用示例:
@@ -132,7 +129,7 @@ async def get_db_session_direct() -> AsyncGenerator[AsyncSession, None]:
     - 正常退出时自动提交事务
     - 发生异常时自动回滚事务
     - 如果用户代码已手动调用 commit/rollback，再次调用是安全的
-    - 适用于所有数据库类型（SQLite, MySQL, PostgreSQL）
+    - 适用于所有数据库类型（SQLite, PostgreSQL）
 
     Yields:
         AsyncSession: SQLAlchemy异步会话对象

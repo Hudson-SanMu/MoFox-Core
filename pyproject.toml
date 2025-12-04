@@ -46,7 +46,6 @@ dependencies = [
     "pydantic>=2.12.3",
     "pygments>=2.19.2",
     "pymongo>=4.13.2",
-    "pymysql>=1.1.1",
     "pypinyin>=0.54.0",
     "PyYAML>=6.0",
     "python-dateutil>=2.9.0.post0",
@@ -74,15 +73,13 @@ dependencies = [
     "uvicorn>=0.35.0",
     "watchdog>=6.0.0",
     "websockets>=15.0.1",
-    "aiomysql>=0.2.0",
     "aiosqlite>=0.21.0",
     "inkfox>=0.1.1",
     "rjieba>=0.1.13",
     "fastmcp>=2.13.0",
     "mofox-wire",
     "jinja2>=3.1.0",
-    "psycopg2-binary",
-    "PyMySQL"
+    "psycopg2-binary"
 ]
 
 [[tool.uv.index]]

@@ -75,7 +75,7 @@
 ### 🚀 拓展功能
  
 - 🧠 **AFC 智能对话** - 基于亲和力流，实现兴趣感知和动态关系构建
-- 🔄 **数据库切换** - 支持 SQLite 与 MySQL 自由切换，采用 SQLAlchemy 2.0 重新构建
+- 🔄 **数据库切换** - 支持 SQLite 与 PostgreSQL 自由切换，采用 SQLAlchemy 2.0 重新构建
 - 🛡️ **反注入集成** - 内置一整套回复前注入过滤系统，为人格保驾护航
 - 🎥 **视频分析** - 支持多种视频识别模式，拓展原版视觉
 - 📅 **日程系统** - 让MoFox规划每一天
@@ -109,7 +109,7 @@
 | 服务         | 描述                                       |
 | ------------ | ------------------------------------------ |
 | 🤖 QQ 协议端  | [NapCatQQ](https://github.com/NapNeko/NapCatQQ) 或其他兼容协议端 |
-| 🗃️ 数据库     | SQLite（默认）或 MySQL（可选）             |
+| 🗃️ 数据库     | SQLite（默认）或 PostgreSQL（可选）             |
 | 🔧 管理工具   | Chat2DB（可选，用于数据库可视化管理）      |
 
 ---
@@ -133,7 +133,7 @@
 
 1.  📝 **核心配置**：编辑 `config/bot_config.toml`，设置 LLM API Key、Bot 名称等基础参数。
 2.  🤖 **协议端配置**：确保使用 [NapCatQQ](https://github.com/NapNeko/NapCatQQ) 或兼容协议端，建立稳定通信。
-3.  🗃️ **数据库配置**：选择 SQLite（默认）或配置 MySQL 数据库连接。
+3.  🗃️ **数据库配置**：选择 SQLite（默认）或配置 PostgreSQL 数据库连接。
 4.  🔌 **插件配置**：在 `config/plugins/` 目录中启用或配置所需插件。
 
 </div>

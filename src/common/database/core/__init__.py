@@ -9,7 +9,6 @@
 
 支持的数据库：
 - SQLite (默认)
-- MySQL
 - PostgreSQL
 """
 
