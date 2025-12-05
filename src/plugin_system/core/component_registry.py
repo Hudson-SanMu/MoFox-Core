@@ -560,7 +560,7 @@ class ComponentRegistry:
             component_instance = router_class()
             server = get_global_server()
             # 生成唯一的 URL 前缀，格式为 /plugins/{plugin_name}
-            prefix = f"/plugins/{info.plugin_name}"
+            prefix = f"/plugins/{info.plugin_name}/{info.name}"
             # 将插件的路由包含到主应用中
             server.app.include_router(component_instance.router, prefix=prefix, tags=[info.plugin_name])
 
