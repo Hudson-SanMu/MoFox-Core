@@ -88,6 +88,12 @@ def _setup_mem_logger() -> logging.Logger:
 
 logger = _setup_mem_logger()
 
+# 启动时记录可选依赖的可用性
+if not OBJGRAPH_AVAILABLE:
+    logger.warning("objgraph 未安装，对象增长分析功能不可用 (pip install objgraph)")
+if not PYMPLER_AVAILABLE:
+    logger.warning("pympler 未安装，类型内存分析功能不可用 (pip install Pympler)")
+
 _process: "Process" = psutil.Process()
 _last_snapshot: tracemalloc.Snapshot | None = None
 _last_type_summary: list | None = None
