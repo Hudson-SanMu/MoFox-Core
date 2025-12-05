@@ -22,9 +22,24 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import objgraph
 import psutil
-from pympler import muppy, summary
+
+# objgraph 是可选依赖，用于对象增长监控
+try:
+    import objgraph
+    OBJGRAPH_AVAILABLE = True
+except ImportError:
+    OBJGRAPH_AVAILABLE = False
+    objgraph = None  # type: ignore[assignment]
+
+# pympler 是可选依赖，用于类型内存分析
+try:
+    from pympler import muppy, summary
+    PYMPLER_AVAILABLE = True
+except ImportError:
+    PYMPLER_AVAILABLE = False
+    muppy = None
+    summary = None
 
 if TYPE_CHECKING:
     from psutil import Process
@@ -153,6 +168,10 @@ def log_object_growth(limit: int = 20) -> None:
     Args:
         limit: 显示的最大增长类型数
     """
+    if not OBJGRAPH_AVAILABLE or objgraph is None:
+        logger.warning("objgraph not available, skipping object growth analysis")
+        return
+    
     logger.info("==== Objgraph growth (top %s) ====", limit)
     try:
         # objgraph.show_growth 默认输出到 stdout，需要捕获输出
@@ -181,6 +200,10 @@ def log_object_growth(limit: int = 20) -> None:
 def log_type_memory_diff() -> None:
     """使用 Pympler 查看各类型对象占用的内存变化"""
     global _last_type_summary
+    
+    if not PYMPLER_AVAILABLE or muppy is None or summary is None:
+        logger.warning("pympler not available, skipping type memory analysis")
+        return
     
     import io
     import sys
@@ -338,6 +361,10 @@ def debug_leak_for_type(type_name: str, max_depth: int = 5, filename: str | None
     Returns:
         是否成功生成引用图
     """
+    if not OBJGRAPH_AVAILABLE or objgraph is None:
+        logger.warning("objgraph not available, cannot generate backrefs graph")
+        return False
+    
     if filename is None:
         filename = f"{type_name}_backrefs.png"
 
