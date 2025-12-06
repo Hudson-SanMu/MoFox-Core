@@ -4,6 +4,7 @@ import binascii
 import hashlib
 import io
 import json
+import json_repair
 import os
 import random
 import re
@@ -1022,6 +1023,15 @@ class EmojiManager:
     -   必须是表情包，非普通截图。
     -   图中文字不超过5个。
 请确保你的最终输出是严格的JSON对象，不要添加任何额外解释或文本。
+输出格式:
+```json
+{{
+  "detailed_description": "",
+  "keywords": [],
+  "refined_sentence": "",
+  "is_compliant": true
+}}
+```
 """
 
                 image_data_for_vlm, image_format_for_vlm = image_base64, image_format
@@ -1041,16 +1051,14 @@ class EmojiManager:
                         if not vlm_response_str:
                             continue
 
-                        match = re.search(r"\{.*\}", vlm_response_str, re.DOTALL)
-                        if match:
-                            vlm_response_json = json.loads(match.group(0))
-                            description = vlm_response_json.get("detailed_description", "")
-                            emotions = vlm_response_json.get("keywords", [])
-                            refined_description = vlm_response_json.get("refined_sentence", "")
-                            is_compliant = vlm_response_json.get("is_compliant", False)
-                            if description and emotions and refined_description:
-                                logger.info("[VLM分析] 成功解析VLM返回的JSON数据。")
-                                break
+                        vlm_response_json = self._parse_json_response(vlm_response_str)
+                        description = vlm_response_json.get("detailed_description", "")
+                        emotions = vlm_response_json.get("keywords", [])
+                        refined_description = vlm_response_json.get("refined_sentence", "")
+                        is_compliant = vlm_response_json.get("is_compliant", False)
+                        if description and emotions and refined_description:
+                            logger.info("[VLM分析] 成功解析VLM返回的JSON数据。")
+                            break
                         logger.warning("[VLM分析] VLM返回的JSON数据不完整或格式错误，准备重试。")
                     except (json.JSONDecodeError, AttributeError) as e:
                         logger.error(f"VLM JSON解析失败 (第 {i+1}/3 次): {e}")
@@ -1194,6 +1202,29 @@ class EmojiManager:
                 except Exception as remove_error:
                     logger.error(f"[错误] 删除异常处理文件时出错: {remove_error}")
             return False
+
+    @classmethod
+    def _parse_json_response(cls, response: str) -> dict[str, Any] | None:
+        """解析 LLM 的 JSON 响应"""
+        try:
+            # 尝试提取 JSON 代码块
+            json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # 尝试直接解析
+                json_str = response.strip()
+
+            # 移除可能的注释
+            json_str = re.sub(r"//.*", "", json_str)
+            json_str = re.sub(r"/\*.*?\*/", "", json_str, flags=re.DOTALL)
+
+            data = json_repair.loads(json_str)
+            return data
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 解析失败: {e}, 响应: {response[:200]}")
+            return None
 
 
 emoji_manager = None
