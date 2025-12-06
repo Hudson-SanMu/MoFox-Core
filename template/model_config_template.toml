@@ -30,6 +30,30 @@ max_retry = 2
 timeout = 30
 retry_interval = 10
 
+#[[api_providers]] # AWS Bedrock配置示例 - 方式1：IAM凭证模式（取消注释以启用）
+#name = "AWS_Bedrock"
+#base_url = ""  # Bedrock不需要base_url，留空即可
+#api_key = "YOUR_AWS_ACCESS_KEY_ID"  # 你的AWS Access Key ID
+#client_type = "bedrock"  # 使用bedrock客户端
+#max_retry = 2
+#timeout = 60  # Bedrock推荐较长超时时间
+#retry_interval = 10
+#[api_providers.extra_params]  # Bedrock需要的额外配置
+#aws_secret_key = "YOUR_AWS_SECRET_ACCESS_KEY"  # 你的AWS Secret Access Key
+#region = "us-east-1"  # AWS区域，可选：us-east-1, us-west-2, eu-central-1等
+
+#[[api_providers]] # AWS Bedrock配置示例 - 方式2：IAM角色模式（推荐EC2/ECS部署）
+#name = "AWS_Bedrock_Role"
+#base_url = ""  # Bedrock不需要base_url
+#api_key = "dummy"  # IAM角色模式不使用api_key，但字段必填，可填任意值
+#client_type = "bedrock"
+#max_retry = 2
+#timeout = 60
+#retry_interval = 10
+#[api_providers.extra_params]
+## 不配置aws_secret_key，将自动使用IAM角色/环境变量认证
+#region = "us-east-1"  # 只需配置区域
+
 
 [[models]] # 模型（可以配置多个）
 model_identifier = "deepseek-chat" # 模型标识符（API服务商提供的模型标识符）
@@ -122,6 +146,28 @@ price_out = 0.0
 # 思考配置（二选一，不能同时使用，否则会返回 400 错误）：
 #thinking_level = "medium"     # Gemini3新版参数，可选值: "low", "medium", "high"
 thinking_budget = 256       # Gemini2.5系列旧版参数，不同模型范围不同（如 gemini-2.5-flash: 1-24576, gemini-2.5-pro: 128-32768）
+
+#[[models]] # AWS Bedrock - Claude 3.5 Sonnet配置示例（取消注释以启用）
+#model_identifier = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"  # 跨区推理配置文件
+#name = "claude-3.5-sonnet-bedrock"
+#api_provider = "AWS_Bedrock"
+#price_in = 3.0   # 每百万输入token价格（USD）
+#price_out = 15.0  # 每百万输出token价格（USD）
+#force_stream_mode = false
+
+#[[models]] # AWS Bedrock - Amazon Nova Pro配置示例
+#model_identifier = "us.amazon.nova-pro-v1:0"
+#name = "nova-pro"
+#api_provider = "AWS_Bedrock"
+#price_in = 0.8
+#price_out = 3.2
+
+#[[models]] # AWS Bedrock - Titan Embeddings嵌入模型示例
+#model_identifier = "amazon.titan-embed-text-v2:0"
+#name = "titan-embed-v2"
+#api_provider = "AWS_Bedrock"
+#price_in = 0.00002  # 每千token
+#price_out = 0.0
 
 [model_task_config.utils] # 在麦麦的一些组件中使用的模型，例如表情包模块，取名模块，关系模块，是麦麦必须的模型
 model_list = ["siliconflow-deepseek-ai/DeepSeek-V3.2-Exp"] # 使用的模型列表，每个子项对应上面的模型名称(name)

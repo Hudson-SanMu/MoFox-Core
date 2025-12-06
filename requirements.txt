@@ -22,6 +22,8 @@ networkx
 numpy
 openai
 google-genai
+aioboto3
+botocore
 pandas
 peewee
 pyarrow
