@@ -189,6 +189,38 @@ def register_plugin_from_file(plugin_name: str, load_after_register: bool = True
 # 该部分包含控制插件整体启用/禁用状态的功能。
 
 
+async def load_plugin(plugin_name: str) -> bool:
+    """
+    加载一个已注册但未加载的插件。
+
+    Args:
+        plugin_name (str): 要加载的插件名称。
+
+    Returns:
+        bool: 如果插件成功加载，则为 True。
+
+    Raises:
+        ValueError: 如果插件未注册或已经加载。
+    """
+    # 检查插件是否已经加载
+    if plugin_name in plugin_manager.list_loaded_plugins():
+        logger.warning(f"插件 '{plugin_name}' 已经加载。")
+        return True
+
+    # 检查插件是否已注册
+    if plugin_name not in plugin_manager.list_registered_plugins():
+        raise ValueError(f"插件 '{plugin_name}' 未注册，无法加载。")
+
+    # 尝试加载插件
+    success, _ = plugin_manager.load_registered_plugin_classes(plugin_name)
+    if success:
+        logger.info(f"插件 '{plugin_name}' 加载成功。")
+    else:
+        logger.error(f"插件 '{plugin_name}' 加载失败。")
+    
+    return success
+
+
 async def enable_plugin(plugin_name: str) -> bool:
     """
     启用一个已禁用的插件。
