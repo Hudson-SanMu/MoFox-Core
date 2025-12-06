@@ -267,6 +267,7 @@ async def disable_plugin(plugin_name: str,) -> bool:
     禁用一个插件。
 
     禁用插件不会卸载它，只会标记为禁用状态。
+    包含对 Chatter 组件的保护机制，防止禁用最后一个启用的 Chatter。
 
     Args:
         plugin_name (str): 要禁用的插件名称。
@@ -279,6 +280,42 @@ async def disable_plugin(plugin_name: str,) -> bool:
     if not plugin_instance:
         logger.warning(f"插件 '{plugin_name}' 未加载，无需禁用。")
         return True
+
+    # Chatter 保护检查：确保系统中至少有一个 Chatter 组件处于启用状态
+    try:
+        from src.plugin_system.base.component_types import ComponentType
+        from src.plugin_system.core.component_registry import component_registry
+
+        # 获取该插件的所有组件
+        plugin_info = component_registry.get_plugin_info(plugin_name)
+        if plugin_info:
+            # 检查插件是否包含 Chatter 组件
+            has_chatter = any(
+                comp.component_type == ComponentType.CHATTER
+                for comp in plugin_info.components
+            )
+
+            if has_chatter:
+                # 获取所有启用的 Chatter 组件
+                enabled_chatters = component_registry.get_enabled_components_by_type(ComponentType.CHATTER)
+
+                # 统计该插件中启用的 Chatter 数量
+                plugin_enabled_chatters = [
+                    comp.name for comp in plugin_info.components
+                    if comp.component_type == ComponentType.CHATTER
+                    and comp.name in enabled_chatters
+                ]
+
+                # 如果禁用此插件会导致没有可用的 Chatter，则阻止操作
+                if len(enabled_chatters) <= len(plugin_enabled_chatters):
+                    logger.warning(
+                        f"操作被阻止：禁用插件 '{plugin_name}' 将导致系统中没有可用的 Chatter 组件。"
+                        f"至少需要保持一个 Chatter 组件处于启用状态。"
+                    )
+                    return False
+    except Exception as e:
+        logger.warning(f"检查 Chatter 保护机制时发生错误: {e}")
+        # 即使检查失败，也继续执行禁用操作（降级处理）
 
     # 设置插件为禁用状态
     plugin_instance.enable_plugin = False
