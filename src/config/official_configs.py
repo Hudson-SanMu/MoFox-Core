@@ -950,6 +950,12 @@ class KokoroFlowChatterWaitingConfig(ValidatedConfigBase):
         le=10.0,
         description="等待时长倍率，用于整体放大或缩短LLM给出的等待时间",
     )
+    max_consecutive_timeouts: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="允许的连续等待超时次数上限，达到后不再等待用户回复 (0 表示不限制)",
+    )
 
 
 class KokoroFlowChatterConfig(ValidatedConfigBase):

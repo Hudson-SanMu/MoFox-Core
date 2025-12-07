@@ -179,11 +179,26 @@ class KokoroFlowChatter(BaseChatter):
                     )
                 
                 # 10. 执行动作
-                adjusted_wait = apply_wait_duration_rules(plan_response.max_wait_seconds)
-                if adjusted_wait != plan_response.max_wait_seconds:
+                raw_wait = plan_response.max_wait_seconds
+                adjusted_wait = apply_wait_duration_rules(
+                    raw_wait,
+                    session.consecutive_timeout_count,
+                )
+                timeout_limit = max(0, self._config.waiting.max_consecutive_timeouts)
+                if (
+                    timeout_limit
+                    and session.consecutive_timeout_count >= timeout_limit
+                    and raw_wait > 0
+                    and adjusted_wait == 0
+                ):
+                    logger.info(
+                        "[KFC] 连续等待 %s 次未收到回复，暂停继续等待",
+                        session.consecutive_timeout_count,
+                    )
+                elif adjusted_wait != raw_wait:
                     logger.debug(
                         "[KFC] 调整等待时长: raw=%ss adjusted=%ss",
-                        plan_response.max_wait_seconds,
+                        raw_wait,
                         adjusted_wait,
                     )
                 plan_response.max_wait_seconds = adjusted_wait

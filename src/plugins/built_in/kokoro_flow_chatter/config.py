@@ -51,6 +51,9 @@ class WaitingDefaults:
     # 等待时长倍率（>1 放大等待时间，<1 缩短）
     wait_duration_multiplier: float = 1.0
 
+    # 连续等待超时上限（达到后不再继续等待，0 表示不限制）
+    max_consecutive_timeouts: int = 3
+
 
 @dataclass
 class ProactiveConfig:
@@ -206,6 +209,7 @@ def load_config() -> KokoroFlowChatterConfig:
                     min_wait_seconds=getattr(wait_cfg, 'min_wait_seconds', 30),
                     max_wait_seconds=getattr(wait_cfg, 'max_wait_seconds', 1800),
                     wait_duration_multiplier=getattr(wait_cfg, 'wait_duration_multiplier', 1.0),
+                    max_consecutive_timeouts=getattr(wait_cfg, 'max_consecutive_timeouts', 3),
                 )
             
             # 主动思考配置 - 支持 proactive 和 proactive_thinking 两种写法
@@ -268,7 +272,7 @@ def reload_config() -> KokoroFlowChatterConfig:
     return _config
 
 
-def apply_wait_duration_rules(raw_wait_seconds: int) -> int:
+def apply_wait_duration_rules(raw_wait_seconds: int, consecutive_timeouts: int = 0) -> int:
     """根据配置计算最终的等待时间"""
     if raw_wait_seconds <= 0:
         return 0
@@ -291,4 +295,10 @@ def apply_wait_duration_rules(raw_wait_seconds: int) -> int:
     if min_wait > 0:
         adjusted = max(adjusted, min_wait)
 
-    return max(adjusted, 0)
+    adjusted = max(adjusted, 0)
+
+    timeout_limit = max(0, waiting_cfg.max_consecutive_timeouts)
+    if timeout_limit and consecutive_timeouts >= timeout_limit:
+        return 0
+
+    return adjusted

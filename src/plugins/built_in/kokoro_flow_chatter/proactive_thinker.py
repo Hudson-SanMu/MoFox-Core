@@ -83,6 +83,7 @@ class ProactiveThinker:
         """加载配置 - 使用统一的配置系统"""
         config = get_config()
         proactive_cfg = config.proactive
+        self._waiting_cfg = config.waiting
         
         # 工作模式
         self._mode = config.mode
@@ -461,11 +462,26 @@ class ProactiveThinker:
                         action.params["situation_type"] = "timeout"
                     action.params["extra_context"] = extra_context
 
-            adjusted_wait = apply_wait_duration_rules(plan_response.max_wait_seconds)
-            if adjusted_wait != plan_response.max_wait_seconds:
+            raw_wait = plan_response.max_wait_seconds
+            adjusted_wait = apply_wait_duration_rules(
+                raw_wait,
+                session.consecutive_timeout_count,
+            )
+            timeout_limit = max(0, getattr(self._waiting_cfg, "max_consecutive_timeouts", 0))
+            if (
+                timeout_limit
+                and session.consecutive_timeout_count >= timeout_limit
+                and raw_wait > 0
+                and adjusted_wait == 0
+            ):
+                logger.info(
+                    "[ProactiveThinker] 连续等待 %s 次未获回复，停止继续等待",
+                    session.consecutive_timeout_count,
+                )
+            elif adjusted_wait != raw_wait:
                 logger.debug(
                     "[ProactiveThinker] 调整超时等待: raw=%ss adjusted=%ss",
-                    plan_response.max_wait_seconds,
+                    raw_wait,
                     adjusted_wait,
                 )
             plan_response.max_wait_seconds = adjusted_wait
@@ -693,11 +709,26 @@ class ProactiveThinker:
                         action.params["situation_type"] = "proactive"
                         action.params["extra_context"] = extra_context
 
-            adjusted_wait = apply_wait_duration_rules(plan_response.max_wait_seconds)
-            if adjusted_wait != plan_response.max_wait_seconds:
+            raw_wait = plan_response.max_wait_seconds
+            adjusted_wait = apply_wait_duration_rules(
+                raw_wait,
+                session.consecutive_timeout_count,
+            )
+            timeout_limit = max(0, getattr(self._waiting_cfg, "max_consecutive_timeouts", 0))
+            if (
+                timeout_limit
+                and session.consecutive_timeout_count >= timeout_limit
+                and raw_wait > 0
+                and adjusted_wait == 0
+            ):
+                logger.info(
+                    "[ProactiveThinker] 连续等待 %s 次未获回复，主动无需再等",
+                    session.consecutive_timeout_count,
+                )
+            elif adjusted_wait != raw_wait:
                 logger.debug(
                     "[ProactiveThinker] 调整主动等待: raw=%ss adjusted=%ss",
-                    plan_response.max_wait_seconds,
+                    raw_wait,
                     adjusted_wait,
                 )
             plan_response.max_wait_seconds = adjusted_wait

@@ -1,5 +1,5 @@
 [inner]
-version = "7.9.7"
+version = "7.9.8"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -628,6 +628,7 @@ default_max_wait_seconds = 300 # LLM 未给出等待时间时的默认值
 min_wait_seconds = 30 # 允许的最短等待时间，防止太快打扰用户
 max_wait_seconds = 1800 # 允许的最长等待时间（秒）
 wait_duration_multiplier = 1.0 # 对 LLM 给出的等待时间应用的倍率（>1 放大，<1 缩短）
+max_consecutive_timeouts = 3 # 连续等待超时达到该次数后，强制不再继续等待（0 表示不限制）
 
 # --- 私聊专属主动思考配置 ---
 # 注意：这是KFC专属的主动思考配置，只有当KFC启用时才生效。
