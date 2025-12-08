@@ -110,9 +110,6 @@ def require_permission(permission_node: str, deny_message: str | None = None, *,
             )
 
             if not has_permission:
-                # 权限不足，发送拒绝消息
-                message = deny_message or f"❌ 你没有执行此操作的权限\n需要权限: {full_permission_node}"
-                await text_to_stream(message, chat_stream.stream_id)
                 # 对于PlusCommand的execute方法，需要返回适当的元组
                 if func.__name__ == "execute" and hasattr(args[0], "send_text"):
                     return False, "权限不足", True
@@ -190,8 +187,6 @@ def require_master(deny_message: str | None = None):
             is_master = await permission_api.is_master(chat_stream.platform, chat_stream.user_info.user_id)
 
             if not is_master:
-                message = deny_message or "❌ 此操作仅限Master用户执行"
-                await text_to_stream(message, chat_stream.stream_id)
                 if func.__name__ == "execute" and hasattr(args[0], "send_text"):
                     return False, "需要Master权限", True
                 return None
@@ -258,9 +253,7 @@ class PermissionChecker:
         has_permission = await permission_api.check_permission(
             chat_stream.platform, chat_stream.user_info.user_id, permission_node
         )
-        if not has_permission:
-            message = deny_message or f"❌ 你没有执行此操作的权限\n需要权限: {permission_node}"
-            await text_to_stream(message, chat_stream.stream_id)
+
         return has_permission
 
     @staticmethod
@@ -276,9 +269,5 @@ class PermissionChecker:
             bool: 是否为Master用户
         """
         is_master = await PermissionChecker.is_master(chat_stream)
-
-        if not is_master:
-            message = deny_message or "❌ 此操作仅限Master用户执行"
-            await text_to_stream(message, chat_stream.stream_id)
 
         return is_master
