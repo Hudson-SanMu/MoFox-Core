@@ -468,7 +468,7 @@ class EmbeddingStore:
             logger.info(f"使用实际检测到的 embedding 维度: {embedding_dim}")
         self.faiss_index = faiss.IndexFlatIP(embedding_dim)
         self.faiss_index.add(embeddings)
-        logger.info(f"✅ 成功构建 Faiss 索引: {len(embeddings)} 个向量, 维度={embedding_dim}")
+        logger.info(f"成功构建 Faiss 索引: {len(embeddings)} 个向量, 维度={embedding_dim}")
 
     def search_top_k(self, query: list[float], k: int) -> list[tuple[str, float]]:
         """搜索最相似的k个项，以余弦相似度为度量

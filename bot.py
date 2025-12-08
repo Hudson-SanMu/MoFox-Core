@@ -14,11 +14,29 @@ from rich.traceback import install
 
 # 初始化日志系统
 from src.common.logger import get_logger, initialize_logging, shutdown_logging
+from src.config.config import MMC_VERSION, global_config, model_config
 
 # 初始化日志和错误显示
 initialize_logging()
 logger = get_logger("main")
 install(extra_lines=3)
+
+
+class StartupStageReporter:
+    """启动阶段报告器"""
+
+    def __init__(self, bound_logger):
+        self._logger = bound_logger
+
+    def emit(self, title: str, **details):
+        detail_pairs = [f"{key}={value}" for key, value in details.items() if value not in (None, "")]
+        if detail_pairs:
+            self._logger.info(f"{title} ({', '.join(detail_pairs)})")
+        else:
+            self._logger.info(title)
+
+
+startup_stage = StartupStageReporter(logger)
 
 # 常量定义
 SUPPORTED_DATABASES = ["sqlite", "postgresql"]
@@ -30,7 +48,7 @@ MAX_ENV_FILE_SIZE = 1024 * 1024  # 1MB限制
 # 设置工作目录为脚本所在目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
-logger.info("工作目录已设置")
+logger.debug("工作目录已设置")
 
 
 class ConfigManager:
@@ -44,7 +62,7 @@ class ConfigManager:
 
         if not env_file.exists():
             if template_env.exists():
-                logger.info("未找到.env文件，正在从模板创建...")
+                logger.debug("未找到.env文件，正在从模板创建...")
                 try:
                     env_file.write_text(template_env.read_text(encoding="utf-8"), encoding="utf-8")
                     logger.info("已从template/template.env创建.env文件")
@@ -90,7 +108,7 @@ class ConfigManager:
                 return False
 
             load_dotenv()
-            logger.info("环境变量加载成功")
+            logger.debug("环境变量加载成功")
             return True
         except Exception as e:
             logger.error(f"加载环境变量失败: {e}")
@@ -113,7 +131,7 @@ class EULAManager:
         # 从 os.environ 读取（避免重复 I/O）
         eula_confirmed = os.getenv("EULA_CONFIRMED", "").lower()
         if eula_confirmed == "true":
-            logger.info("EULA已通过环境变量确认")
+            logger.debug("EULA已通过环境变量确认")
             return
 
         # 提示用户确认EULA
@@ -290,7 +308,7 @@ class DatabaseManager:
             from src.common.database.core import check_and_migrate_database as initialize_sql_database
             from src.config.config import global_config
 
-            logger.info("正在初始化数据库连接...")
+            logger.debug("正在初始化数据库连接...")
             start_time = time.time()
 
             # 使用线程执行器运行潜在的阻塞操作
@@ -421,10 +439,10 @@ class WebUIManager:
                 return False
 
             if WebUIManager._process and WebUIManager._process.returncode is None:
-                logger.info("WebUI 开发服务器已在运行，跳过重复启动")
+                logger.debug("WebUI 开发服务器已在运行，跳过重复启动")
                 return True
 
-            logger.info(f"正在启动 WebUI 开发服务器: npm run dev (cwd={webui_dir})")
+            logger.debug(f"正在启动 WebUI 开发服务器: npm run dev (cwd={webui_dir})")
             npm_exe = "npm.cmd" if platform.system().lower() == "windows" else "npm"
             proc = await asyncio.create_subprocess_exec(
                 npm_exe,
@@ -475,7 +493,7 @@ class WebUIManager:
 
                 if line:
                     text = line.decode(errors="ignore").rstrip()
-                    logger.info(f"[webui] {text}")
+                    logger.debug(f"[webui] {text}")
                     low = text.lower()
                     if any(k in low for k in success_keywords):
                         detected_success = True
@@ -496,7 +514,7 @@ class WebUIManager:
                         if not line:
                             break
                         text = line.decode(errors="ignore").rstrip()
-                        logger.info(f"[webui] {text}")
+                        logger.debug(f"[webui] {text}")
                 except Exception as e:
                     logger.debug(f"webui 日志读取停止: {e}")
 
@@ -538,7 +556,7 @@ class WebUIManager:
                     await WebUIManager._drain_task
                 except Exception:
                     pass
-            logger.info("WebUI 开发服务器已停止")
+            logger.debug("WebUI 开发服务器已停止")
             return True
         finally:
             WebUIManager._process = None
@@ -555,22 +573,71 @@ class MaiBotMain:
         try:
             if platform.system().lower() != "windows":
                 time.tzset() # type: ignore
-                logger.info("时区设置完成")
+                logger.debug("时区设置完成")
             else:
-                logger.info("Windows系统，跳过时区设置")
+                logger.debug("Windows系统，跳过时区设置")
         except Exception as e:
             logger.warning(f"时区设置失败: {e}")
 
+    def _emit_config_summary(self):
+        """输出配置加载阶段摘要"""
+        if not global_config:
+            return
+
+        bot_cfg = getattr(global_config, "bot", None)
+        db_cfg = getattr(global_config, "database", None)
+        platform = getattr(bot_cfg, "platform", "unknown") if bot_cfg else "unknown"
+        nickname = getattr(bot_cfg, "nickname", "unknown") if bot_cfg else "unknown"
+        db_type = getattr(db_cfg, "database_type", "unknown") if db_cfg else "unknown"
+        model_count = len(getattr(model_config, "models", []) or [])
+
+        startup_stage.emit(
+            "配置加载完成",
+            platform=platform,
+            nickname=nickname,
+            database=db_type,
+            models=model_count,
+        )
+
+    def _emit_component_summary(self):
+        """输出组件初始化阶段摘要"""
+        adapter_total = running_adapters = 0
+        plugin_total = 0
+
+        try:
+            from src.plugin_system.core.adapter_manager import get_adapter_manager
+
+            adapter_state = get_adapter_manager().list_adapters()
+            adapter_total = len(adapter_state)
+            running_adapters = sum(1 for info in adapter_state.values() if info.get("running"))
+        except Exception as exc:
+            logger.debug(f"统计适配器信息失败: {exc}")
+
+        try:
+            from src.plugin_system.core.plugin_manager import plugin_manager
+
+            plugin_total = len(plugin_manager.list_loaded_plugins())
+        except Exception as exc:
+            logger.debug(f"统计插件信息失败: {exc}")
+
+        startup_stage.emit(
+            "核心组件初始化完成",
+            adapters=adapter_total,
+            running=running_adapters,
+            plugins=plugin_total,
+        )
+
     async def initialize_database_async(self):
         """异步初始化数据库表结构"""
-        logger.info("正在初始化数据库表结构...")
+        logger.debug("正在初始化数据库表结构")
         try:
             start_time = time.time()
             from src.common.database.core import check_and_migrate_database
 
             await check_and_migrate_database()
             elapsed_time = time.time() - start_time
-            logger.info(f"数据库表结构初始化完成，耗时: {elapsed_time:.2f}秒")
+            db_type = getattr(getattr(global_config, "database", None), "database_type", "unknown")
+            startup_stage.emit("数据库就绪", engine=db_type, elapsed=f"{elapsed_time:.2f}s")
         except Exception as e:
             logger.error(f"数据库表结构初始化失败: {e}")
             raise
@@ -590,6 +657,7 @@ class MaiBotMain:
         if not ConfigurationValidator.validate_configuration():
             raise RuntimeError("配置验证失败，请检查配置文件")
 
+        self._emit_config_summary()
         return self.create_main_system()
 
     async def run_async_init(self, main_system):
@@ -600,6 +668,7 @@ class MaiBotMain:
 
         # 初始化主系统
         await main_system.initialize()
+        self._emit_component_summary()
 
         # 显示彩蛋
         EasterEgg.show()
@@ -609,7 +678,7 @@ async def wait_for_user_input():
     """等待用户输入（异步方式）"""
     try:
         if os.getenv("ENVIRONMENT") != "production":
-            logger.info("程序执行完成，按 Ctrl+C 退出...")
+            logger.debug("程序执行完成，按 Ctrl+C 退出...")
             # 使用 asyncio.Event 而不是 sleep 循环
             shutdown_event = asyncio.Event()
             await shutdown_event.wait()
@@ -646,7 +715,17 @@ async def main_async():
 
             # 运行主任务
             main_task = asyncio.create_task(main_system.schedule_tasks())
-            logger.info("麦麦机器人启动完成，开始运行主任务...")
+            bot_cfg = getattr(global_config, "bot", None)
+            platform = getattr(bot_cfg, "platform", "unknown") if bot_cfg else "unknown"
+            nickname = getattr(bot_cfg, "nickname", "MoFox") if bot_cfg else "MoFox"
+            version = getattr(global_config, "MMC_VERSION", MMC_VERSION) if global_config else MMC_VERSION
+            startup_stage.emit(
+                "MoFox 已成功启动",
+                version=version,
+                platform=platform,
+                nickname=nickname,
+            )
+            logger.debug("麦麦机器人启动完成，开始运行主任务")
 
             # 同时运行主任务和用户输入等待
             user_input_done = asyncio.create_task(wait_for_user_input())

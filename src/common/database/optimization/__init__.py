@@ -31,6 +31,7 @@ from .preloader import (
     DataPreloader,
     close_preloader,
     get_preloader,
+    record_preload_access,
 )
 from .redis_cache import RedisCache, close_redis_cache, get_redis_cache
 
@@ -62,5 +63,6 @@ __all__ = [
     "get_cache",
     "get_cache_backend_type",
     "get_preloader",
+    "record_preload_access",
     "get_redis_cache"
 ]

@@ -154,7 +154,7 @@ class CacheManager:
         if key in self.l1_kv_cache:
             entry = self.l1_kv_cache[key]
             if time.time() < entry["expires_at"]:
-                logger.info(f"命中L1键值缓存: {key}")
+                logger.debug(f"命中L1键值缓存: {key}")
                 return entry["data"]
             else:
                 del self.l1_kv_cache[key]
@@ -178,7 +178,7 @@ class CacheManager:
                 hit_index = indices[0][0]
                 l1_hit_key = self.l1_vector_id_to_key.get(hit_index)
                 if l1_hit_key and l1_hit_key in self.l1_kv_cache:
-                    logger.info(f"命中L1语义缓存: {l1_hit_key}")
+                    logger.debug(f"命中L1语义缓存: {l1_hit_key}")
                     return self.l1_kv_cache[l1_hit_key]["data"]
 
         # 步骤 2b: L2 精确缓存 (数据库)
@@ -190,7 +190,7 @@ class CacheManager:
             # 使用 getattr 安全访问属性，避免 Pylance 类型检查错误
             expires_at = getattr(cache_results_obj, "expires_at", 0)
             if time.time() < expires_at:
-                logger.info(f"命中L2键值缓存: {key}")
+                logger.debug(f"命中L2键值缓存: {key}")
                 cache_value = getattr(cache_results_obj, "cache_value", "{}")
                 data = orjson.loads(cache_value)
 
@@ -228,7 +228,7 @@ class CacheManager:
 
                     if distance != "N/A" and distance < 0.75:
                         l2_hit_key = results["ids"][0][0] if isinstance(results["ids"][0], list) else results["ids"][0]
-                        logger.info(f"命中L2语义缓存: key='{l2_hit_key}', 距离={distance:.4f}")
+                        logger.debug(f"命中L2语义缓存: key='{l2_hit_key}', 距离={distance:.4f}")
 
                         # 从数据库获取缓存数据
                         semantic_cache_results_obj = await db_query(

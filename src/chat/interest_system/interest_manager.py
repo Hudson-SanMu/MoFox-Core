@@ -82,7 +82,6 @@ class InterestManager:
                 if await calculator.initialize():
                     self._current_calculator = calculator
                     logger.info(f"兴趣值计算组件注册成功: {calculator.component_name} v{calculator.component_version}")
-                    logger.info("系统现在只有一个活跃的兴趣值计算器")
                     return True
                 else:
                     logger.error(f"兴趣值计算组件初始化失败: {calculator.component_name}")

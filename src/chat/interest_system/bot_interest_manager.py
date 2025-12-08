@@ -82,7 +82,7 @@ class BotInterestManager:
 
         # 检查embedding配置是否存在
         if not hasattr(model_config.model_task_config, "embedding"):
-            raise RuntimeError("❌ 未找到embedding模型配置")
+            raise RuntimeError("未找到embedding模型配置")
 
         self.embedding_config = model_config.model_task_config.embedding
 
@@ -127,7 +127,7 @@ class BotInterestManager:
                 logger.debug("正在保存至数据库...")
                 await self._save_interests_to_database(generated_interests)
             else:
-                raise RuntimeError("❌ 兴趣标签生成失败")
+                raise RuntimeError("兴趣标签生成失败")
 
     async def _generate_interests_from_personality(
         self, personality_description: str, personality_id: str
@@ -138,7 +138,7 @@ class BotInterestManager:
 
             # 检查embedding客户端是否可用
             if not hasattr(self, "embedding_request"):
-                raise RuntimeError("❌ Embedding客户端未初始化，无法生成兴趣标签")
+                raise RuntimeError("Embedding客户端未初始化，无法生成兴趣标签")
 
             # 构建提示词
             prompt = f"""
@@ -284,11 +284,11 @@ class BotInterestManager:
                         provider = model_config.get_provider(model_info.api_provider)
                         original_timeouts[provider.name] = provider.timeout
                         if provider.timeout < INIT_TIMEOUT:
-                            logger.debug(f"⏱️ 临时增加 API provider '{provider.name}' 超时: {provider.timeout}s → {INIT_TIMEOUT}s")
+                            logger.debug(f"临时增加 API provider '{provider.name}' 超时: {provider.timeout}s → {INIT_TIMEOUT}s")
                             provider.timeout = INIT_TIMEOUT
                     except Exception as e:
-                        logger.warning(f"⚠️ 无法修改模型 '{model_name}' 的超时设置: {e}")
-
+                        logger.warning(f"无法修改模型 '{model_name}' 的超时设置: {e}")
+                
                 # 调用LLM API
                 success, response, _reasoning_content, model_name = await llm_api.generate_with_model(
                     prompt=full_prompt,
@@ -303,28 +303,28 @@ class BotInterestManager:
                     try:
                         provider = model_config.get_provider(provider_name)
                         if provider.timeout != original_timeout:
-                            logger.debug(f"⏱️ 恢复 API provider '{provider_name}' 超时: {provider.timeout}s → {original_timeout}s")
+                            logger.debug(f"恢复 API provider '{provider_name}' 超时: {provider.timeout}s → {original_timeout}s")
                             provider.timeout = original_timeout
                     except Exception as e:
-                        logger.warning(f"⚠️ 无法恢复 provider '{provider_name}' 的超时设置: {e}")
+                        logger.warning(f"无法恢复 provider '{provider_name}' 的超时设置: {e}")
 
             if success and response:
                 # 直接返回原始响应，后续使用统一的 JSON 解析工具
                 return response
             else:
-                logger.warning("⚠️ LLM返回空响应或调用失败")
+                logger.warning("LLM返回空响应或调用失败")
                 return None
 
         except Exception as e:
-            logger.error(f"❌ 调用LLM生成兴趣标签失败: {e}")
-            logger.error("🔍 错误详情:")
+            logger.error(f"调用LLM生成兴趣标签失败: {e}")
+            logger.error("错误详情:")
             traceback.print_exc()
             return None
 
     async def _generate_embeddings_for_tags(self, interests: BotPersonalityInterests):
         """为所有兴趣标签生成embedding（缓存在内存和文件中）"""
         if not hasattr(self, "embedding_request"):
-            raise RuntimeError("❌ Embedding客户端未初始化，无法生成embedding")
+            raise RuntimeError("Embedding客户端未初始化，无法生成embedding")
 
         total_tags = len(interests.interest_tags)
 
@@ -335,7 +335,7 @@ class BotInterestManager:
             filtered_cache = {key: value for key, value in file_cache.items() if key in allowed_keys}
             dropped_cache = len(file_cache) - len(filtered_cache)
             if dropped_cache > 0:
-                logger.debug(f"🧹 跳过 {dropped_cache} 个与当前兴趣标签无关的缓存embedding")
+                logger.debug(f"跳过 {dropped_cache} 个与当前兴趣标签无关的缓存embedding")
             self.embedding_cache.update(filtered_cache)
 
         memory_cached_count = 0
@@ -349,10 +349,10 @@ class BotInterestManager:
                 tag.embedding = self.embedding_cache[tag.tag_name]
                 if file_cache and tag.tag_name in file_cache:
                     file_cached_count += 1
-                    logger.debug(f"   [{i}/{total_tags}] 📂 '{tag.tag_name}' - 使用文件缓存")
+                    logger.debug(f"   [{i}/{total_tags}]  '{tag.tag_name}' - 使用文件缓存")
                 else:
                     memory_cached_count += 1
-                    logger.debug(f"   [{i}/{total_tags}] 💾 '{tag.tag_name}' - 使用内存缓存")
+                    logger.debug(f"   [{i}/{total_tags}]  '{tag.tag_name}' - 使用内存缓存")
             else:
                 # 动态生成新的embedding
                 embedding_text = tag.tag_name
@@ -362,13 +362,13 @@ class BotInterestManager:
                     tag.embedding = embedding  # 设置到 tag 对象（内存中）
                     self.embedding_cache[tag.tag_name] = embedding  # 同时缓存到内存
                     generated_count += 1
-                    logger.debug(f"   ✅ '{tag.tag_name}' embedding动态生成成功")
+                    logger.debug(f"'{tag.tag_name}' embedding动态生成成功")
                 else:
                     failed_count += 1
-                    logger.warning(f"   ❌ '{tag.tag_name}' embedding生成失败")
+                    logger.warning(f"'{tag.tag_name}' embedding生成失败")
 
         if failed_count > 0:
-            raise RuntimeError(f"❌ 有 {failed_count} 个兴趣标签embedding生成失败")
+            raise RuntimeError(f"有 {failed_count} 个兴趣标签embedding生成失败")
 
         # 如果有新生成的embedding，保存到文件
         if generated_count > 0:
@@ -382,7 +382,7 @@ class BotInterestManager:
         cache=False 用于消息内容，避免在 embedding_cache 中长期保留大文本导致内存膨胀。
         """
         if not hasattr(self, "embedding_request"):
-            raise RuntimeError("❌ Embedding请求客户端未初始化")
+            raise RuntimeError("Embedding请求客户端未初始化")
 
         # 检查缓存
         if cache and text in self.embedding_cache:
@@ -390,8 +390,8 @@ class BotInterestManager:
 
         # 使用LLMRequest获取embedding
         if not self.embedding_request:
-            raise RuntimeError("❌ Embedding客户端未初始化")
-        embedding, _model_name = await self.embedding_request.get_embedding(text)
+            raise RuntimeError("Embedding客户端未初始化")
+        embedding, model_name = await self.embedding_request.get_embedding(text)
 
         if embedding and len(embedding) > 0:
             if isinstance(embedding[0], list):
@@ -409,7 +409,7 @@ class BotInterestManager:
                 self._detected_embedding_dimension = current_dim
                 if self.embedding_dimension and self.embedding_dimension != current_dim:
                     logger.warning(
-                        "⚠️ 实际embedding维度(%d)与配置值(%d)不一致，请在 model_config.model_task_config.embedding.embedding_dimension 中同步更新",
+                        "实际embedding维度(%d)与配置值(%d)不一致，请在 model_config.model_task_config.embedding.embedding_dimension 中同步更新",
                         current_dim,
                         self.embedding_dimension,
                     )
@@ -417,13 +417,13 @@ class BotInterestManager:
                     self.embedding_dimension = current_dim
             elif current_dim != self.embedding_dimension:
                 logger.warning(
-                    "⚠️ 收到的embedding维度发生变化: 之前=%d, 当前=%d。请确认模型配置是否正确。",
+                    "收到的embedding维度发生变化: 之前=%d, 当前=%d。请确认模型配置是否正确。",
                     self.embedding_dimension,
                     current_dim,
                 )
             return embedding_float
         else:
-            raise RuntimeError(f"❌ 返回的embedding为空: {embedding}")
+            raise RuntimeError(f"返回的embedding为空: {embedding}")
 
     async def _generate_message_embedding(self, message_text: str, keywords: list[str]) -> list[float]:
         """为消息生成embedding向量"""
@@ -489,7 +489,7 @@ class BotInterestManager:
             if not active_tags:
                 return
 
-            logger.debug(f"🔍 开始计算与 {len(active_tags)} 个兴趣标签的相似度")
+            logger.debug(f"开始计算与 {len(active_tags)} 个兴趣标签的相似度")
 
             for tag in active_tags:
                 if tag.embedding:
@@ -501,11 +501,11 @@ class BotInterestManager:
                     if similarity > 0.3:
                         result.add_match(tag.tag_name, weighted_score, keywords)
                         logger.debug(
-                            f"   🏷️  '{tag.tag_name}': 相似度={similarity:.3f}, 权重={tag.weight:.2f}, 加权分数={weighted_score:.3f}"
+                            f"'{tag.tag_name}': 相似度={similarity:.3f}, 权重={tag.weight:.2f}, 加权分数={weighted_score:.3f}"
                         )
 
         except Exception as e:
-            logger.error(f"❌ 计算相似度分数失败: {e}")
+            logger.error(f"计算相似度分数失败: {e}")
 
     async def calculate_interest_match(
         self, message_text: str, keywords: list[str] | None = None, message_embedding: list[float] | None = None
@@ -560,7 +560,7 @@ class BotInterestManager:
         medium_threshold = affinity_config.medium_match_interest_threshold
         low_threshold = affinity_config.low_match_interest_threshold
 
-        logger.debug(f"🔍 使用分级相似度阈值: 高={high_threshold}, 中={medium_threshold}, 低={low_threshold}")
+        logger.debug(f"使用分级相似度阈值: 高={high_threshold}, 中={medium_threshold}, 低={low_threshold}")
 
         for tag in active_tags:
             if tag.embedding:
@@ -647,7 +647,7 @@ class BotInterestManager:
         if hasattr(self, "_new_expanded_embeddings_generated") and self._new_expanded_embeddings_generated:
             await self._save_embedding_cache_to_file(self.current_interests.personality_id)
             self._new_expanded_embeddings_generated = False
-            logger.debug("💾 已保存新生成的扩展embedding到缓存文件")
+            logger.debug("已保存新生成的扩展embedding到缓存文件")
 
         return result
 
@@ -671,7 +671,7 @@ class BotInterestManager:
                 self.expanded_tag_cache[tag_name] = expanded_tag
                 self.expanded_embedding_cache[tag_name] = embedding
                 self._new_expanded_embeddings_generated = True  # 标记有新生成的embedding
-                logger.debug(f"✅ 为标签'{tag_name}'生成并缓存扩展embedding: {expanded_tag[:50]}...")
+                logger.debug(f"为标签'{tag_name}'生成并缓存扩展embedding: {expanded_tag[:50]}...")
                 return embedding
         except Exception as e:
             logger.warning(f"为标签'{tag_name}'生成扩展embedding失败: {e}")
@@ -700,12 +700,12 @@ class BotInterestManager:
         if self.current_interests:
             for tag in self.current_interests.interest_tags:
                 if tag.tag_name == tag_name and tag.expanded:
-                    logger.debug(f"✅ 使用LLM生成的扩展描述: {tag_name} -> {tag.expanded[:50]}...")
+                    logger.debug(f"使用LLM生成的扩展描述: {tag_name} -> {tag.expanded[:50]}...")
                     self.expanded_tag_cache[tag_name] = tag.expanded
                     return tag.expanded
 
         # 🔧 回退策略：基于规则的扩展（用于兼容旧数据或LLM未生成扩展的情况）
-        logger.debug(f"⚠️ 标签'{tag_name}'没有LLM扩展描述，使用规则回退方案")
+        logger.debug(f"标签'{tag_name}'没有LLM扩展描述，使用规则回退方案")
         tag_lower = tag_name.lower()
 
         # 技术编程类标签（具体化描述）
@@ -790,7 +790,7 @@ class BotInterestManager:
                 if keyword_lower == tag_name_lower:
                     bonus += affinity_config.high_match_interest_threshold * 0.6  # 使用高匹配阈值的60%作为完全匹配奖励
                     logger.debug(
-                        f"   🎯 关键词完全匹配: '{keyword}' == '{tag_name}' (+{affinity_config.high_match_interest_threshold * 0.6:.3f})"
+                        f"关键词完全匹配: '{keyword}' == '{tag_name}' (+{affinity_config.high_match_interest_threshold * 0.6:.3f})"
                     )
 
                 # 包含匹配
@@ -799,14 +799,14 @@ class BotInterestManager:
                         affinity_config.medium_match_interest_threshold * 0.3
                     )  # 使用中匹配阈值的30%作为包含匹配奖励
                     logger.debug(
-                        f"   🎯 关键词包含匹配: '{keyword}' ⊃ '{tag_name}' (+{affinity_config.medium_match_interest_threshold * 0.3:.3f})"
+                        f"关键词包含匹配: '{keyword}' ⊃ '{tag_name}' (+{affinity_config.medium_match_interest_threshold * 0.3:.3f})"
                     )
 
                 # 部分匹配（编辑距离）
                 elif self._calculate_partial_match(keyword_lower, tag_name_lower):
                     bonus += affinity_config.low_match_interest_threshold * 0.4  # 使用低匹配阈值的40%作为部分匹配奖励
                     logger.debug(
-                        f"   🎯 关键词部分匹配: '{keyword}' ≈ '{tag_name}' (+{affinity_config.low_match_interest_threshold * 0.4:.3f})"
+                        f"关键词部分匹配: '{keyword}' ≈ '{tag_name}' (+{affinity_config.low_match_interest_threshold * 0.4:.3f})"
                     )
 
             if bonus > 0:
@@ -939,11 +939,11 @@ class BotInterestManager:
                         return interests
 
                     except (orjson.JSONDecodeError, Exception) as e:
-                        logger.error(f"❌ 解析兴趣标签JSON失败: {e}")
-                        logger.debug(f"🔍 原始JSON数据: {db_interests.interest_tags[:200]}...")
+                        logger.error(f"解析兴趣标签JSON失败: {e}")
+                        logger.debug(f"原始JSON数据: {db_interests.interest_tags[:200]}...")
                         return None
                 else:
-                    logger.info(f"ℹ️ 数据库中未找到personality_id为 '{personality_id}' 的兴趣标签配置")
+                    logger.info(f"数据库中未找到personality_id为 '{personality_id}' 的兴趣标签配置")
                     return None
 
         except Exception as e:
@@ -955,11 +955,6 @@ class BotInterestManager:
     async def _save_interests_to_database(self, interests: BotPersonalityInterests):
         """保存兴趣标签到数据库"""
         try:
-            logger.info("💾 正在保存兴趣标签到数据库...")
-            logger.info(f"📋 personality_id: {interests.personality_id}")
-            logger.info(f"🏷️  兴趣标签数量: {len(interests.interest_tags)}")
-            logger.info(f"🔄 版本: {interests.version}")
-
             # 导入SQLAlchemy相关模块
             import orjson
 
@@ -999,18 +994,18 @@ class BotInterestManager:
 
                 if existing_record:
                     # 更新现有记录
-                    logger.info("🔄 更新现有的兴趣标签配置")
+                    logger.info("更新现有的兴趣标签配置")
                     existing_record.interest_tags = json_data.decode("utf-8")
                     existing_record.personality_description = interests.personality_description
                     existing_record.embedding_model = interests.embedding_model
                     existing_record.version = interests.version
                     existing_record.last_updated = interests.last_updated
 
-                    logger.info(f"✅ 成功更新兴趣标签配置，版本: {interests.version}")
+                    logger.info(f"成功更新兴趣标签配置，版本: {interests.version}")
 
                 else:
                     # 创建新记录
-                    logger.info("🆕 创建新的兴趣标签配置")
+                    logger.info("创建新的兴趣标签配置")
                     new_record = DBBotPersonalityInterests(
                         personality_id=interests.personality_id,
                         personality_description=interests.personality_description,
@@ -1021,9 +1016,8 @@ class BotInterestManager:
                     )
                     session.add(new_record)
                     await session.commit()
-                    logger.info(f"✅ 成功创建兴趣标签配置，版本: {interests.version}")
 
-            logger.info("✅ 兴趣标签已成功保存到数据库")
+            logger.info("兴趣标签已成功保存到数据库")
 
             # 验证保存是否成功
             async with get_db_session() as session:
@@ -1039,9 +1033,9 @@ class BotInterestManager:
                     .first()
                 )
                 if saved_record:
-                    logger.info(f"✅ 验证成功：数据库中存在personality_id为 {interests.personality_id} 的记录")
-                    logger.info(f"   版本: {saved_record.version}")
-                    logger.info(f"   最后更新: {saved_record.last_updated}")
+                    logger.info(f"验证成功：数据库中存在personality_id为 {interests.personality_id} 的记录")
+                    logger.info(f"版本: {saved_record.version}")
+                    logger.info(f"最后更新: {saved_record.last_updated}")
                 else:
                     logger.error(f"❌ 验证失败：数据库中未找到personality_id为 {interests.personality_id} 的记录")
 
@@ -1089,13 +1083,12 @@ class BotInterestManager:
             expanded_embeddings = cache_data.get("expanded_embeddings", {})
             if expanded_embeddings:
                 self.expanded_embedding_cache.update(expanded_embeddings)
-                logger.info(f"📂 加载 {len(expanded_embeddings)} 个扩展标签embedding缓存")
 
-            logger.info(f"✅ 成功从文件加载 {len(embeddings)} 个标签embedding缓存 (版本: {cache_version}, 模型: {cache_embedding_model})")
+            logger.info(f"成功从文件加载 {len(embeddings)} 个标签embedding缓存 (版本: {cache_version}, 模型: {cache_embedding_model})")
             return embeddings
 
         except Exception as e:
-            logger.warning(f"⚠️ 加载embedding缓存文件失败: {e}")
+            logger.warning(f"加载embedding缓存文件失败: {e}")
             return None
 
     async def _save_embedding_cache_to_file(self, personality_id: str):
@@ -1134,10 +1127,10 @@ class BotInterestManager:
             async with aiofiles.open(cache_file, "wb") as f:
                 await f.write(orjson.dumps(cache_data, option=orjson.OPT_INDENT_2))
 
-            logger.debug(f"💾 已保存 {len(self.embedding_cache)} 个标签embedding和 {len(self.expanded_embedding_cache)} 个扩展embedding到缓存文件: {cache_file}")
+            logger.debug(f"已保存 {len(self.embedding_cache)} 个标签embedding和 {len(self.expanded_embedding_cache)} 个扩展embedding到缓存文件: {cache_file}")
 
         except Exception as e:
-            logger.warning(f"⚠️ 保存embedding缓存文件失败: {e}")
+            logger.warning(f"保存embedding缓存文件失败: {e}")
 
     def get_current_interests(self) -> BotPersonalityInterests | None:
         """获取当前的兴趣标签配置"""

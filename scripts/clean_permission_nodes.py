@@ -31,12 +31,10 @@ async def clean_permission_nodes():
 
             deleted_count = getattr(result, "rowcount", 0)
             logger.info(f"✅ 已清理 {deleted_count} 个权限节点记录")
-            print(f"✅ 已清理 {deleted_count} 个权限节点记录")
-            print("请重启应用以重新注册权限节点")
+
 
     except Exception as e:
         logger.error(f"❌ 清理权限节点失败: {e}")
-        print(f"❌ 清理权限节点失败: {e}")
         raise
 
 

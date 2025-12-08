@@ -141,7 +141,6 @@ class CounterAttackGenerator:
             if success and response:
                 # 清理响应
                 response = response.strip().strip('"').strip("'")
-                logger.info(f"LLM生成反击响应: {response[:50]}...")
                 return response
 
             return None

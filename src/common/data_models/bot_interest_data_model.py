@@ -6,7 +6,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
-
+from src.config.config import model_config
 from . import BaseDataModel
 
 
@@ -55,7 +55,7 @@ class BotPersonalityInterests(BaseDataModel):
     personality_id: str
     personality_description: str  # 人设描述文本
     interest_tags: list[BotInterestTag] = field(default_factory=list)
-    embedding_model: str = "text-embedding-ada-002"  # 使用的embedding模型
+    embedding_model: list[str] = field(default_factory=lambda: model_config.model_task_config.embedding.model_list)  # 使用的embedding模型
     last_updated: datetime = field(default_factory=datetime.now)
     version: int = 1  # 版本号，用于追踪更新
 

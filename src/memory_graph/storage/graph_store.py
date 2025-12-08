@@ -39,9 +39,6 @@ class GraphStore:
         # 节点 -> {memory_id: [MemoryEdge]}，用于快速获取邻接边
         self.node_edge_index: dict[str, dict[str, list[MemoryEdge]]] = {}
 
-        logger.info("初始化图存储")
-
-
     def _register_memory_edges(self, memory: Memory) -> None:
         """在记忆中的边加入邻接索引"""
         for edge in memory.edges:

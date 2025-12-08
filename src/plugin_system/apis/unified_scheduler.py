@@ -420,14 +420,6 @@ class UnifiedScheduler:
         # 取消所有正在执行的任务
         await self._cancel_all_running_tasks()
 
-        # 显示最终统计
-        stats = self.get_statistics()
-        logger.info(
-            f"调度器最终统计: 总任务={stats['total_tasks']}, "
-            f"执行次数={stats['total_executions']}, "
-            f"失败={stats['total_failures']}"
-        )
-
         # 清理资源
         self._tasks.clear()
         self._tasks_by_name.clear()

@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
+from collections import OrderedDict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,15 @@ from src.common.database.optimization.cache_manager import get_cache
 from src.common.logger import get_logger
 
 logger = get_logger("preloader")
+
+# 预加载注册表（用于后台刷新热点数据）
+_preload_loader_registry: OrderedDict[str, Callable[[], Awaitable[Any]]] = OrderedDict()
+_registry_lock = asyncio.Lock()
+_preload_task: asyncio.Task | None = None
+_preload_task_lock = asyncio.Lock()
+_PRELOAD_REGISTRY_LIMIT = 1024
+# 默认后台预加载轮询间隔（秒）
+_DEFAULT_PRELOAD_INTERVAL = 60
 
 
 @dataclass
@@ -223,16 +233,19 @@ class DataPreloader:
 
     async def start_preload_batch(
         self,
-        session: AsyncSession,
         loaders: dict[str, Callable[[], Awaitable[Any]]],
+        limit: int = 100,
     ) -> None:
         """批量启动预加载任务
 
         Args:
-            session: 数据库会话
             loaders: 数据键到加载函数的映射
+            limit: 参与预加载的热点键数量上限
         """
-        preload_keys = await self.get_preload_keys()
+        if not loaders:
+            return
+
+        preload_keys = await self.get_preload_keys(limit=limit)
 
         for key in preload_keys:
             if key in loaders:
@@ -418,6 +431,91 @@ class CommonDataPreloader:
         await self.preloader.preload_data(cache_key, loader)
 
 
+# 预加载后台任务与注册表管理
+async def _get_preload_interval() -> float:
+    """获取后台预加载轮询间隔"""
+    try:
+        from src.config.config import global_config
+
+        if global_config and getattr(global_config, "database", None):
+            interval = getattr(global_config.database, "preload_interval", None)
+            if interval:
+                return max(5.0, float(interval))
+    except Exception:
+        # 配置可能未加载或不存在该字段，使用默认值
+        pass
+    return float(_DEFAULT_PRELOAD_INTERVAL)
+
+
+async def _register_preload_loader(
+    cache_key: str,
+    loader: Callable[[], Awaitable[Any]],
+) -> None:
+    """注册用于热点预加载的加载函数"""
+    async with _registry_lock:
+        # move_to_end可以保持最近注册的顺序，便于淘汰旧项
+        _preload_loader_registry[cache_key] = loader
+        _preload_loader_registry.move_to_end(cache_key)
+
+        # 控制注册表大小，避免无限增长
+        while len(_preload_loader_registry) > _PRELOAD_REGISTRY_LIMIT:
+            _preload_loader_registry.popitem(last=False)
+
+
+async def _snapshot_loaders() -> dict[str, Callable[[], Awaitable[Any]]]:
+    """获取当前注册的预加载loader快照"""
+    async with _registry_lock:
+        return dict(_preload_loader_registry)
+
+
+async def _preload_worker() -> None:
+    """后台周期性预加载任务"""
+    while True:
+        try:
+            interval = await _get_preload_interval()
+            loaders = await _snapshot_loaders()
+
+            if loaders:
+                preloader = await get_preloader()
+                await preloader.start_preload_batch(loaders)
+
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"预加载后台任务异常: {e}")
+            # 避免紧急重试导致CPU占用过高
+            await asyncio.sleep(5)
+
+
+async def _ensure_preload_worker() -> None:
+    """确保后台预加载任务已启动"""
+    global _preload_task
+
+    async with _preload_task_lock:
+        if _preload_task is None or _preload_task.done():
+            _preload_task = asyncio.create_task(_preload_worker())
+
+
+async def record_preload_access(
+    cache_key: str,
+    *,
+    related_keys: list[str] | None = None,
+    loader: Callable[[], Awaitable[Any]] | None = None,
+) -> None:
+    """记录访问并注册预加载loader
+
+    这个入口为上层API（CRUD/Query）提供：记录访问模式、建立关联关系、
+    以及注册用于后续后台预加载的加载函数。
+    """
+    preloader = await get_preloader()
+    await preloader.record_access(cache_key, related_keys)
+
+    if loader is not None:
+        await _register_preload_loader(cache_key, loader)
+        await _ensure_preload_worker()
+
+
 # 全局预加载器实例
 _global_preloader: DataPreloader | None = None
 _preloader_lock = asyncio.Lock()
@@ -438,7 +536,22 @@ async def get_preloader() -> DataPreloader:
 async def close_preloader() -> None:
     """关闭全局预加载器"""
     global _global_preloader
+    global _preload_task
 
+    # 停止后台任务
+    if _preload_task is not None:
+        _preload_task.cancel()
+        try:
+            await _preload_task
+        except asyncio.CancelledError:
+            pass
+        _preload_task = None
+
+    # 清理注册表
+    async with _registry_lock:
+        _preload_loader_registry.clear()
+
+    # 清理预加载器实例
     if _global_preloader is not None:
         await _global_preloader.clear()
         _global_preloader = None

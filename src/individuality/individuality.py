@@ -47,7 +47,7 @@ class Individuality:
         personality_hash, _ = self._get_config_hash(bot_nickname, personality_core, personality_side, identity)
         self.bot_person_id = personality_hash
         self.name = bot_nickname
-        logger.info(f"生成的 personality_id: {self.bot_person_id[:16]}... (基于人设文本 hash)")
+        logger.debug(f"生成的 personality_id: {self.bot_person_id[:16]}... (基于人设文本 hash)")
 
         person_info_manager = get_person_info_manager()
 

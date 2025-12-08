@@ -229,7 +229,7 @@ class NodeMerger:
             是否成功
         """
         try:
-            logger.info(f"合并节点: '{source.content}' ({source.id}) → '{target.content}' ({target.id})")
+            logger.debug(f"合并节点: '{source.content}' ({source.id}) → '{target.content}' ({target.id})")
 
             # 1. 在图存储中合并节点
             self.graph_store.merge_nodes(source.id, target.id)
@@ -240,7 +240,7 @@ class NodeMerger:
             # 3. 更新所有相关记忆的节点引用
             self._update_memory_references(source.id, target.id)
 
-            logger.info(f"节点合并成功: {source.id} → {target.id}")
+            logger.debug(f"节点合并成功: {source.id} → {target.id}")
             return True
 
         except Exception as e:

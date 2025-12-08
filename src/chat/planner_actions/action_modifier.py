@@ -131,7 +131,7 @@ class ActionModifier:
                         continue
 
         if removals_s0:
-            logger.info(f"{self.log_prefix} 第0阶段：类型/Chatter过滤 - 移除了 {len(removals_s0)} 个动作")
+            logger.info(f"{self.log_prefix} 第0阶段：类型Chatter过滤 - 移除了 {len(removals_s0)} 个动作")
             for action_name, reason in removals_s0:
                 logger.debug(f"{self.log_prefix} - 移除 {action_name}: {reason}")
 

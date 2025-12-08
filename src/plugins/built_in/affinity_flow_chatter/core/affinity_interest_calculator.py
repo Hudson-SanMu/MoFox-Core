@@ -77,14 +77,6 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         logger.info(f"  - 回复冷却减少: {self.reply_cooldown_reduction}")
         logger.info(f"  - 最大不回复计数: {self.max_no_reply_count}")
 
-        # 检查 bot_interest_manager 状态
-        try:
-            logger.info(f"  - bot_interest_manager 初始化状态: {bot_interest_manager.is_initialized}")
-            if not bot_interest_manager.is_initialized:
-                logger.warning("  - bot_interest_manager 未初始化，这将导致兴趣匹配返回默认值0.3")
-        except Exception as e:
-            logger.error(f"  - 检查 bot_interest_manager 时出错: {e}")
-
     async def execute(self, message: "DatabaseMessages") -> InterestCalculationResult:
         """执行AffinityFlow风格的兴趣值计算"""
         try:

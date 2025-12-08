@@ -110,9 +110,6 @@ def start_tracemalloc(max_frames: int = 25) -> None:
     """
     if not tracemalloc.is_tracing():
         tracemalloc.start(max_frames)
-        logger.info("tracemalloc started with max_frames=%s", max_frames)
-    else:
-        logger.info("tracemalloc already started")
 
 
 def stop_tracemalloc() -> None:

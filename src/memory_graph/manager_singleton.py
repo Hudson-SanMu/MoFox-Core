@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from src.common.logger import get_logger
@@ -19,6 +20,7 @@ _initialized: bool = False
 
 # 全局 UnifiedMemoryManager 实例（新的三层记忆系统）
 _unified_memory_manager = None
+_unified_memory_init_lock: asyncio.Lock | None = None
 
 
 # ============================================================================
@@ -66,7 +68,7 @@ async def initialize_memory_manager(
         await _memory_manager.initialize()
 
         _initialized = True
-        logger.info("✅ 全局 MemoryManager 初始化成功")
+        logger.info("全局 MemoryManager 初始化成功")
 
         return _memory_manager
 
@@ -98,7 +100,7 @@ async def shutdown_memory_manager():
     if _memory_manager:
         try:
             await _memory_manager.shutdown()
-            logger.info("✅ 全局 MemoryManager 已关闭")
+            logger.info("全局 MemoryManager 已关闭")
         except Exception as e:
             logger.error(f"关闭 MemoryManager 时出错: {e}")
         finally:
@@ -194,6 +196,27 @@ def get_unified_memory_manager():
     return _unified_memory_manager
 
 
+async def ensure_unified_memory_manager_initialized():
+    """
+    确保统一记忆管理器已初始化。
+
+    在首次访问时自动初始化，避免调用方重复判断。
+    """
+    global _unified_memory_init_lock, _unified_memory_manager
+
+    if _unified_memory_manager is not None:
+        return _unified_memory_manager
+
+    if _unified_memory_init_lock is None:
+        _unified_memory_init_lock = asyncio.Lock()
+
+    async with _unified_memory_init_lock:
+        if _unified_memory_manager is not None:
+            return _unified_memory_manager
+
+        return await initialize_unified_memory_manager()
+
+
 async def shutdown_unified_memory_manager() -> None:
     """关闭统一记忆管理器"""
     global _unified_memory_manager
@@ -205,7 +228,7 @@ async def shutdown_unified_memory_manager() -> None:
     try:
         await _unified_memory_manager.shutdown()
         _unified_memory_manager = None
-        logger.info("✅ 统一记忆管理器已关闭")
+        logger.info("统一记忆管理器已关闭")
 
     except Exception as e:
         logger.error(f"关闭统一记忆管理器失败: {e}")

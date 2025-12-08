@@ -16,7 +16,7 @@ from sqlalchemy import and_, asc, desc, func, or_, select
 # 导入 CRUD 辅助函数以避免重复定义
 from src.common.database.api.crud import _dict_to_model, _model_to_dict
 from src.common.database.core.session import get_db_session
-from src.common.database.optimization import get_cache
+from src.common.database.optimization import get_cache, record_preload_access
 from src.common.logger import get_logger
 
 logger = get_logger("database.query")
@@ -272,6 +272,16 @@ class QueryBuilder(Generic[T]):
             模型实例列表或字典列表
         """
         cache_key = ":".join(self._cache_key_parts) + ":all"
+        stmt = self._stmt
+
+        if self._use_cache:
+            async def _preload_loader() -> list[dict[str, Any]]:
+                async with get_db_session() as session:
+                    result = await session.execute(stmt)
+                    instances = list(result.scalars().all())
+                    return [_model_to_dict(inst) for inst in instances]
+
+            await record_preload_access(cache_key, loader=_preload_loader)
 
         # 尝试从缓存获取 (缓存的是字典列表)
         if self._use_cache:
@@ -310,6 +320,16 @@ class QueryBuilder(Generic[T]):
             模型实例或None
         """
         cache_key = ":".join(self._cache_key_parts) + ":first"
+        stmt = self._stmt
+
+        if self._use_cache:
+            async def _preload_loader() -> dict[str, Any] | None:
+                async with get_db_session() as session:
+                    result = await session.execute(stmt)
+                    instance = result.scalars().first()
+                    return _model_to_dict(instance) if instance is not None else None
+
+            await record_preload_access(cache_key, loader=_preload_loader)
 
         # 尝试从缓存获取 (缓存的是字典)
         if self._use_cache:
@@ -348,6 +368,15 @@ class QueryBuilder(Generic[T]):
             记录数量
         """
         cache_key = ":".join(self._cache_key_parts) + ":count"
+        count_stmt = select(func.count()).select_from(self._stmt.subquery())
+
+        if self._use_cache:
+            async def _preload_loader() -> int:
+                async with get_db_session() as session:
+                    result = await session.execute(count_stmt)
+                    return result.scalar() or 0
+
+            await record_preload_access(cache_key, loader=_preload_loader)
 
         # 尝试从缓存获取
         if self._use_cache:
@@ -357,8 +386,6 @@ class QueryBuilder(Generic[T]):
                 return cached
 
         # 构建count查询
-        count_stmt = select(func.count()).select_from(self._stmt.subquery())
-
         # 从数据库查询
         async with get_db_session() as session:
             result = await session.execute(count_stmt)

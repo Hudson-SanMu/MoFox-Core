@@ -77,7 +77,7 @@ class MemoryManager:
         self._maintenance_interval_hours = getattr(self.config, "consolidation_interval_hours", 1.0)
         self._maintenance_running = False  # 维护任务运行状态
 
-        logger.info(f"记忆管理器已创建 (data_dir={self.data_dir}, enable={getattr(self.config, 'enable', False)})")
+        logger.debug(f"记忆管理器已创建 (data_dir={self.data_dir}, enable={getattr(self.config, 'enable', False)})")
 
     async def initialize(self) -> None:
         """
@@ -117,7 +117,7 @@ class MemoryManager:
                 self.graph_store = GraphStore()
             else:
                 stats = self.graph_store.get_statistics()
-                logger.info(
+                logger.debug(
                     f"加载图数据: {stats['total_memories']} 条记忆, "
                     f"{stats['total_nodes']} 个节点, {stats['total_edges']} 条边"
                 )
@@ -167,7 +167,7 @@ class MemoryManager:
             )
 
             self._initialized = True
-            logger.info("✅ 记忆管理器初始化完成")
+            logger.info("记忆管理器初始化完成")
 
             # 启动后台维护任务
             self._start_maintenance_task()
@@ -206,7 +206,7 @@ class MemoryManager:
                 pass
 
             self._initialized = False
-            logger.info("✅ 记忆管理器已关闭")
+            logger.info("记忆管理器已关闭")
 
         except Exception as e:
             logger.error(f"关闭记忆管理器失败: {e}")
@@ -1011,11 +1011,11 @@ class MemoryManager:
                 await self.persistence.save_graph_store(self.graph_store)
 
                 logger.info(
-                    f"✅ 自动遗忘完成: 遗忘了 {forgotten_count} 条记忆, "
+                    f"自动遗忘完成: 遗忘了 {forgotten_count} 条记忆, "
                     f"清理了 {orphan_nodes} 个孤立节点, {orphan_edges} 条孤立边"
                 )
             else:
-                logger.info("✅ 自动遗忘完成: 没有需要遗忘的记忆")
+                logger.info("自动遗忘完成: 没有需要遗忘的记忆")
 
             return forgotten_count
 
@@ -1149,7 +1149,7 @@ class MemoryManager:
             await self.initialize()
 
         try:
-            logger.info("🧹 开始记忆整理：检查遗忘 + 清理孤立节点...")
+            logger.info("开始记忆整理：检查遗忘 + 清理孤立节点...")
 
             # 步骤1: 自动遗忘低激活度的记忆
             forgotten_count = await self.auto_forget()
@@ -1164,7 +1164,7 @@ class MemoryManager:
                 "message": "记忆整理完成（仅遗忘和清理孤立节点）"
             }
 
-            logger.info(f"✅ 记忆整理完成: {result}")
+            logger.info(f"记忆整理完成: {result}")
             return result
 
         except Exception as e:
@@ -1272,7 +1272,7 @@ class MemoryManager:
             await self.initialize()
 
         try:
-            logger.info("🔧 开始执行记忆系统维护...")
+            logger.info("开始执行记忆系统维护...")
 
             result = {
                 "forgotten": 0,
@@ -1301,11 +1301,11 @@ class MemoryManager:
             total_time = (datetime.now() - start_time).total_seconds()
             result["total_time"] = total_time
 
-            logger.info(f"✅ 维护完成 (耗时 {total_time:.2f}s): {result}")
+            logger.info(f"维护完成 (耗时 {total_time:.2f}s): {result}")
             return result
 
         except Exception as e:
-            logger.error(f"❌ 维护失败: {e}")
+            logger.error(f"维护失败: {e}")
             return {"error": str(e), "total_time": 0}
 
     async def _lightweight_auto_link_memories(  # 已废弃
@@ -1371,8 +1371,8 @@ class MemoryManager:
                 name="memory_maintenance_loop"
             )
 
-            logger.info(
-                f"✅ 记忆维护后台任务已启动 "
+            logger.debug(
+                f"记忆维护后台任务已启动 "
                 f"(间隔={self._maintenance_interval_hours}小时)"
             )
 
@@ -1395,7 +1395,7 @@ class MemoryManager:
             except asyncio.CancelledError:
                 logger.debug("维护任务已取消")
 
-            logger.info("✅ 记忆维护后台任务已停止")
+            logger.info("记忆维护后台任务已停止")
             self._maintenance_task = None
 
         except Exception as e:

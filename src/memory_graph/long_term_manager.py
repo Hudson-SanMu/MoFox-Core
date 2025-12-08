@@ -653,7 +653,7 @@ class LongTermMemoryManager:
             memory.metadata["transferred_from_stm"] = source_stm.id
             memory.metadata["transfer_time"] = datetime.now().isoformat()
 
-            logger.info(f"✅ 创建长期记忆: {memory.id} (来自短期记忆 {source_stm.id})")
+            logger.info(f"创建长期记忆: {memory.id} (来自短期记忆 {source_stm.id})")
             # 强制注册 target_id，无论它是否符合 placeholder 格式
             # 这样即使 LLM 使用了中文描述作为 ID (如 "新创建的记忆"), 也能正确映射
             self._register_temp_id(op.target_id, memory.id, temp_id_map, force=True)
@@ -686,7 +686,7 @@ class LongTermMemoryManager:
         success = await self.memory_manager.update_memory(memory_id, **updates)
 
         if success:
-            logger.info(f"✅ 更新长期记忆: {memory_id}")
+            logger.info(f"更新长期记忆: {memory_id}")
         else:
             logger.error(f"更新长期记忆失败: {memory_id}")
 
@@ -732,7 +732,7 @@ class LongTermMemoryManager:
 
             # 3. 异步保存
             asyncio.create_task(self.memory_manager._async_save_graph_store("合并记忆"))
-            logger.info(f"✅ 合并记忆完成: {source_ids} -> {target_id}")
+            logger.info(f"合并记忆完成: {source_ids} -> {target_id}")
         else:
             logger.error(f"合并记忆失败: {source_ids}")
 
@@ -763,7 +763,7 @@ class LongTermMemoryManager:
         if success:
             # 尝试为新节点生成 embedding (异步)
             asyncio.create_task(self._generate_node_embedding(node_id, content))
-            logger.info(f"✅ 创建节点: {content} ({node_type}) -> {memory_id}")
+            logger.info(f"创建节点: {content} ({node_type}) -> {memory_id}")
             # 强制注册 target_id，无论它是否符合 placeholder 格式
             self._register_temp_id(op.target_id, node_id, temp_id_map, force=True)
             self._register_aliases_from_params(
@@ -794,7 +794,7 @@ class LongTermMemoryManager:
         )
 
         if success:
-            logger.info(f"✅ 更新节点: {node_id}")
+            logger.info(f"更新节点: {node_id}")
         else:
             logger.error(f"更新节点失败: {node_id}")
 
@@ -820,8 +820,8 @@ class LongTermMemoryManager:
         # 合并其他节点到目标节点
         for source_id in sources:
             self.memory_manager.graph_store.merge_nodes(source_id, target_id)
-
-        logger.info(f"✅ 合并节点: {sources} -> {target_id}")
+            
+        logger.info(f"合并节点: {sources} -> {target_id}")
 
     async def _execute_create_edge(
         self, op: GraphOperation, temp_id_map: dict[str, str]
@@ -856,7 +856,7 @@ class LongTermMemoryManager:
         )
 
         if edge_id:
-            logger.info(f"✅ 创建边: {source_id} -> {target_id} ({relation})")
+            logger.info(f"创建边: {source_id} -> {target_id} ({relation})")
         else:
             logger.error(f"创建边失败: {op}")
 
@@ -880,7 +880,7 @@ class LongTermMemoryManager:
         )
 
         if success:
-            logger.info(f"✅ 更新边: {edge_id}")
+            logger.info(f"更新边: {edge_id}")
         else:
             logger.error(f"更新边失败: {edge_id}")
 
@@ -897,7 +897,7 @@ class LongTermMemoryManager:
         success = self.memory_manager.graph_store.remove_edge(edge_id)
 
         if success:
-            logger.info(f"✅ 删除边: {edge_id}")
+            logger.info(f"删除边: {edge_id}")
         else:
             logger.error(f"删除边失败: {edge_id}")
 
@@ -976,7 +976,7 @@ class LongTermMemoryManager:
                 self.memory_manager.graph_store
             )
 
-            logger.info(f"✅ 长期记忆衰减完成: {decayed_count} 条记忆已更新")
+            logger.info(f"长期记忆衰减完成: {decayed_count} 条记忆已更新")
             return {"decayed_count": decayed_count, "total_memories": len(all_memories)}
 
         except Exception as e:
@@ -1005,7 +1005,7 @@ class LongTermMemoryManager:
             # 长期记忆的保存由 MemoryManager 负责
 
             self._initialized = False
-            logger.info("✅ 长期记忆管理器已关闭")
+            logger.info("长期记忆管理器已关闭")
 
         except Exception as e:
             logger.error(f"关闭长期记忆管理器失败: {e}")

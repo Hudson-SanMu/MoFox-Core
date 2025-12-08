@@ -154,25 +154,25 @@ class QZoneService:
                 return {"success": False, "message": f"好友'{target_name}'没有关联QQ号"}
 
         qq_account = config_api.get_global_config("bot.qq_account", "")
-        logger.info(f"[DEBUG] 准备获取API客户端，qq_account={qq_account}")
+        logger.debug(f"准备获取API客户端，qq_account={qq_account}")
         api_client = await self._get_api_client(qq_account, stream_id)
         if not api_client:
-            logger.error("[DEBUG] API客户端获取失败，返回错误")
+            logger.error("API客户端获取失败，返回错误")
             return {"success": False, "message": "获取QZone API客户端失败"}
 
-        logger.info("[DEBUG] API客户端获取成功，准备读取说说")
+        logger.debug("API客户端获取成功，准备读取说说")
         num_to_read = self.get_config("read.read_number", 5)
 
         # 尝试执行，如果Cookie失效则自动重试一次
         for retry_count in range(2):  # 最多尝试2次
             try:
-                logger.info(f"[DEBUG] 开始调用 list_feeds，target_qq={target_qq}, num={num_to_read}")
+                logger.debug(f"开始调用 list_feeds，target_qq={target_qq}, num={num_to_read}")
                 feeds = await api_client["list_feeds"](target_qq, num_to_read)
-                logger.info(f"[DEBUG] list_feeds 返回，feeds数量={len(feeds) if feeds else 0}")
+                logger.debug(f"list_feeds 返回，feeds数量={len(feeds) if feeds else 0}")
                 if not feeds:
                     return {"success": True, "message": f"没有从'{target_name}'的空间获取到新说说。"}
 
-                logger.info(f"[DEBUG] 准备处理 {len(feeds)} 条说说")
+                logger.debug(f"准备处理 {len(feeds)} 条说说")
                 total_liked = 0
                 total_commented = 0
                 for feed in feeds:
@@ -623,7 +623,7 @@ class QZoneService:
         raise RuntimeError(f"无法连接到Napcat服务: 超过最大重试次数({max_retries})")
 
     async def _get_api_client(self, qq_account: str, stream_id: str | None) -> dict | None:
-        logger.info(f"[DEBUG] 开始获取API客户端，qq_account={qq_account}")
+        logger.debug(f"开始获取API客户端，qq_account={qq_account}")
         cookies = await self.cookie_service.get_cookies(qq_account, stream_id)
         if not cookies:
             logger.error(
@@ -631,14 +631,14 @@ class QZoneService:
             )
             return None
 
-        logger.info(f"[DEBUG] Cookie获取成功，keys: {list(cookies.keys())}")
+        logger.debug(f"Cookie获取成功，keys: {list(cookies.keys())}")
 
         p_skey = cookies.get("p_skey") or cookies.get("p_skey".upper())
         if not p_skey:
             logger.error(f"获取API客户端失败：Cookie中缺少关键的 'p_skey'。Cookie内容: {cookies}")
             return None
 
-        logger.info("[DEBUG] p_skey获取成功")
+        logger.debug("p_skey获取成功")
 
         gtk = self._generate_gtk(p_skey)
         uin = cookies.get("uin", "").lstrip("o")
@@ -646,7 +646,7 @@ class QZoneService:
             logger.error(f"获取API客户端失败：Cookie中缺少关键的 'uin'。Cookie内容: {cookies}")
             return None
 
-        logger.info(f"[DEBUG] uin={uin}, gtk={gtk}, 准备构造API客户端")
+        logger.debug(f"uin={uin}, gtk={gtk}, 准备构造API客户端")
 
         async def _request(method, url, params=None, data=None, headers=None):
             final_headers = {"referer": f"https://user.qzone.qq.com/{uin}", "origin": "https://user.qzone.qq.com"}
@@ -850,7 +850,7 @@ class QZoneService:
         async def _list_feeds(t_qq: str, num: int) -> list[dict]:
             """获取指定用户说说列表 (统一接口)"""
             try:
-                logger.info(f"[DEBUG] _list_feeds 开始，t_qq={t_qq}, num={num}")
+                logger.debug(f"_list_feeds 开始，t_qq={t_qq}, num={num}")
                 # 统一使用 format=json 获取完整评论
                 params = {
                     "g_tk": gtk,
@@ -864,12 +864,11 @@ class QZoneService:
                     "format": "json",  # 关键：使用JSON格式
                     "need_comment": 1,
                 }
-                logger.info(f"[DEBUG] 准备发送HTTP请求到 {self.LIST_URL}")
+                logger.debug(f"准备发送HTTP请求到 {self.LIST_URL}")
                 res_text = await _request("GET", self.LIST_URL, params=params)
-                logger.info(f"[DEBUG] HTTP请求返回，响应长度={len(res_text)}")
+                logger.debug(f"HTTP请求返回，响应长度={len(res_text)}")
                 json_data = orjson.loads(res_text)
-                logger.info(f"[DEBUG] JSON解析成功，code={json_data.get('code')}")
-
+                logger.debug(f"JSON解析成功，code={json_data.get('code')}")
                 if json_data.get("code") != 0:
                     error_code = json_data.get("code")
                     error_message = json_data.get("message", "未知错误")
@@ -1249,7 +1248,7 @@ class QZoneService:
                 logger.error(f"监控好友动态失败: {e}")
                 return []
 
-        logger.info("[DEBUG] API客户端构造完成，返回包含6个方法的字典")
+        logger.debug("API客户端构造完成，返回包含6个方法的字典")
         return {
             "publish": _publish,
             "list_feeds": _list_feeds,

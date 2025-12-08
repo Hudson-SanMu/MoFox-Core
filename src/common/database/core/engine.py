@@ -79,7 +79,7 @@ async def get_engine() -> AsyncEngine:
             elif db_type == "postgresql":
                 await _enable_postgresql_optimizations(_engine)
 
-            logger.info(f"✅ {db_type.upper()} 数据库引擎初始化成功")
+            logger.info(f"{db_type.upper()} 数据库引擎初始化成功")
             return _engine
 
         except Exception as e:
@@ -116,7 +116,7 @@ def _build_sqlite_config(config) -> tuple[str, dict]:
         },
     }
 
-    logger.info(f"SQLite配置: {db_path}")
+    logger.debug(f"SQLite配置: {db_path}")
     return url, engine_kwargs
 
 
@@ -167,7 +167,7 @@ def _build_postgresql_config(config) -> tuple[str, dict]:
     if connect_args:
         engine_kwargs["connect_args"] = connect_args
 
-    logger.info(
+    logger.debug(
         f"PostgreSQL配置: {config.postgresql_user}@{config.postgresql_host}:{config.postgresql_port}/{config.postgresql_database}"
     )
     return url, engine_kwargs
@@ -184,7 +184,7 @@ async def close_engine():
         logger.info("正在关闭数据库引擎...")
         await _engine.dispose()
         _engine = None
-        logger.info("✅ 数据库引擎已关闭")
+        logger.info("数据库引擎已关闭")
 
 
 async def _enable_sqlite_optimizations(engine: AsyncEngine):
@@ -214,8 +214,6 @@ async def _enable_sqlite_optimizations(engine: AsyncEngine):
             # 临时存储使用内存
             await conn.execute(text("PRAGMA temp_store = MEMORY"))
 
-        logger.info("✅ SQLite性能优化已启用 (WAL模式 + 并发优化)")
-
     except Exception as e:
         logger.warning(f"⚠️ SQLite性能优化失败: {e}，将使用默认配置")
 
@@ -240,8 +238,6 @@ async def _enable_postgresql_optimizations(engine: AsyncEngine):
             await conn.execute(text("SET statement_timeout = '300000'"))
             # 启用自动 EXPLAIN（可选，用于调试）
             # await conn.execute(text("SET auto_explain.log_min_duration = '1000'"))
-
-        logger.info("✅ PostgreSQL性能优化已启用")
 
     except Exception as e:
         logger.warning(f"⚠️ PostgreSQL性能优化失败: {e}，将使用默认配置")

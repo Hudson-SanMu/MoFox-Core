@@ -308,7 +308,6 @@ async def _process_single_segment(
                         filename = seg_data.get("filename", "video.mp4")
 
                         logger.info(f"视频文件名: {filename}")
-                        logger.info(f"Base64数据长度: {len(video_base64) if video_base64 else 0}")
 
                         if video_base64:
                             # 解码base64视频数据

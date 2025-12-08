@@ -60,8 +60,7 @@ class VoiceUploader:
         }
 
         logger.info(f"正在上传音频文件: {audio_path}")
-        logger.info(f"文件大小: {len(audio_data)} bytes")
-
+        
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 self.upload_url,

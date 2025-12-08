@@ -137,7 +137,7 @@ class EventManager:
             return False
 
         event.enabled = True
-        logger.info(f"事件 {event_name} 已启用")
+        logger.debug(f"事件 {event_name} 已启用")
         return True
 
     def disable_event(self, event_name: EventType | str) -> bool:
@@ -155,7 +155,7 @@ class EventManager:
             return False
 
         event.enabled = False
-        logger.info(f"事件 {event_name} 已禁用")
+        logger.debug(f"事件 {event_name} 已禁用")
         return True
 
     def register_event_handler(self, handler_class: type[BaseEventHandler], plugin_config: dict | None = None) -> bool:
@@ -198,7 +198,7 @@ class EventManager:
                 self._pending_subscriptions[handler_name] = failed_subscriptions
                 logger.warning(f"事件处理器 {handler_name} 的部分订阅失败，已缓存: {failed_subscriptions}")
 
-        logger.info(f"事件处理器 {handler_name} 注册成功")
+        logger.debug(f"事件处理器 {handler_name} 注册成功")
         return True
 
     def get_event_handler(self, handler_name: str) -> BaseEventHandler | None:
@@ -246,7 +246,7 @@ class EventManager:
                     event.subscribers.remove(subscriber)
                     logger.debug(f"事件处理器 {handler_name} 已从事件 {event.name} 取消订阅。")
 
-        logger.info(f"事件处理器 {handler_name} 已被完全移除。")
+        logger.debug(f"事件处理器 {handler_name} 已被完全移除。")
         return True
 
 
@@ -284,7 +284,7 @@ class EventManager:
         # 按权重从高到低排序订阅者
         event.subscribers.sort(key=lambda h: getattr(h, "weight", 0), reverse=True)
 
-        logger.info(f"事件处理器 {handler_name} 成功订阅到事件 {event_name}，当前权重排序完成")
+        logger.debug(f"事件处理器 {handler_name} 成功订阅到事件 {event_name}，当前权重排序完成")
         return True
 
     def unsubscribe_handler_from_event(self, handler_name: str, event_name: EventType | str) -> bool:
@@ -311,7 +311,7 @@ class EventManager:
                 break
 
         if removed:
-            logger.info(f"事件处理器 {handler_name} 成功从事件 {event_name} 取消订阅")
+            logger.debug(f"事件处理器 {handler_name} 成功从事件 {event_name} 取消订阅")
         else:
             logger.warning(f"事件处理器 {handler_name} 未订阅事件 {event_name}")
 

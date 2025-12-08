@@ -508,9 +508,9 @@ def load_config(config_path: str) -> Config:
 
     # 创建Config对象（各个配置类会自动进行 Pydantic 验证）
     try:
-        logger.info("正在解析和验证配置文件...")
+        logger.debug("正在解析和验证配置文件...")
         config = Config.from_dict(config_data)
-        logger.info("配置文件解析和验证完成")
+        logger.debug("配置文件解析和验证完成")
 
         # 【临时修复】在验证后，手动从原始数据重新加载 master_users
         try:
@@ -520,7 +520,7 @@ def load_config(config_path: str) -> Config:
                 raw_master_users = config_dict["permission"]["master_users"]
                 # 现在 raw_master_users 就是一个标准的 Python 列表了
                 config.permission.master_users = raw_master_users
-                logger.info(f"【临时修复】已手动将 master_users 设置为: {config.permission.master_users}")
+                logger.debug(f"【临时修复】已手动将 master_users 设置为: {config.permission.master_users}")
         except Exception as patch_exc:
             logger.error(f"【临时修复】手动设置 master_users 失败: {patch_exc}")
 
@@ -545,9 +545,9 @@ def api_ada_load_config(config_path: str) -> APIAdapterConfig:
     config_dict = dict(config_data)
 
     try:
-        logger.info("正在解析和验证API适配器配置文件...")
+        logger.debug("正在解析和验证API适配器配置文件...")
         config = APIAdapterConfig.from_dict(config_dict)
-        logger.info("API适配器配置文件解析和验证完成")
+        logger.debug("API适配器配置文件解析和验证完成")
         return config
     except Exception as e:
         logger.critical(f"API适配器配置文件解析失败: {e}")
@@ -566,11 +566,11 @@ def initialize_configs_once() -> tuple[Config, APIAdapterConfig]:
         logger.debug("config.py 初始化已执行，跳过重复运行")
         return global_config, model_config
 
-    logger.info(f"MaiCore当前版本: {MMC_VERSION}")
+    logger.debug(f"MaiCore当前版本: {MMC_VERSION}")
     update_config()
     update_model_config()
 
-    logger.info("正在品鉴配置文件...")
+    logger.debug("正在品鉴配置文件...")
     global_config = load_config(config_path=os.path.join(CONFIG_DIR, "bot_config.toml"))
     model_config = api_ada_load_config(config_path=os.path.join(CONFIG_DIR, "model_config.toml"))
 
@@ -581,4 +581,4 @@ def initialize_configs_once() -> tuple[Config, APIAdapterConfig]:
 # 同一进程只执行一次初始化，避免重复生成或覆盖配置
 global_config, model_config = initialize_configs_once()
 
-logger.info("非常的新鲜，非常的美味！")
+logger.debug("非常的新鲜，非常的美味！")

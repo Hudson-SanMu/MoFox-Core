@@ -158,7 +158,7 @@ class UnifiedMemoryManager:
             await self.long_term_manager.initialize()
 
             self._initialized = True
-            logger.info("✅ 统一记忆管理器初始化完成")
+            logger.info("统一记忆管理器初始化完成")
 
             # 启动自动转移任务
             self._start_auto_transfer_task()
@@ -714,7 +714,7 @@ class UnifiedMemoryManager:
                 await self.memory_manager.shutdown()
 
             self._initialized = False
-            logger.info("✅ 统一记忆管理器已关闭")
+            logger.info("统一记忆管理器已关闭")
 
         except Exception as e:
             logger.error(f"关闭统一记忆管理器失败: {e}")

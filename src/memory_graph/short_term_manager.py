@@ -416,13 +416,13 @@ class ShortTermMemoryManager:
 
             elif decision.operation == ShortTermOperation.DISCARD:
                 # 丢弃
-                logger.info(f"🗑️ 丢弃低价值记忆: {decision.reasoning}")
+                logger.debug(f"丢弃低价值记忆: {decision.reasoning}")
                 return None
 
             elif decision.operation == ShortTermOperation.KEEP_SEPARATE:
                 # 保持独立
                 self.memories.append(new_memory)
-                logger.info(f"✅ 保持独立记忆: {new_memory.id}")
+                logger.debug(f"保持独立记忆: {new_memory.id}")
                 return new_memory
 
             else:
@@ -578,7 +578,7 @@ class ShortTermMemoryManager:
             for mem in results:
                 mem.update_access()
 
-            logger.info(f"检索到 {len(results)} 条短期记忆")
+            logger.debug(f"检索到 {len(results)} 条短期记忆")
             return results
 
         except Exception as e:
@@ -729,7 +729,7 @@ class ShortTermMemoryManager:
                 memory.embedding = embedding
                 success_count += 1
 
-        logger.info(f"✅ 向量重新生成完成（成功: {success_count}/{len(memories_to_process)}）")
+        logger.info(f"向量重新生成完成（成功: {success_count}/{len(memories_to_process)}）")
 
     async def shutdown(self) -> None:
         """关闭管理器"""
@@ -743,7 +743,7 @@ class ShortTermMemoryManager:
             await self._save_to_disk()
 
             self._initialized = False
-            logger.info("✅ 短期记忆管理器已关闭")
+            logger.info("短期记忆管理器已关闭")
 
         except Exception as e:
             logger.error(f"关闭短期记忆管理器失败: {e}")

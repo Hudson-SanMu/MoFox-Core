@@ -154,7 +154,7 @@ class MainSystem:
                 default_enabled = getattr(calc_info, "enabled_by_default", True)
 
                 if not enabled or not default_enabled:
-                    logger.info(f"兴趣计算器 {calc_name} 未启用，跳过")
+                    logger.debug(f"兴趣计算器 {calc_name} 未启用，跳过")
                     continue
 
                 try:
@@ -169,7 +169,7 @@ class MainSystem:
                         logger.warning(f"无法找到 {calc_name} 的组件类")
                         continue
 
-                    logger.info(f"成功获取 {calc_name} 的组件类: {component_class.__name__}")
+                    logger.debug(f"成功获取 {calc_name} 的组件类: {component_class.__name__}")
 
                     # 确保组件是 BaseInterestCalculator 的子类
                     if not issubclass(component_class, BaseInterestCalculator):
@@ -190,7 +190,7 @@ class MainSystem:
                     # 注册到兴趣管理器
                     if await interest_manager.register_calculator(calculator_instance):
                         registered_calculators.append(calculator_instance)
-                        logger.info(f"成功注册兴趣计算器: {calc_name}")
+                        logger.debug(f"成功注册兴趣计算器: {calc_name}")
                     else:
                         logger.error(f"兴趣计算器 {calc_name} 注册失败")
 
@@ -198,9 +198,9 @@ class MainSystem:
                     logger.error(f"处理兴趣计算器 {calc_name} 时出错: {e}")
 
             if registered_calculators:
-                logger.info(f"成功注册了 {len(registered_calculators)} 个兴趣计算器")
+                logger.debug(f"成功注册了 {len(registered_calculators)} 个兴趣计算器")
                 for calc in registered_calculators:
-                    logger.info(f"  - {calc.component_name} v{calc.component_version}")
+                    logger.debug(f"  - {calc.component_name} v{calc.component_version}")
             else:
                 logger.error("未能成功注册任何兴趣计算器")
 
@@ -319,7 +319,7 @@ class MainSystem:
 
         # 并行执行所有清理任务
         if cleanup_tasks:
-            logger.info(f"开始并行执行 {len(cleanup_tasks)} 个清理任务...")
+            logger.debug(f"开始并行执行 {len(cleanup_tasks)} 个清理任务...")
             tasks = [task for _, task in cleanup_tasks]
             task_names = [name for name, _ in cleanup_tasks]
 
@@ -377,10 +377,10 @@ class MainSystem:
             logger.error("缺少必要的bot配置")
             raise ValueError("Bot配置不完整")
 
-        logger.info(f"正在唤醒{global_config.bot.nickname}......")
+        logger.debug(f"正在唤醒{global_config.bot.nickname}......")
 
         # 初始化 CoreSinkManager（包含 MessageRuntime）
-        logger.info("正在初始化 CoreSinkManager...")
+        logger.debug("正在初始化 CoreSinkManager...")
         self.core_sink_manager = await initialize_core_sink_manager()
 
         # 获取 MessageHandler 并向 MessageRuntime 注册处理器
@@ -389,7 +389,7 @@ class MainSystem:
 
         # 向 MessageRuntime 注册消息处理器和钩子
         self.message_handler.register_handlers(self.core_sink_manager.runtime)
-        logger.info("CoreSinkManager 和 MessageHandler 初始化完成（使用 MessageRuntime 路由）")
+        logger.debug("CoreSinkManager 和 MessageHandler 初始化完成（使用 MessageRuntime 路由）")
 
         # 初始化组件
         await self._init_components()
@@ -398,19 +398,11 @@ class MainSystem:
         egg_texts, weights = zip(*EGG_PHRASES)
         selected_egg = choices(egg_texts, weights=weights, k=1)[0]
 
-        logger.info(f"""
-全部系统初始化完成，{global_config.bot.nickname if global_config and global_config.bot else 'Bot'}已成功唤醒
-=========================================================
-MoFox_Bot(第三方修改版)
-全部组件已成功启动!
-=========================================================
-🌐 项目地址: https://github.com/MoFox-Studio/MoFox-Core
-🏠 官方项目: https://github.com/Mai-with-u/MaiBot
-=========================================================
-这是基于原版MMC的社区改版，包含增强功能和优化(同时也有更多的'特性')
-=========================================================
-小贴士:{selected_egg}
-""")
+        logger.debug(
+            "全部系统初始化完成，%s 已唤醒（彩蛋：%s）",
+            global_config.bot.nickname if global_config and global_config.bot else "Bot",
+            selected_egg,
+        )
 
     async def _init_components(self) -> None:
         """初始化其他组件"""
@@ -424,7 +416,7 @@ MoFox_Bot(第三方修改版)
         ]
 
         await asyncio.gather(*base_init_tasks, return_exceptions=True)
-        logger.info("基础定时任务初始化成功")
+        logger.debug("基础定时任务初始化成功")
 
         # 注册默认事件
         event_manager.init_default_events()
@@ -437,7 +429,7 @@ MoFox_Bot(第三方修改版)
             permission_manager = PermissionManager()
             await permission_manager.initialize()
             permission_api.set_permission_manager(permission_manager)
-            logger.info("权限管理器初始化成功")
+            logger.debug("权限管理器初始化成功")
         except Exception as e:
             logger.error(f"权限管理器初始化失败: {e}")
 
@@ -450,7 +442,7 @@ MoFox_Bot(第三方修改版)
             self.server.register_router(message_router, prefix="/api")
             self.server.register_router(llm_statistic_router, prefix="/api")
             self.server.register_router(visualizer_router, prefix="/visualizer")
-            logger.info("API路由注册成功")
+            logger.debug("API路由注册成功")
         except Exception as e:
             logger.error(f"注册API路由失败: {e}")
         # 初始化统一调度器
@@ -476,11 +468,11 @@ MoFox_Bot(第三方修改版)
 
         # 初始化表情管理器
         get_emoji_manager().initialize()
-        logger.info("表情包管理器初始化成功")
+        logger.debug("表情包管理器初始化成功")
 
         # 启动情绪管理器
         await mood_manager.start()
-        logger.info("情绪管理器初始化成功")
+        logger.debug("情绪管理器初始化成功")
 
         # 启动聊天管理器的自动保存任务
         from src.chat.message_receive.chat_stream import get_chat_manager
@@ -499,9 +491,9 @@ MoFox_Bot(第三方修改版)
         try:
             if global_config and global_config.memory and global_config.memory.enable:
                 from src.memory_graph.manager_singleton import initialize_unified_memory_manager
-                logger.info("三层记忆系统已启用，正在初始化...")
+                logger.debug("三层记忆系统已启用，正在初始化...")
                 await initialize_unified_memory_manager()
-                logger.info("三层记忆系统初始化成功")
+                logger.debug("三层记忆系统初始化成功")
             else:
                 logger.debug("三层记忆系统未启用（配置中禁用）")
         except Exception as e:
@@ -515,19 +507,19 @@ MoFox_Bot(第三方修改版)
             from src.chat.knowledge.knowledge_lib import initialize_lpmm_knowledge
 
             initialize_lpmm_knowledge()
-            logger.info("LPMM知识库初始化成功")
+            logger.debug("LPMM知识库初始化成功")
         except Exception as e:
             logger.error(f"LPMM知识库初始化失败: {e}")
 
         # 消息接收器已在 initialize() 中通过 CoreSinkManager 创建
-        logger.info("核心消息接收器已就绪（通过 CoreSinkManager）")
+        logger.debug("核心消息接收器已就绪（通过 CoreSinkManager）")
 
         # 启动消息重组器
         try:
             from src.utils.message_chunker import reassembler
 
             await reassembler.start_cleanup_task()
-            logger.info("消息重组器已启动")
+            logger.debug("消息重组器已启动")
         except Exception as e:
             logger.error(f"启动消息重组器失败: {e}")
 
@@ -537,11 +529,11 @@ MoFox_Bot(第三方修改版)
 
             storage_batcher = get_message_storage_batcher()
             await storage_batcher.start()
-            logger.info("消息存储批处理器已启动")
+            logger.debug("消息存储批处理器已启动")
 
             update_batcher = get_message_update_batcher()
             await update_batcher.start()
-            logger.info("消息更新批处理器已启动")
+            logger.debug("消息更新批处理器已启动")
         except Exception as e:
             logger.error(f"启动消息批处理器失败: {e}")
 
@@ -550,7 +542,7 @@ MoFox_Bot(第三方修改版)
             from src.chat.message_manager import message_manager
 
             await message_manager.start()
-            logger.info("消息管理器已启动")
+            logger.debug("消息管理器已启动")
         except Exception as e:
             logger.error(f"启动消息管理器失败: {e}")
 
@@ -564,7 +556,7 @@ MoFox_Bot(第三方修改版)
         try:
             await event_manager.trigger_event(EventType.ON_START, permission_group="SYSTEM")
             init_time = int(1000 * (time.time() - init_start_time))
-            logger.info(f"初始化完成，神经元放电{init_time}次")
+            logger.debug(f"初始化完成，神经元放电{init_time}次")
         except Exception as e:
             logger.error(f"启动事件触发失败: {e}")
 
@@ -574,7 +566,7 @@ MoFox_Bot(第三方修改版)
 
             adapter_manager = get_adapter_manager()
             await adapter_manager.start_all_adapters()
-            logger.info("所有适配器已启动")
+            logger.debug("所有适配器已启动")
         except Exception as e:
             logger.error(f"启动适配器失败: {e}")
 
@@ -583,7 +575,7 @@ MoFox_Bot(第三方修改版)
             if MEM_MONITOR_ENABLED:
                 started = start_background_monitor(interval_sec=2400)
                 if started:
-                    logger.info("[DEV] 内存监控已启动 (间隔=2400s ≈ 40min)")
+                    logger.debug("[DEV] 内存监控已启动 (间隔=2400s ≈ 40min)")
         except Exception as e:
             logger.error(f"启动内存监控失败: {e}")
 
@@ -593,7 +585,7 @@ MoFox_Bot(第三方修改版)
         if global_config and global_config.planning_system and global_config.planning_system.monthly_plan_enable:
             try:
                 await monthly_plan_manager.start_monthly_plan_generation()
-                logger.info("月度计划管理器初始化成功")
+                logger.debug("月度计划管理器初始化成功")
             except Exception as e:
                 logger.error(f"月度计划管理器初始化失败: {e}")
 
@@ -602,7 +594,7 @@ MoFox_Bot(第三方修改版)
             try:
                 await schedule_manager.load_or_generate_today_schedule()
                 await schedule_manager.start_daily_schedule_generation()
-                logger.info("日程表管理器初始化成功")
+                logger.debug("日程表管理器初始化成功")
             except Exception as e:
                 logger.error(f"日程表管理器初始化失败: {e}")
 
@@ -614,7 +606,7 @@ MoFox_Bot(第三方修改版)
                 result = init_func()
                 if asyncio.iscoroutine(result):
                     await result
-                logger.info(f"{component_name}初始化成功")
+                logger.debug(f"{component_name}初始化成功")
                 return True
             except Exception as e:
                 logger.error(f"{component_name}初始化失败: {e}")

@@ -825,7 +825,7 @@ class MemoryTools:
                 filter_rate = filtered_count / total_candidates
                 if filter_rate > 0.5:  # 降低警告阈值到50%
                     logger.warning(
-                        f"⚠️ 过滤率较高 ({filter_rate*100:.1f}%)！"
+                        f"过滤率较高 ({filter_rate*100:.1f}%)！"
                         f"原因：{filter_stats['importance']}个记忆重要性 < {self.search_min_importance}。"
                         f"建议：1) 降低 min_importance 阈值，或 2) 检查记忆质量评分"
                     )

@@ -26,15 +26,13 @@ class InterestService:
         """
         try:
             logger.info("开始初始化智能兴趣系统...")
-            logger.info(f"人设ID: {personality_id}, 描述长度: {len(personality_description)}")
-
             await bot_interest_manager.initialize(personality_description, personality_id)
             self.is_initialized = True
             logger.info("智能兴趣系统初始化完成。")
 
             # 显示初始化后的统计信息
             stats = bot_interest_manager.get_interest_stats()
-            logger.info(f"兴趣系统统计: {stats}")
+            logger.debug(f"兴趣系统统计: {stats}")
 
         except Exception as e:
             logger.error(f"初始化智能兴趣系统失败: {e}")

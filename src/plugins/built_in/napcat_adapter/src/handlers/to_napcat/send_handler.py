@@ -34,7 +34,7 @@ class SendHandler:
         """
         处理来自核心的消息，将其转换为 Napcat 可接受的格式并发送
         """
-        logger.info("接收到来自MoFox-Bot的消息，处理中")
+        logger.debug("接收到来自MoFox-Bot的消息，处理中")
 
         if not envelope:
             logger.warning("空的消息，跳过处理")
@@ -50,13 +50,13 @@ class SendHandler:
             seg_type = segment.get("type")
 
             if seg_type == "command":
-                logger.info("处理命令")
+                logger.debug("处理命令")
                 return await self.send_command(envelope)
             if seg_type == "adapter_command":
-                logger.info("处理适配器命令")
+                logger.debug("处理适配器命令")
                 return await self.handle_adapter_command(envelope)
             if seg_type == "adapter_response":
-                logger.info("收到adapter_response消息，此消息应该由Bot端处理，跳过")
+                logger.debug("收到adapter_response消息，此消息应该由Bot端处理，跳过")
                 return None
 
         return await self.send_normal_message(envelope)
@@ -65,7 +65,6 @@ class SendHandler:
         """
         处理普通消息发送
         """
-        logger.info("处理普通信息中")
         message_info: MessageInfoPayload = envelope.get("message_info", {})
         message_segment: SegPayload = envelope.get("message_segment", {})  # type: ignore[assignment]
 
@@ -487,7 +486,6 @@ class SendHandler:
 
     def handle_set_emoji_like_command(self, args: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         """处理设置表情回应命令"""
-        logger.info(f"开始处理表情回应命令, 接收到参数: {args}")
         try:
             message_id = int(args["message_id"])
             emoji_id = int(args["emoji_id"])

@@ -744,7 +744,7 @@ class PathScoreExpansion:
                             node_type_hints[node_id] = getattr(node_obj_type, "value", str(node_obj_type))
 
             if all_node_ids:
-                logger.info(f"🧠 预处理 {len(all_node_ids)} 个节点的类型信息")
+                logger.debug(f"预处理 {len(all_node_ids)} 个节点的类型信息")
                 for nid in all_node_ids:
                     node_attrs = self.graph_store.graph.nodes.get(nid, {}) if hasattr(self.graph_store, "graph") else {}
                     metadata = node_attrs.get("metadata", {}) if isinstance(node_attrs, dict) else {}

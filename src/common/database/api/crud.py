@@ -19,6 +19,7 @@ from src.common.database.optimization import (
     Priority,
     get_batch_scheduler,
     get_cache,
+    record_preload_access,
 )
 from src.common.logger import get_logger
 
@@ -143,6 +144,16 @@ class CRUDBase(Generic[T]):
         """
         cache_key = f"{self.model_name}:id:{id}"
 
+        if use_cache:
+            async def _preload_loader() -> dict[str, Any] | None:
+                async with get_db_session() as session:
+                    stmt = select(self.model).where(self.model.id == id)
+                    result = await session.execute(stmt)
+                    instance = result.scalar_one_or_none()
+                    return _model_to_dict(instance) if instance is not None else None
+
+            await record_preload_access(cache_key, loader=_preload_loader)
+
         # 尝试从缓存获取 (缓存的是字典)
         if use_cache:
             cache = await get_cache()
@@ -186,6 +197,21 @@ class CRUDBase(Generic[T]):
             模型实例或None
         """
         cache_key = f"{self.model_name}:filter:{sorted(filters.items())!s}"
+
+        filters_copy = dict(filters)
+        if use_cache:
+            async def _preload_loader() -> dict[str, Any] | None:
+                async with get_db_session() as session:
+                    stmt = select(self.model)
+                    for key, value in filters_copy.items():
+                        if hasattr(self.model, key):
+                            stmt = stmt.where(getattr(self.model, key) == value)
+
+                    result = await session.execute(stmt)
+                    instance = result.scalar_one_or_none()
+                    return _model_to_dict(instance) if instance is not None else None
+
+            await record_preload_access(cache_key, loader=_preload_loader)
 
         # 尝试从缓存获取 (缓存的是字典)
         if use_cache:
@@ -238,6 +264,29 @@ class CRUDBase(Generic[T]):
             模型实例列表
         """
         cache_key = f"{self.model_name}:multi:{skip}:{limit}:{sorted(filters.items())!s}"
+
+        filters_copy = dict(filters)
+        if use_cache:
+            async def _preload_loader() -> list[dict[str, Any]]:
+                async with get_db_session() as session:
+                    stmt = select(self.model)
+
+                    # 应用过滤条件
+                    for key, value in filters_copy.items():
+                        if hasattr(self.model, key):
+                            if isinstance(value, list | tuple | set):
+                                stmt = stmt.where(getattr(self.model, key).in_(value))
+                            else:
+                                stmt = stmt.where(getattr(self.model, key) == value)
+
+                    # 应用分页
+                    stmt = stmt.offset(skip).limit(limit)
+
+                    result = await session.execute(stmt)
+                    instances = list(result.scalars().all())
+                    return [_model_to_dict(inst) for inst in instances]
+
+            await record_preload_access(cache_key, loader=_preload_loader)
 
         # 尝试从缓存获取 (缓存的是字典列表)
         if use_cache:

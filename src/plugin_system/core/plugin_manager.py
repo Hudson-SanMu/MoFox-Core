@@ -50,7 +50,6 @@ class PluginManager:
             core_sink: 核心消息接收器实例（InProcessCoreSink）
         """
         self._core_sink = core_sink
-        logger.info("已设置核心消息接收器")
 
     def add_plugin_directory(self, directory: str) -> bool:
         """添加插件目录"""

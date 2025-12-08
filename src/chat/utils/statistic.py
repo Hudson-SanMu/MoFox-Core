@@ -179,40 +179,17 @@ class StatisticOutputTask(AsyncTask):
     @staticmethod
     async def _yield_control(iteration: int, interval: int = 200) -> None:
         """
-        �ڴ����������ʱ������������첽�¼�ѭ�����Ӧ
-
-        Args:
-            iteration: ��ǰ�������
-            interval: ÿ�����ٴ��л�һ��
+        在长时间运行的循环中定期让出控制权，以防止阻塞事件循环
+        :param iteration: 当前迭代次数
+        :param interval: 每隔多少次迭代让出一次控制权
         """
+
         if iteration % interval == 0:
             await asyncio.sleep(0)
 
     async def run(self):
-        try:
-            now = datetime.now()
-            logger.info("正在收集统计数据(异步)...")
-            stats = await self._collect_all_statistics(now)
-            logger.info("统计数据收集完成")
-
-            self._statistic_console_output(stats, now)
-            # 使用新的 HTMLReportGenerator 生成报告
-            chart_data = await self._collect_chart_data(stats)
-            deploy_time = datetime.fromtimestamp(float(local_storage.get("deploy_time", now.timestamp())))  # type: ignore
-            report_generator = HTMLReportGenerator(
-                name_mapping=self.name_mapping,
-                stat_period=self.stat_period,
-                deploy_time=deploy_time,
-            )
-            await report_generator.generate_report(stats, chart_data, now, self.record_file_path)
-            logger.info("统计数据HTML报告输出完成")
-
-        except Exception as e:
-            logger.exception(f"输出统计数据过程中发生异常，错误信息：{e}")
-
-    async def run_async_background(self):
         """
-        备选方案：完全异步后台运行统计输出
+        完全异步后台运行统计输出
         使用此方法可以让统计任务完全非阻塞
         """
 

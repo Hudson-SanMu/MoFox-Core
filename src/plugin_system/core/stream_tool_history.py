@@ -97,7 +97,7 @@ class StreamToolHistoryManager:
             "average_execution_time": 0.0,
         }
 
-        logger.info(f"[{chat_id}] 工具历史记录管理器初始化完成，最大历史: {max_history}")
+        logger.debug(f"[{chat_id}] 工具历史记录管理器初始化完成，最大历史: {max_history}")
 
     async def add_tool_call(self, record: ToolCallRecord) -> None:
         """添加工具调用记录
@@ -141,7 +141,7 @@ class StreamToolHistoryManager:
         if self.enable_memory_cache:
             memory_result = self._search_memory_cache(tool_name, args)
             if memory_result:
-                logger.info(f"[{self.chat_id}] 内存缓存命中: {tool_name}")
+                logger.debug(f"[{self.chat_id}] 内存缓存命中: {tool_name}")
                 return memory_result
 
         # 然后检查全局缓存系统
@@ -433,7 +433,7 @@ def _evict_old_stream_managers() -> None:
         evicted.append(chat_id)
 
     if evicted:
-        logger.info(f"🔧 StreamToolHistoryManager LRU淘汰: 释放了 {len(evicted)} 个不活跃的管理器")
+        logger.debug(f"StreamToolHistoryManager LRU淘汰: 释放了 {len(evicted)} 个不活跃的管理器")
 
 
 def get_stream_tool_history_manager(chat_id: str) -> StreamToolHistoryManager:

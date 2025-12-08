@@ -219,12 +219,14 @@ class KFCContextBuilder:
             return ""
 
         try:
-            from src.memory_graph.manager_singleton import get_unified_memory_manager
+            from src.memory_graph.manager_singleton import (
+                ensure_unified_memory_manager_initialized,
+            )
             from src.memory_graph.utils.three_tier_formatter import memory_formatter
 
-            unified_manager = get_unified_memory_manager()
+            unified_manager = await ensure_unified_memory_manager_initialized()
             if not unified_manager:
-                logger.warning("[KFC记忆] 管理器未初始化，跳过记忆检索")
+                logger.warning("[KFC记忆] 管理器初始化失败或未启用，跳过记忆检索")
                 return ""
 
             # 构建查询文本（使用最近多条消息的组合块）
