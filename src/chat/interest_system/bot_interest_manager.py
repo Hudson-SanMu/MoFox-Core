@@ -910,10 +910,15 @@ class BotInterestManager:
                         logger.debug(f"🏷️  解析到 {len(tags_data)} 个兴趣标签")
 
                         # 创建BotPersonalityInterests对象
+                        embedding_model_list = (
+                            [db_interests.embedding_model]
+                            if isinstance(db_interests.embedding_model, str)
+                            else list(db_interests.embedding_model)
+                        )
                         interests = BotPersonalityInterests(
                             personality_id=db_interests.personality_id,
                             personality_description=db_interests.personality_description,
-                            embedding_model=db_interests.embedding_model,
+                            embedding_model=embedding_model_list,
                             version=db_interests.version,
                             last_updated=db_interests.last_updated,
                         )
@@ -978,6 +983,13 @@ class BotInterestManager:
             # 序列化为JSON
             json_data = orjson.dumps(tags_data)
 
+            # 数据库存储单个模型名称，转换 list -> str
+            embedding_model_value: str = ""
+            if isinstance(interests.embedding_model, list):
+                embedding_model_value = interests.embedding_model[0] if interests.embedding_model else ""
+            else:
+                embedding_model_value = str(interests.embedding_model or "")
+
             async with get_db_session() as session:
                 # 检查是否已存在相同personality_id的记录
                 existing_record = (
@@ -997,7 +1009,7 @@ class BotInterestManager:
                     logger.info("更新现有的兴趣标签配置")
                     existing_record.interest_tags = json_data.decode("utf-8")
                     existing_record.personality_description = interests.personality_description
-                    existing_record.embedding_model = interests.embedding_model
+                    existing_record.embedding_model = embedding_model_value
                     existing_record.version = interests.version
                     existing_record.last_updated = interests.last_updated
 
@@ -1010,7 +1022,7 @@ class BotInterestManager:
                         personality_id=interests.personality_id,
                         personality_description=interests.personality_description,
                         interest_tags=json_data.decode("utf-8"),
-                        embedding_model=interests.embedding_model,
+                        embedding_model=embedding_model_value,
                         version=interests.version,
                         last_updated=interests.last_updated,
                     )

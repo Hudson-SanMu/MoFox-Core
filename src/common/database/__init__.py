@@ -2,7 +2,7 @@
 
 重构后的数据库模块，提供：
 - 核心层：引擎、会话、模型、迁移
-- 优化层：缓存、预加载、批处理
+- 优化层：缓存、批处理
 - API层：CRUD、查询构建器、业务API
 - Utils层：装饰器、监控
 - 兼容层：向后兼容的API
@@ -51,11 +51,9 @@ from src.common.database.core import (
 # ===== 优化层 =====
 from src.common.database.optimization import (
     AdaptiveBatchScheduler,
-    DataPreloader,
     MultiLevelCache,
     get_batch_scheduler,
     get_cache,
-    get_preloader,
 )
 
 # ===== Utils层 =====
@@ -83,7 +81,6 @@ __all__ = [
     "Base",
     # API层 - 基础类
     "CRUDBase",
-    "DataPreloader",
     # 优化层
     "MultiLevelCache",
     "QueryBuilder",
@@ -103,7 +100,6 @@ __all__ = [
     "get_message_count",
     "get_monitor",
     "get_or_create_person",
-    "get_preloader",
     "get_recent_actions",
     "get_session_factory",
     "get_usage_statistics",

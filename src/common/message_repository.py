@@ -15,6 +15,9 @@ from src.config.config import global_config
 logger = get_logger(__name__)
 
 
+SAFE_FETCH_LIMIT = 5000  # 防止一次性读取过多行导致内存暴涨
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -105,33 +108,28 @@ async def find_messages(
                 query = query.where(not_(Messages.is_public_notice))
                 query = query.where(not_(Messages.is_command))
 
-            if limit > 0:
-                # 确保limit是正整数
-                limit = max(1, int(limit))
-
-                if limit_mode == "earliest":
-                    # 获取时间最早的 limit 条记录，已经是正序
-                    query = query.order_by(Messages.time.asc()).limit(limit)
-                    try:
-                        result = await session.execute(query)
-                        results = result.scalars().all()
-                    except Exception as e:
-                        logger.error(f"执行earliest查询失败: {e}")
-                        results = []
-                else:  # 默认为 'latest'
-                    # 获取时间最晚的 limit 条记录
-                    query = query.order_by(Messages.time.desc()).limit(limit)
-                    try:
-                        result = await session.execute(query)
-                        latest_results = result.scalars().all()
-                        # 将结果按时间正序排列
-                        results = sorted(latest_results, key=lambda msg: msg.time)
-                    except Exception as e:
-                        logger.error(f"执行latest查询失败: {e}")
-                        results = []
+            # 统一做上限保护，防止无限制查询导致内存暴涨
+            if limit <= 0:
+                capped_limit = SAFE_FETCH_LIMIT
+                logger.warning(
+                    "find_messages 未指定 limit，自动限制为 %s 行以避免内存占用过高",
+                    capped_limit,
+                )
             else:
-                # limit 为 0 时，应用传入的 sort 参数
-                if sort:
+                capped_limit = max(1, int(limit))
+                if capped_limit > SAFE_FETCH_LIMIT:
+                    logger.warning(
+                        "find_messages 请求的 limit=%s 超过安全上限，已限制为 %s",
+                        limit,
+                        SAFE_FETCH_LIMIT,
+                    )
+                    capped_limit = SAFE_FETCH_LIMIT
+
+            if capped_limit > 0:
+                # 如果调用方原本请求无限制并且提供了排序，保留自定义排序
+                requested_unbounded = limit <= 0
+                custom_sorted = False
+                if requested_unbounded and sort:
                     sort_terms = []
                     for field_name, direction in sort:
                         if hasattr(Messages, field_name):
@@ -146,12 +144,32 @@ async def find_messages(
                             logger.warning(f"排序字段 '{field_name}' 在 Messages 模型中未找到。将跳过此排序条件。")
                     if sort_terms:
                         query = query.order_by(*sort_terms)
+                        custom_sorted = True
+
+                if not custom_sorted:
+                    if limit_mode == "earliest":
+                        # 获取时间最早的 limit 条记录，已经是正序
+                        query = query.order_by(Messages.time.asc())
+                    else:  # 默认为 'latest'
+                        # 获取时间最晚的 limit 条记录
+                        query = query.order_by(Messages.time.desc())
+
+                query = query.limit(capped_limit)
                 try:
                     result = await session.execute(query)
-                    results = result.scalars().all()
+                    fetched = result.scalars().all()
+                    if custom_sorted:
+                        results = fetched
+                    elif limit_mode == "earliest":
+                        results = fetched
+                    else:
+                        # latest 分支需要正序返回
+                        results = sorted(fetched, key=lambda msg: msg.time)
                 except Exception as e:
-                    logger.error(f"执行无限制查询失败: {e}")
+                    logger.error(f"执行查询失败: {e}")
                     results = []
+            else:
+                results = []
 
             # 在会话内将结果转换为字典，避免会话分离错误
             return [_model_to_dict(msg) for msg in results]
@@ -219,6 +237,66 @@ async def count_messages(message_filter: dict[str, Any]) -> int:
         log_message = f"使用 SQLAlchemy 计数消息失败 (message_filter={message_filter}): {e}\n{traceback.format_exc()}"
         logger.error(log_message)
         return 0
+
+
+async def count_and_length_messages(message_filter: dict[str, Any]) -> tuple[int, int]:
+    """
+    计算符合条件的消息数量以及 processed_plain_text 的总长度。
+
+    Args:
+        message_filter: 查询过滤器字典
+
+    Returns:
+        (消息数量, 文本总长度)，出错时返回 (0, 0)
+    """
+    try:
+        async with get_db_session() as session:
+            count_expr = func.count(Messages.id)
+            length_expr = func.coalesce(func.sum(func.length(Messages.processed_plain_text)), 0)
+            query = select(count_expr, length_expr)
+
+            if message_filter:
+                conditions = []
+                for key, value in message_filter.items():
+                    if hasattr(Messages, key):
+                        field = getattr(Messages, key)
+                        if isinstance(value, dict):
+                            for op, op_value in value.items():
+                                if op == "$gt":
+                                    conditions.append(field > op_value)
+                                elif op == "$lt":
+                                    conditions.append(field < op_value)
+                                elif op == "$gte":
+                                    conditions.append(field >= op_value)
+                                elif op == "$lte":
+                                    conditions.append(field <= op_value)
+                                elif op == "$ne":
+                                    conditions.append(field != op_value)
+                                elif op == "$in":
+                                    conditions.append(field.in_(op_value))
+                                elif op == "$nin":
+                                    conditions.append(field.not_in(op_value))
+                                else:
+                                    logger.warning(
+                                        f"计数长度时，过滤器中遇到未知操作符 '{op}' (字段: '{key}')。将跳过此操作符。"
+                                    )
+                        else:
+                            conditions.append(field == value)
+                    else:
+                        logger.warning(f"计数长度时，过滤器键 '{key}' 在 Messages 模型中未找到。将跳过此条件。")
+
+                if conditions:
+                    query = query.where(*conditions)
+
+            count_value, total_length = (await session.execute(query)).one()
+            return int(count_value or 0), int(total_length or 0)
+    except Exception as e:
+        log_message = (
+            f"使用 SQLAlchemy 统计消息数量与长度失败 (filter={message_filter}): {e}\n"
+            + traceback.format_exc()
+        )
+        logger.error(log_message)
+        return 0, 0
 
 
 # 你可以在这里添加更多与 messages 集合相关的数据库操作函数，例如 find_one_message, insert_message 等。

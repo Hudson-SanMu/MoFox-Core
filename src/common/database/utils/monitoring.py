@@ -64,10 +64,6 @@ class DatabaseMetrics:
     batch_items_total: int = 0
     batch_avg_size: float = 0.0
 
-    # 预加载统计
-    preload_operations: int = 0
-    preload_hits: int = 0
-
     @property
     def cache_hit_rate(self) -> float:
         """缓存命中率"""
@@ -152,12 +148,6 @@ class DatabaseMonitor:
             self._metrics.batch_items_total / self._metrics.batch_operations
         )
 
-    def record_preload_operation(self, hit: bool = False):
-        """记录预加载操作"""
-        self._metrics.preload_operations += 1
-        if hit:
-            self._metrics.preload_hits += 1
-
     def get_metrics(self) -> DatabaseMetrics:
         """获取指标"""
         return self._metrics
@@ -195,15 +185,6 @@ class DatabaseMonitor:
                 "operations": metrics.batch_operations,
                 "total_items": metrics.batch_items_total,
                 "avg_size": f"{metrics.batch_avg_size:.1f}",
-            },
-            "preload": {
-                "operations": metrics.preload_operations,
-                "hits": metrics.preload_hits,
-                "hit_rate": (
-                    f"{metrics.preload_hits / metrics.preload_operations:.2%}"
-                    if metrics.preload_operations > 0
-                    else "N/A"
-                ),
             },
             "overall": {
                 "error_rate": f"{metrics.error_rate:.2%}",
@@ -259,15 +240,6 @@ class DatabaseMonitor:
             f"  操作={batch['operations']}, "
             f"总项目={batch['total_items']}, "
             f"平均大小={batch['avg_size']}"
-        )
-
-        # 预加载统计
-        logger.info("\n预加载:")
-        preload = summary["preload"]
-        logger.info(
-            f"  操作={preload['operations']}, "
-            f"命中={preload['hits']}, "
-            f"命中率={preload['hit_rate']}"
         )
 
         # 整体统计

@@ -13,7 +13,7 @@ from src.common.data_models.database_data_model import DatabaseUserInfo
 
 # MessageRecv 已被移除，现在使用 DatabaseMessages
 from src.common.logger import get_logger
-from src.common.message_repository import count_messages, find_messages
+from src.common.message_repository import count_and_length_messages, count_messages, find_messages
 from src.config.config import global_config, model_config
 from src.llm_models.utils_model import LLMRequest
 from src.person_info.person_info import PersonInfoManager, get_person_info_manager
@@ -723,14 +723,8 @@ async def count_messages_between(start_time: float, end_time: float, stream_id: 
     filter_query = {"chat_id": stream_id, "time": {"$gt": start_time, "$lte": end_time}}
 
     try:
-        # 先获取消息数量
-        count = await count_messages(filter_query)
-
-        # 获取消息内容计算总长度
-        messages = await find_messages(message_filter=filter_query)
-        total_length = sum(len(msg.get("processed_plain_text", "")) for msg in messages)
-
-        return count, total_length
+        # 使用聚合查询，避免一次性拉取全部消息导致内存暴涨
+        return await count_and_length_messages(filter_query)
 
     except Exception as e:
         logger.error(f"计算消息数量时发生意外错误: {e}")

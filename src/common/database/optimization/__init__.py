@@ -3,7 +3,6 @@
 职责：
 - 批量调度
 - 多级缓存（内存缓存 + Redis缓存）
-- 数据预加载
 """
 
 from .batch_scheduler import (
@@ -25,18 +24,9 @@ from .cache_manager import (
     get_cache,
     get_cache_backend_type,
 )
-from .preloader import (
-    AccessPattern,
-    CommonDataPreloader,
-    DataPreloader,
-    close_preloader,
-    get_preloader,
-    record_preload_access,
-)
 from .redis_cache import RedisCache, close_redis_cache, get_redis_cache
 
 __all__ = [
-    "AccessPattern",
     # Batch Scheduler
     "AdaptiveBatchScheduler",
     "BaseCacheStats",
@@ -46,9 +36,6 @@ __all__ = [
     "CacheBackend",
     "CacheEntry",
     "CacheStats",
-    "CommonDataPreloader",
-    # Preloader
-    "DataPreloader",
     "LRUCache",
     # Memory Cache
     "MultiLevelCache",
@@ -57,12 +44,9 @@ __all__ = [
     "RedisCache",
     "close_batch_scheduler",
     "close_cache",
-    "close_preloader",
     "close_redis_cache",
     "get_batch_scheduler",
     "get_cache",
     "get_cache_backend_type",
-    "get_preloader",
-    "record_preload_access",
     "get_redis_cache"
 ]
