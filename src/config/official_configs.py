@@ -508,6 +508,7 @@ class MemoryConfig(ValidatedConfigBase):
     short_term_decay_factor: float = Field(default=0.98, description="衰减因子")
 
     # 长期记忆层配置
+    use_judge: bool = Field(default=True, description="使用评判模型决定是否检索长期记忆")
     long_term_batch_size: int = Field(default=10, description="批量转移大小")
     long_term_decay_factor: float = Field(default=0.95, description="衰减因子")
     long_term_auto_transfer_interval: int = Field(default=60, description="自动转移间隔（秒）")
