@@ -121,7 +121,7 @@ class StatisticOutputTask(AsyncTask):
 
     def __init__(self, record_file_path: str = "mofox_bot_statistics.html"):
         # 延迟300秒启动，运行间隔300秒
-        super().__init__(task_name="Statistics Data Output Task", wait_before_start=0, run_interval=300)
+        super().__init__(task_name="Statistics Data Output Task", wait_before_start=600, run_interval=900)
 
         self.name_mapping: dict[str, tuple[str, float]] = {}
         """

@@ -114,6 +114,9 @@ def _build_sqlite_config(config) -> tuple[str, dict]:
             "check_same_thread": False,
             "timeout": 60,
         },
+        # ⚠️ 禁用 SQLAlchemy 查询编译缓存以阻断可能的 tuple 膨胀
+        # 观察到长时间运行后 tuple 数量飙升，先通过关闭缓存止血
+        "query_cache_size": 0,
     }
 
     logger.debug(f"SQLite配置: {db_path}")
@@ -162,6 +165,8 @@ def _build_postgresql_config(config) -> tuple[str, dict]:
         "pool_timeout": config.connection_timeout,
         "pool_recycle": 3600,
         "pool_pre_ping": True,
+        # ⚠️ 禁用 SQLAlchemy 查询编译缓存以阻断可能的 tuple 膨胀
+        "query_cache_size": 0,
     }
 
     if connect_args:
