@@ -18,7 +18,6 @@ llm_tool_benchmark_results.json
 MaiBot-Napcat-Adapter-main
 MaiBot-Napcat-Adapter
 /test
-uv.lock
 MaiBot-dev.code-workspace
 /log_debug
 /src/test
@@ -336,12 +335,10 @@ MaiBot.code-workspace
 /tests
 /tests
 .kilocode/rules/MoFox.md
-src/chat/planner_actions/planner (2).py
 rust_video/Cargo.lock
 .claude/settings.local.json
 package-lock.json
 package.json
-src/chat/planner_actions/新建 文本文档.txt
 /backup
 mofox_bot_statistics.html
 src/plugins/built_in/napcat_adapter/src/handlers/napcat_cache.json
