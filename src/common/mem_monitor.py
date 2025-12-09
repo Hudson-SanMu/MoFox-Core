@@ -7,6 +7,7 @@
 - tracemalloc 内存分配差异分析
 - 对象类型增长监控 (objgraph)
 - 类型内存占用分析 (Pympler)
+- 采样策略：仅定期检查总 RSS，超过 1GiB 或单次增长 200MiB 时采集详细数据并告警
 
 通过环境变量 MEM_MONITOR_ENABLED 控制是否启用（默认禁用）
 日志输出到独立文件 logs/mem_monitor.log
@@ -99,7 +100,26 @@ _monitor_thread: threading.Thread | None = None
 _stop_event: threading.Event = threading.Event()
 
 # 环境变量控制是否启用，防止所有环境一起开
-MEM_MONITOR_ENABLED = False
+MEM_MONITOR_ENABLED = True
+# 触发详细采集的阈值
+MEM_ABSOLUTE_THRESHOLD_MB = 1024.0  # 超过 1 GiB
+MEM_GROWTH_THRESHOLD_MB = 200.0  # 单次增长超过 200 MiB
+
+
+def _build_trigger_reason(rss_mb: float, last_rss_mb: float | None) -> str | None:
+    """根据阈值判断是否需要采集详细数据，返回触发原因"""
+    if rss_mb >= MEM_ABSOLUTE_THRESHOLD_MB:
+        return f"RSS {rss_mb:.1f} MiB >= {MEM_ABSOLUTE_THRESHOLD_MB:.0f} MiB"
+
+    if last_rss_mb is not None:
+        delta = rss_mb - last_rss_mb
+        if delta >= MEM_GROWTH_THRESHOLD_MB:
+            return (
+                f"RSS increased by {delta:.1f} MiB since last check "
+                f"({last_rss_mb:.1f} -> {rss_mb:.1f})"
+            )
+
+    return None
 
 
 def start_tracemalloc(max_frames: int = 25) -> None:
@@ -249,21 +269,34 @@ def periodic_mem_monitor(interval_sec: int = 2400, tracemalloc_limit: int = 20, 
 
     start_tracemalloc()
 
-    logger.info("Memory monitor thread started, interval=%s sec", interval_sec)
+    logger.info(
+        "Memory monitor thread started, interval=%s sec, thresholds: >=%.0f MiB or +%.0f MiB since last check",
+        interval_sec,
+        MEM_ABSOLUTE_THRESHOLD_MB,
+        MEM_GROWTH_THRESHOLD_MB,
+    )
 
-    counter = 0
+    last_rss_mb: float | None = None
     while not _stop_event.is_set():
         # 使用 Event.wait 替代 time.sleep，支持优雅退出
         if _stop_event.wait(timeout=interval_sec):
             break
 
         try:
-            counter += 1
-            log_rss("periodic")
-            log_tracemalloc_diff("periodic", limit=tracemalloc_limit)
-            log_object_growth(limit=objgraph_limit)
-            if counter % 3 == 0:
+            mem_info = log_rss("periodic")
+            rss_mb = mem_info["rss_mb"]
+
+            trigger_reason = _build_trigger_reason(rss_mb, last_rss_mb)
+            if trigger_reason:
+                logger.warning(
+                    "Memory threshold hit: %s. Collecting detailed diagnostics...",
+                    trigger_reason,
+                )
+                log_tracemalloc_diff("alert", limit=tracemalloc_limit)
+                log_object_growth(limit=objgraph_limit)
                 log_type_memory_diff()
+
+            last_rss_mb = rss_mb
         except Exception:
             logger.exception("Memory monitor iteration failed")
 
