@@ -887,12 +887,7 @@ async def _create_redis_cache(db_config: Any) -> CacheBackend:
     Raises:
         RuntimeError: Redis 连接失败时抛出异常
     """
-    try:
-        from src.common.database.optimization.redis_cache import RedisCache
-    except ModuleNotFoundError as exc:
-        raise RuntimeError(
-            "Redis 缓存后端需要可选依赖 'redis'，请执行 `pip install redis` 或将 cache_backend 配置为 'memory'"
-        ) from exc
+    from src.common.database.optimization.redis_cache import RedisCache
 
     logger.info(
         f"创建 Redis 缓存: {db_config.redis_host}:{db_config.redis_port}/{db_config.redis_db}, "
