@@ -67,7 +67,6 @@ elua.confirmed
 # C extensions
 *.so
 /results
-uv.lock
 # Distribution / packaging
 .Python
 build/
