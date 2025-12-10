@@ -91,12 +91,12 @@ class InterestManager:
                 logger.error(f"注册兴趣值计算组件失败: {e}")
                 return False
 
-    async def calculate_interest(self, message: "DatabaseMessages", timeout: float = 2.0) -> InterestCalculationResult:
+    async def calculate_interest(self, message: "DatabaseMessages", timeout: float | None = None) -> InterestCalculationResult:
         """计算消息兴趣值
 
         Args:
             message: 数据库消息对象
-            timeout: 最大等待时间（秒），超时则使用默认值返回
+            timeout: 最大等待时间（秒），超时则使用默认值返回；为None时不设置超时
 
         Returns:
             InterestCalculationResult: 计算结果或默认结果
@@ -112,6 +112,9 @@ class InterestManager:
 
         # 使用 create_task 异步执行计算
         task = asyncio.create_task(self._async_calculate(message))
+
+        if timeout is None:
+            return await task
 
         try:
             # 等待计算结果，但有超时限制

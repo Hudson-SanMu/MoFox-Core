@@ -191,12 +191,12 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         logger.debug(f"开始兴趣匹配计算，内容: {content[:50]}...")
 
         try:
-            # 使用机器人的兴趣标签系统进行智能匹配（1.5秒超时保护）
+            # 使用机器人的兴趣标签系统进行智能匹配（5秒超时保护）
             match_result = await asyncio.wait_for(
                 bot_interest_manager.calculate_interest_match(
                     content, keywords or [], getattr(message, "semantic_embedding", None)
                 ),
-                timeout=1.5
+                timeout=5.0
             )
             logger.debug(f"兴趣匹配结果: {match_result}")
 
@@ -215,7 +215,7 @@ class AffinityInterestCalculator(BaseInterestCalculator):
                 return 0.0
 
         except asyncio.TimeoutError:
-            logger.warning("[超时] 兴趣匹配计算超时(>1.5秒)，返回默认分值0.5以保留其他分数")
+            logger.warning("[超时] 兴趣匹配计算超时(>5秒)，返回默认分值0.5以保留其他分数")
             return 0.5  # 超时时返回默认分值，避免丢失提及分和关系分
         except Exception as e:
             logger.warning(f"智能兴趣匹配失败: {e}")
