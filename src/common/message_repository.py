@@ -15,7 +15,7 @@ from src.config.config import global_config
 logger = get_logger(__name__)
 
 
-SAFE_FETCH_LIMIT = 5000  # 防止一次性读取过多行导致内存暴涨
+SAFE_FETCH_LIMIT = 1000  # 防止一次性读取过多行导致内存暴涨
 
 
 class Base(DeclarativeBase):
