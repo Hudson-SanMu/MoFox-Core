@@ -506,24 +506,16 @@ def load_config(config_path: str) -> Config:
     with open(config_path, encoding="utf-8") as f:
         config_data = tomlkit.load(f)
 
+    # 将 tomlkit 对象转换为纯 Python 字典，避免 Pydantic 严格模式下的类型验证问题
+    # tomlkit 返回的是特殊类型（如 Array、String 等），虽然继承自 Python 标准类型，
+    # 但在 Pydantic 严格模式下可能导致类型验证失败
+    config_dict = config_data.unwrap()
+
     # 创建Config对象（各个配置类会自动进行 Pydantic 验证）
     try:
         logger.debug("正在解析和验证配置文件...")
-        config = Config.from_dict(config_data)
+        config = Config.from_dict(config_dict)
         logger.debug("配置文件解析和验证完成")
-
-        # 【临时修复】在验证后，手动从原始数据重新加载 master_users
-        try:
-            # 先将 tomlkit 对象转换为纯 Python 字典
-            config_dict = config_data.unwrap()
-            if "permission" in config_dict and "master_users" in config_dict["permission"]:
-                raw_master_users = config_dict["permission"]["master_users"]
-                # 现在 raw_master_users 就是一个标准的 Python 列表了
-                config.permission.master_users = raw_master_users
-                logger.debug(f"【临时修复】已手动将 master_users 设置为: {config.permission.master_users}")
-        except Exception as patch_exc:
-            logger.error(f"【临时修复】手动设置 master_users 失败: {patch_exc}")
-
         return config
     except Exception as e:
         logger.critical(f"配置文件解析失败: {e}")
