@@ -20,6 +20,7 @@ from src.common.logger import get_logger
 logger = get_logger("redis_cache")
 
 import redis.asyncio as aioredis
+from redis.asyncio.connection import Connection, SSLConnection
 
 
 class RedisCache(CacheBackend):
@@ -98,7 +99,11 @@ class RedisCache(CacheBackend):
                 return self._client
 
             try:
-                # 创建连接池 (使用 aioredis 模块确保类型安全)
+                # redis-py 7.x+ 使用 connection_class 来指定 SSL 连接
+                # 不再支持直接传递 ssl=True/False 给 ConnectionPool
+                connection_class = SSLConnection if self.ssl else Connection
+
+                # 创建连接池
                 self._pool = aioredis.ConnectionPool(
                     host=self.host,
                     port=self.port,
@@ -108,7 +113,7 @@ class RedisCache(CacheBackend):
                     socket_timeout=self.socket_timeout,
                     socket_connect_timeout=self.socket_timeout,
                     decode_responses=False,  # 我们自己处理序列化
-                    ssl=self.ssl,
+                    connection_class=connection_class,
                 )
 
                 # 创建客户端
