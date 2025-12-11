@@ -1,15 +1,16 @@
 """AffinityFlow 风格兴趣值计算组件
 
 基于原有的 AffinityFlow 兴趣度评分系统，提供标准化的兴趣值计算功能
+集成了语义兴趣度计算（TF-IDF + Logistic Regression）
 """
 
 import asyncio
 import time
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import orjson
 
-from src.chat.interest_system import bot_interest_manager
 from src.common.logger import get_logger
 from src.config.config import global_config
 from src.plugin_system.base.base_interest_calculator import BaseInterestCalculator, InterestCalculationResult
@@ -36,17 +37,18 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         # 从配置加载评分权重
         affinity_config = global_config.affinity_flow
         self.score_weights = {
-            "interest_match": affinity_config.keyword_match_weight,  # 兴趣匹配度权重
+            "semantic": 0.5,  # 语义兴趣度权重（核心维度）
             "relationship": affinity_config.relationship_weight,  # 关系分权重
             "mentioned": affinity_config.mention_bot_weight,  # 是否提及bot权重
         }
 
+        # 语义兴趣度评分器（替代原有的 embedding 兴趣匹配）
+        self.semantic_scorer = None
+        self.use_semantic_scoring = True  # 必须启用
+
         # 评分阈值
         self.reply_threshold = affinity_config.reply_action_interest_threshold  # 回复动作兴趣阈值
         self.mention_threshold = affinity_config.mention_bot_adjustment_threshold  # 提及bot后的调整阈值
-
-        # 兴趣匹配系统配置
-        self.use_smart_matching = True
 
         # 连续不回复概率提升
         self.no_reply_count = 0
@@ -69,13 +71,16 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         self.post_reply_boost_max_count = affinity_config.post_reply_boost_max_count
         self.post_reply_boost_decay_rate = affinity_config.post_reply_boost_decay_rate
 
-        logger.info("[Affinity兴趣计算器] 初始化完成:")
+        logger.info("[Affinity兴趣计算器] 初始化完成（基于语义兴趣度 TF-IDF+LR）:")
         logger.info(f"  - 权重配置: {self.score_weights}")
         logger.info(f"  - 回复阈值: {self.reply_threshold}")
-        logger.info(f"  - 智能匹配: {self.use_smart_matching}")
+        logger.info(f"  - 语义评分: {self.use_semantic_scoring} (TF-IDF + Logistic Regression)")
         logger.info(f"  - 回复后连续对话: {self.enable_post_reply_boost}")
         logger.info(f"  - 回复冷却减少: {self.reply_cooldown_reduction}")
         logger.info(f"  - 最大不回复计数: {self.max_no_reply_count}")
+
+        # 异步初始化语义评分器
+        asyncio.create_task(self._initialize_semantic_scorer())
 
     async def execute(self, message: "DatabaseMessages") -> InterestCalculationResult:
         """执行AffinityFlow风格的兴趣值计算"""
@@ -93,10 +98,9 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             logger.debug(f"[Affinity兴趣计算] 消息内容: {content[:50]}...")
             logger.debug(f"[Affinity兴趣计算] 用户ID: {user_id}")
 
-            # 1. 计算兴趣匹配分
-            keywords = self._extract_keywords_from_database(message)
-            interest_match_score = await self._calculate_interest_match_score(message, content, keywords)
-            logger.debug(f"[Affinity兴趣计算] 兴趣匹配分: {interest_match_score}")
+            # 1. 计算语义兴趣度（核心维度，替代原 embedding 兴趣匹配）
+            semantic_score = await self._calculate_semantic_score(content)
+            logger.debug(f"[Affinity兴趣计算] 语义兴趣度（TF-IDF+LR）: {semantic_score}")
 
             # 2. 计算关系分
             relationship_score = await self._calculate_relationship_score(user_id)
@@ -108,12 +112,12 @@ class AffinityInterestCalculator(BaseInterestCalculator):
 
             # 4. 综合评分
             # 确保所有分数都是有效的 float 值
-            interest_match_score = float(interest_match_score) if interest_match_score is not None else 0.0
+            semantic_score = float(semantic_score) if semantic_score is not None else 0.0
             relationship_score = float(relationship_score) if relationship_score is not None else 0.0
             mentioned_score = float(mentioned_score) if mentioned_score is not None else 0.0
 
             raw_total_score = (
-                interest_match_score * self.score_weights["interest_match"]
+                semantic_score * self.score_weights["semantic"]
                 + relationship_score * self.score_weights["relationship"]
                 + mentioned_score * self.score_weights["mentioned"]
             )
@@ -122,7 +126,8 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             total_score = min(raw_total_score, 1.0)
 
             logger.debug(
-                f"[Affinity兴趣计算] 综合得分计算: {interest_match_score:.3f}*{self.score_weights['interest_match']} + "
+                f"[Affinity兴趣计算] 综合得分计算: "
+                f"{semantic_score:.3f}*{self.score_weights['semantic']} + "
                 f"{relationship_score:.3f}*{self.score_weights['relationship']} + "
                 f"{mentioned_score:.3f}*{self.score_weights['mentioned']} = {raw_total_score:.3f}"
             )
@@ -153,7 +158,7 @@ class AffinityInterestCalculator(BaseInterestCalculator):
 
             logger.debug(
                 f"Affinity兴趣值计算完成 - 消息 {message_id}: {adjusted_score:.3f} "
-                f"(匹配:{interest_match_score:.2f}, 关系:{relationship_score:.2f}, 提及:{mentioned_score:.2f})"
+                f"(语义:{semantic_score:.2f}, 关系:{relationship_score:.2f}, 提及:{mentioned_score:.2f})"
             )
 
             return InterestCalculationResult(
@@ -171,55 +176,6 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             return InterestCalculationResult(
                 success=False, message_id=getattr(message, "message_id", ""), interest_value=0.0, error_message=str(e)
             )
-
-    async def _calculate_interest_match_score(
-        self, message: "DatabaseMessages", content: str, keywords: list[str] | None = None
-    ) -> float:
-        """计算兴趣匹配度（使用智能兴趣匹配系统，带超时保护）"""
-
-        # 调试日志：检查各个条件
-        if not content:
-            logger.debug("兴趣匹配返回0.0: 内容为空")
-            return 0.0
-        if not self.use_smart_matching:
-            logger.debug("兴趣匹配返回0.0: 智能匹配未启用")
-            return 0.0
-        if not bot_interest_manager.is_initialized:
-            logger.debug("兴趣匹配返回0.0: bot_interest_manager未初始化")
-            return 0.0
-
-        logger.debug(f"开始兴趣匹配计算，内容: {content[:50]}...")
-
-        try:
-            # 使用机器人的兴趣标签系统进行智能匹配（5秒超时保护）
-            match_result = await asyncio.wait_for(
-                bot_interest_manager.calculate_interest_match(
-                    content, keywords or [], getattr(message, "semantic_embedding", None)
-                ),
-                timeout=5.0
-            )
-            logger.debug(f"兴趣匹配结果: {match_result}")
-
-            if match_result:
-                # 返回匹配分数，考虑置信度和匹配标签数量
-                affinity_config = global_config.affinity_flow
-                match_count_bonus = min(
-                    len(match_result.matched_tags) * affinity_config.match_count_bonus, affinity_config.max_match_bonus
-                )
-                final_score = match_result.overall_score * 1.15 * match_result.confidence + match_count_bonus
-                # 移除兴趣匹配分数上限，允许超过1.0，最终分数会被整体限制
-                logger.debug(f"兴趣匹配最终得分: {final_score:.3f} (原始: {match_result.overall_score * 1.15 * match_result.confidence + match_count_bonus:.3f})")
-                return final_score
-            else:
-                logger.debug("兴趣匹配返回0.0: match_result为None")
-                return 0.0
-
-        except asyncio.TimeoutError:
-            logger.warning("[超时] 兴趣匹配计算超时(>5秒)，返回默认分值0.5以保留其他分数")
-            return 0.5  # 超时时返回默认分值，避免丢失提及分和关系分
-        except Exception as e:
-            logger.warning(f"智能兴趣匹配失败: {e}")
-            return 0.0
 
     async def _calculate_relationship_score(self, user_id: str) -> float:
         """计算用户关系分"""
@@ -316,60 +272,167 @@ class AffinityInterestCalculator(BaseInterestCalculator):
 
         return adjusted_reply_threshold, adjusted_action_threshold
 
-    def _extract_keywords_from_database(self, message: "DatabaseMessages") -> list[str]:
-        """从数据库消息中提取关键词"""
-        keywords = []
+    async def _initialize_semantic_scorer(self):
+        """异步初始化语义兴趣度评分器"""
+        if not self.use_semantic_scoring:
+            logger.debug("[语义评分] 未启用语义兴趣度评分")
+            return
 
-        # 尝试从 key_words 字段提取（存储的是JSON字符串）
-        key_words = getattr(message, "key_words", "")
-        if key_words:
+        try:
+            from src.chat.semantic_interest import SemanticInterestScorer
+            from src.chat.semantic_interest.runtime_scorer import ModelManager
+
+            # 查找最新的模型文件
+            model_dir = Path("data/semantic_interest/models")
+            if not model_dir.exists():
+                logger.warning(f"[语义评分] 模型目录不存在，已创建: {model_dir}")
+                model_dir.mkdir(parents=True, exist_ok=True)
+
+            # 使用模型管理器（支持人设感知）
+            self.model_manager = ModelManager(model_dir)
+            
+            # 获取人设信息
+            persona_info = self._get_current_persona_info()
+            
+            # 加载模型（自动选择合适的版本）
             try:
-                extracted = orjson.loads(key_words)
-                if isinstance(extracted, list):
-                    keywords = extracted
-            except (orjson.JSONDecodeError, TypeError):
-                keywords = []
+                scorer = await self.model_manager.load_model(
+                    version="auto",  # 自动选择或训练
+                    persona_info=persona_info
+                )
+                self.semantic_scorer = scorer
+                logger.info("[语义评分] 语义兴趣度评分器初始化成功（人设感知）")
+                
+                # 启动自动训练任务（每24小时检查一次）
+                await self.model_manager.start_auto_training(
+                    persona_info=persona_info,
+                    interval_hours=24
+                )
+                
+            except FileNotFoundError:
+                logger.warning(f"[语义评分] 未找到训练模型，将自动训练...")
+                # 触发首次训练
+                from src.chat.semantic_interest.auto_trainer import get_auto_trainer
+                auto_trainer = get_auto_trainer()
+                trained, model_path = await auto_trainer.auto_train_if_needed(
+                    persona_info=persona_info,
+                    force=True  # 强制训练
+                )
+                if trained and model_path:
+                    self.semantic_scorer = SemanticInterestScorer(model_path)
+                    self.semantic_scorer.load()
+                    logger.info("[语义评分] 首次训练完成，模型已加载")
+                else:
+                    logger.error("[语义评分] 首次训练失败")
+                    self.use_semantic_scoring = False
 
-        # 如果没有 keywords，尝试从 key_words_lite 提取
-        if not keywords:
-            key_words_lite = getattr(message, "key_words_lite", "")
-            if key_words_lite:
-                try:
-                    extracted = orjson.loads(key_words_lite)
-                    if isinstance(extracted, list):
-                        keywords = extracted
-                except (orjson.JSONDecodeError, TypeError):
-                    keywords = []
+        except ImportError:
+            logger.warning("[语义评分] 无法导入语义兴趣度模块，将禁用语义评分")
+            self.use_semantic_scoring = False
+        except Exception as e:
+            logger.error(f"[语义评分] 初始化失败: {e}")
+            self.use_semantic_scoring = False
 
-        # 如果还是没有，从消息内容中提取（降级方案）
-        if not keywords:
-            content = getattr(message, "processed_plain_text", "") or ""
-            keywords = self._extract_keywords_from_content(content)
+    def _get_current_persona_info(self) -> dict[str, Any]:
+        """获取当前人设信息
+        
+        Returns:
+            人设信息字典
+        """
+        # 默认信息（至少包含名字）
+        persona_info = {
+            "name": global_config.bot.nickname,
+            "interests": [],
+            "dislikes": [],
+            "personality": "",
+        }
 
-        return keywords[:15]  # 返回前15个关键词
+        # 优先从已生成的人设文件获取（Individuality 初始化时会生成）
+        try:
+            persona_file = Path("data/personality/personality_data.json")
+            if persona_file.exists():
+                data = orjson.loads(persona_file.read_bytes())
+                personality_parts = [data.get("personality", ""), data.get("identity", "")]
+                persona_info["personality"] = "，".join([p for p in personality_parts if p]).strip("，")
+                if persona_info["personality"]:
+                    return persona_info
+        except Exception as e:
+            logger.debug(f"[语义评分] 从文件获取人设信息失败: {e}")
 
-    def _extract_keywords_from_content(self, content: str) -> list[str]:
-        """从内容中提取关键词（降级方案）"""
-        import re
+        # 退化为配置中的人设描述
+        try:
+            personality_parts = []
+            personality_core = getattr(global_config.personality, "personality_core", "")
+            personality_side = getattr(global_config.personality, "personality_side", "")
+            identity = getattr(global_config.personality, "identity", "")
 
-        # 清理文本
-        content = re.sub(r"[^\w\s\u4e00-\u9fff]", " ", content)  # 保留中文、英文、数字
-        words = content.split()
+            if personality_core:
+                personality_parts.append(personality_core)
+            if personality_side:
+                personality_parts.append(personality_side)
+            if identity:
+                personality_parts.append(identity)
 
-        # 过滤和关键词提取
-        keywords = []
-        for word in words:
-            word = word.strip()
-            if (
-                len(word) >= 2  # 至少2个字符
-                and word.isalnum()  # 字母数字
-                and not word.isdigit()
-            ):  # 不是纯数字
-                keywords.append(word.lower())
+            persona_info["personality"] = "，".join(personality_parts) or "默认人设"
+        except Exception as e:
+            logger.debug(f"[语义评分] 使用配置获取人设信息失败: {e}")
+            persona_info["personality"] = "默认人设"
 
-        # 去重并限制数量
-        unique_keywords = list(set(keywords))
-        return unique_keywords[:10]  # 返回前10个唯一关键词
+        return persona_info
+
+    async def _calculate_semantic_score(self, content: str) -> float:
+        """计算语义兴趣度分数
+
+        Args:
+            content: 消息文本
+
+        Returns:
+            语义兴趣度分数 [0.0, 1.0]
+        """
+        # 检查是否启用
+        if not self.use_semantic_scoring:
+            return 0.0
+
+        # 检查评分器是否已加载
+        if not self.semantic_scorer:
+            return 0.0
+
+        # 检查内容是否为空
+        if not content or not content.strip():
+            return 0.0
+
+        try:
+            # 调用评分器（异步 + 线程池，避免CPU密集阻塞事件循环）
+            loop = asyncio.get_running_loop()
+            score = await loop.run_in_executor(None, self.semantic_scorer.score, content)
+            logger.debug(f"[语义评分] 内容: '{content[:50]}...' -> 分数: {score:.3f}")
+            return score
+
+        except Exception as e:
+            logger.warning(f"[语义评分] 计算失败: {e}")
+            return 0.0
+
+    async def reload_semantic_model(self):
+        """重新加载语义兴趣度模型（支持热更新和人设检查）"""
+        if not self.use_semantic_scoring:
+            logger.info("[语义评分] 语义评分未启用，无需重载")
+            return
+
+        logger.info("[语义评分] 开始重新加载模型...")
+        
+        # 检查人设是否变化
+        if hasattr(self, 'model_manager') and self.model_manager:
+            persona_info = self._get_current_persona_info()
+            reloaded = await self.model_manager.check_and_reload_for_persona(persona_info)
+            if reloaded:
+                self.semantic_scorer = self.model_manager.get_scorer()
+                logger.info("[语义评分] 模型重载完成（人设已更新）")
+            else:
+                logger.info("[语义评分] 人设未变化，无需重载")
+        else:
+            # 降级：简单重新初始化
+            await self._initialize_semantic_scorer()
+            logger.info("[语义评分] 模型重载完成")
 
     def update_no_reply_count(self, replied: bool):
         """更新连续不回复计数"""
