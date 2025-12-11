@@ -103,7 +103,7 @@ command_prefixes = ['/']
 
 [personality]
 # 建议50字以内，描述人格的核心特质
-personality_core = "是一个积极向上的女大学生" 
+personality_core = "是一个积极向上的女大学生"
 # 人格的细节，描述人格的一些侧面
 personality_side = "用一句话或几句话描述人格的侧面特质"
 #アイデンティティがない 生まれないらららら
@@ -313,6 +313,7 @@ short_term_search_top_k = 5 # 搜索时返回的最大数量
 short_term_decay_factor = 0.98 # 衰减因子
 
 # 长期记忆层配置
+use_judge = true # 使用评判模型决定是否检索长期记忆
 long_term_batch_size = 10 # 批量转移大小
 long_term_decay_factor = 0.95 # 衰减因子
 long_term_auto_transfer_interval = 180 # 自动转移间隔（秒）
@@ -427,7 +428,7 @@ auto_install = true #it can work now!
 auto_install_timeout = 300
 # 是否使用PyPI镜像源（推荐，可加速下载）
 use_mirror = true
-mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple" # PyPI镜像源URL，如: "https://pypi.tuna.tsinghua.edu.cn/simple" 
+mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple" # PyPI镜像源URL，如: "https://pypi.tuna.tsinghua.edu.cn/simple"
 # 依赖安装日志级别
 install_log_level = "INFO"
 

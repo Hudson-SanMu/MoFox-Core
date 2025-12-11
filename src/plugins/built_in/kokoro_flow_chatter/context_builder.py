@@ -235,7 +235,7 @@ class KFCContextBuilder:
 
             search_result = await unified_manager.search_memories(
                 query_text=query_text,
-                use_judge=True,
+                use_judge=config.memory.use_judge,
                 recent_chat_history=chat_history,
             )
 
