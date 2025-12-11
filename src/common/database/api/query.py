@@ -215,26 +215,25 @@ class QueryBuilder(Generic[T]):
 
             async with get_db_session() as session:
                 result = await session.execute(paginated_stmt)
-                # .all() 已经返回 list，无需再包装
                 instances = result.scalars().all()
 
                 if not instances:
                     # 没有更多数据
                     break
 
-                # 在 session 内部转换为字典列表
+                # 在 session 内部转换为字典列表，保证字段可用再释放连接
                 instances_dicts = [_model_to_dict(inst) for inst in instances]
 
-                if as_dict:
-                    yield instances_dicts
-                else:
-                    yield [_dict_to_model(self.model, row) for row in instances_dicts]
+            if as_dict:
+                yield instances_dicts
+            else:
+                yield [_dict_to_model(self.model, row) for row in instances_dicts]
 
-                # 如果返回的记录数小于 batch_size，说明已经是最后一批
-                if len(instances) < batch_size:
-                    break
+            # 如果返回的记录数小于 batch_size，说明已经是最后一批
+            if len(instances) < batch_size:
+                break
 
-                offset += batch_size
+            offset += batch_size
 
     async def iter_all(
         self,
