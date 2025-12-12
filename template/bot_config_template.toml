@@ -1,5 +1,5 @@
 [inner]
-version = "7.9.8"
+version = "7.9.9"
 
 #----以下是给开发人员阅读的，如果你只是部署了MoFox-Bot，不需要阅读----
 #如果你想要修改配置文件，请递增version的值
@@ -635,6 +635,13 @@ mode = "split"
 # --- 核心行为配置 ---
 max_wait_seconds_default = 300 # 默认的最大等待秒数（AI发送消息后愿意等待用户回复的时间）
 enable_continuous_thinking = true # 是否在等待期间启用心理活动更新
+
+# --- 自定义决策提示词 ---
+# 类似于AFC的planner_custom_prompt_content，允许用户自定义KFC的决策行为指导
+# 在unified模式下：会插入到完整提示词中，影响整体思考和回复生成
+# 在split模式下：只会插入到planner提示词中，影响决策规划，不影响replyer的回复生成
+# 留空则不生效
+custom_decision_prompt = ""
 
 # --- 等待策略 ---
 [kokoro_flow_chatter.waiting]

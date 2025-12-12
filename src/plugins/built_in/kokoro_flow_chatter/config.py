@@ -158,6 +158,9 @@ class KokoroFlowChatterConfig:
     # LLM 配置
     llm: LLMConfig = field(default_factory=LLMConfig)
 
+    # 自定义决策提示词
+    custom_decision_prompt: str = ""
+
     # 调试模式
     debug: bool = False
 
@@ -255,6 +258,10 @@ def load_config() -> KokoroFlowChatterConfig:
                     max_tokens=getattr(llm_cfg, "max_tokens", 1024),
                     timeout=getattr(llm_cfg, "timeout", 60.0),
                 )
+
+            # 自定义决策提示词配置
+            if hasattr(kfc_cfg, "custom_decision_prompt"):
+                config.custom_decision_prompt = str(kfc_cfg.custom_decision_prompt)
 
     except Exception as e:
         from src.common.logger import get_logger

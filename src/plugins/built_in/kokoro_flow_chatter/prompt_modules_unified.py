@@ -101,6 +101,33 @@ def build_rules_module() -> str:
 
 
 # ============================================================
+# 模块2.5: 自定义决策提示词 - 用户自定义的决策行为指导
+# ============================================================
+
+def build_custom_decision_module() -> str:
+    """
+    构建自定义决策提示词模块
+
+    允许用户通过配置文件自定义KFC的决策行为指导
+    类似于AFC的planner_custom_prompt_content
+    """
+    from .config import get_config
+
+    kfc_config = get_config()
+    custom_prompt = getattr(kfc_config, "custom_decision_prompt", "")
+    
+    # 调试输出
+    logger.debug(f"[自定义决策提示词] 原始值: {repr(custom_prompt)}, 类型: {type(custom_prompt)}")
+
+    if not custom_prompt or not custom_prompt.strip():
+        logger.debug("[自定义决策提示词] 为空或仅含空白字符，跳过")
+        return ""
+
+    logger.info(f"[自定义决策提示词] 已加载: {custom_prompt.strip()}")
+    return custom_prompt.strip()
+
+
+# ============================================================
 # 模块3: 情境上下文 - 时间/场景/内在状态/关系/记忆
 # ============================================================
 
@@ -354,6 +381,9 @@ def build_system_prompt(
     # 角色框架（不提AI，直接进入角色）
     role_frame = "你是一个真实的人，有自己的生活、想法和情绪。像平时和朋友聊天一样自然地交流。"
 
+    # 获取自定义决策提示词
+    custom_decision_block = build_custom_decision_module()
+
     # 组装各模块
     modules = [
         role_frame,
@@ -363,6 +393,17 @@ def build_system_prompt(
         "",
         "## 2. 规则",
         build_rules_module(),
+    ]
+
+    # 如果有自定义决策提示词，插入到规则后面
+    if custom_decision_block:
+        modules.extend([
+            "",
+            "## 2.5. 决策指导",
+            custom_decision_block,
+        ])
+
+    modules.extend([
         "",
         "## 3. 现在的情况",
         build_context_module(session, chat_stream, context_data),
@@ -372,7 +413,7 @@ def build_system_prompt(
         "",
         "## 5. 怎么回复",
         build_output_module(context_data),
-    ]
+    ])
 
     return "\n".join(modules)
 

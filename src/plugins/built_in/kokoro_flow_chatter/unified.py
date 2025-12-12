@@ -147,17 +147,35 @@ class UnifiedPromptGenerator:
 
         # 生成连续追问警告（使用 followup_count 作为追问计数，只有真正发消息才算）
         followup_count = session.waiting_config.followup_count
-        max_followups = 3  # 最多追问3次
+        max_followups = 2  # 建议最多追问2次
 
         if followup_count >= max_followups:
-            followup_warning = f"""⚠️ **重要提醒**：
+            followup_warning = f"""⚠️ **强烈建议**：
 你已经连续追问了 {followup_count} 次，对方都没有回复。
-**强烈建议不要再发消息了**——继续追问会显得很缠人、很不尊重对方的空间。
-对方可能真的在忙，或者暂时不想回复，这都是正常的。
-请选择 `do_nothing` 继续等待，或者直接结束对话（设置 `max_wait_seconds: 0`）。"""
-        elif followup_count > 0:
-            followup_warning = f"""📝 提示：这已经是你第 {followup_count + 1} 次等待对方回复了。
-如果对方持续没有回应，可能真的在忙或不方便，不需要急着追问。"""
+**极度推荐选择 `do_nothing` 或设置 `max_wait_seconds: 0` 结束这个话题**。
+
+对方很可能：
+- 正在忙自己的事情，没有时间回复
+- 需要一些个人空间和独处时间
+- 暂时不方便或不想聊天
+
+这些都是完全正常的。不是所有人都能一直在线，每个人都有自己的生活节奏。
+继续追问很可能会让对方感到压力和不适，不如给彼此一些空间。
+
+**最好的选择**：
+1. 选择 `do_nothing` 安静等待对方主动联系
+2. 或者主动结束这个话题（`max_wait_seconds: 0`），让对方知道你理解他们可能在忙"""
+        elif followup_count == 1:
+            followup_warning = """📝 温馨提醒：
+这是你第2次等待对方回复（已追问1次）。
+可以再试着温柔地追问一次，但要做好对方可能真的在忙的心理准备。
+如果这次之后对方还是没回复，**强烈建议**不要再继续追问了——
+选择 `do_nothing` 给对方空间，或者主动结束话题，都是尊重对方的表现。"""
+        elif followup_count == 0:
+            followup_warning = """💭 追问提示：
+如果对方一段时间没回复，可以适当追问一次，用轻松的语气提醒一下。
+但要记住：不是所有人都能一直在线，对方可能在忙。
+建议最多追问2次左右，之后就给对方一些空间吧。"""
         else:
             followup_warning = ""
 
