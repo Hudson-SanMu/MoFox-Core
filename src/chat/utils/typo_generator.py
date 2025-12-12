@@ -96,7 +96,7 @@ class ChineseTypoGenerator:
 
         # 🔧 内存优化：复用全局缓存的拼音字典和字频数据
         if _shared_pinyin_dict is None:
-            _shared_pinyin_dict = self._create_pinyin_dict()
+            _shared_pinyin_dict = self._load_or_create_pinyin_dict()
             logger.debug("拼音字典已创建并缓存")
         self.pinyin_dict = _shared_pinyin_dict
 
@@ -140,6 +140,35 @@ class ChineseTypoGenerator:
             f.write(orjson.dumps(normalized_freq, option=orjson.OPT_INDENT_2).decode("utf-8"))
 
         return normalized_freq
+
+    def _load_or_create_pinyin_dict(self):
+        """
+        加载或创建拼音到汉字映射字典（磁盘缓存加速冷启动）
+        """
+        cache_file = Path("depends-data/pinyin_dict.json")
+
+        if cache_file.exists():
+            try:
+                with open(cache_file, encoding="utf-8") as f:
+                    data = orjson.loads(f.read())
+                # 恢复为 defaultdict(list) 以兼容旧逻辑
+                restored = defaultdict(list)
+                for py, chars in data.items():
+                    restored[py] = list(chars)
+                return restored
+            except Exception as e:
+                logger.warning(f"读取拼音缓存失败，将重新生成: {e}")
+
+        pinyin_dict = self._create_pinyin_dict()
+
+        try:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                f.write(orjson.dumps(dict(pinyin_dict), option=orjson.OPT_INDENT_2).decode("utf-8"))
+        except Exception as e:
+            logger.warning(f"写入拼音缓存失败（不影响使用）: {e}")
+
+        return pinyin_dict
 
     @staticmethod
     def _create_pinyin_dict():

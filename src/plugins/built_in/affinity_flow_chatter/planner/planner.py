@@ -174,10 +174,10 @@ class ChatterActionPlanner:
 
             try:
                 from src.plugins.built_in.affinity_flow_chatter.core.affinity_interest_calculator import (
-                    AffinityInterestCalculator,
+                    afc_interest_calculator,
                 )
 
-                calculator = AffinityInterestCalculator()
+                calculator = afc_interest_calculator
                 if not await calculator.initialize():
                     logger.warning("AffinityInterestCalculator 初始化失败")
                     return None

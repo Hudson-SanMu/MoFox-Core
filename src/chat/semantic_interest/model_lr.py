@@ -44,7 +44,6 @@ class SemanticInterestModel:
             n_jobs: 并行任务数，-1 表示使用所有 CPU 核心
         """
         self.clf = LogisticRegression(
-            multi_class="multinomial",
             solver=solver,
             max_iter=max_iter,
             class_weight=class_weight,
@@ -206,7 +205,6 @@ class SemanticInterestModel:
         """
         params = self.clf.get_params()
         return {
-            "multi_class": params["multi_class"],
             "solver": params["solver"],
             "max_iter": params["max_iter"],
             "class_weight": params["class_weight"],

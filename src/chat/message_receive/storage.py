@@ -3,10 +3,10 @@ import re
 import time
 import traceback
 from collections import deque
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional, Any, cast
 
 import orjson
-from sqlalchemy import desc, select, update
+from sqlalchemy import desc, insert, select, update
 from sqlalchemy.engine import CursorResult
 
 from src.common.data_models.database_data_model import DatabaseMessages
@@ -25,29 +25,55 @@ class MessageStorageBatcher:
     消息存储批处理器
 
     优化: 将消息缓存一段时间后批量写入数据库，减少数据库连接池压力
+    2025-12: 增加二级缓冲区，降低 commit 频率并使用 Core 批量插入。
     """
 
-    def __init__(self, batch_size: int = 50, flush_interval: float = 5.0):
+    def __init__(
+        self,
+        batch_size: int = 50,
+        flush_interval: float = 5.0,
+        *,
+        commit_batch_size: int | None = None,
+        commit_interval: float | None = None,
+        db_chunk_size: int = 200,
+    ):
         """
         初始化批处理器
 
         Args:
-            batch_size: 批量大小，达到此数量立即写入
-            flush_interval: 自动刷新间隔（秒）
+            batch_size: 写入队列中触发准备阶段的消息条数
+            flush_interval: 自动刷新/检查间隔（秒）
+            commit_batch_size: 实际落库前需要累积的条数（默认=2x batch_size，至少100）
+            commit_interval: 降低刷盘频率的最大等待时长（默认=max(flush_interval*2, 10s)）
+            db_chunk_size: 单次SQL语句批量写入数量上限
         """
         self.batch_size = batch_size
         self.flush_interval = flush_interval
+        self.commit_batch_size = commit_batch_size or max(batch_size * 2, 100)
+        self.commit_interval = commit_interval or max(flush_interval * 2, 10.0)
+        self.db_chunk_size = max(50, db_chunk_size)
+
         self.pending_messages: deque = deque()
+        self._prepared_buffer: list[dict[str, Any]] = []
         self._lock = asyncio.Lock()
+        self._flush_barrier = asyncio.Lock()
         self._flush_task = None
         self._running = False
+        self._last_commit_ts = time.monotonic()
 
     async def start(self):
         """启动自动刷新任务"""
         if self._flush_task is None and not self._running:
             self._running = True
+            self._last_commit_ts = time.monotonic()
             self._flush_task = asyncio.create_task(self._auto_flush_loop())
-            logger.info(f"消息存储批处理器已启动 (批量大小: {self.batch_size}, 刷新间隔: {self.flush_interval}秒)")
+            logger.info(
+                "消息存储批处理器已启动 (批量大小: %s, 刷新间隔: %ss, commit批量: %s, commit间隔: %ss)",
+                self.batch_size,
+                self.flush_interval,
+                self.commit_batch_size,
+                self.commit_interval,
+            )
 
     async def stop(self):
         """停止批处理器"""
@@ -62,7 +88,7 @@ class MessageStorageBatcher:
             self._flush_task = None
 
         # 刷新剩余的消息
-        await self.flush()
+        await self.flush(force=True)
         logger.info("消息存储批处理器已停止")
 
     async def add_message(self, message_data: dict):
@@ -76,61 +102,82 @@ class MessageStorageBatcher:
                     'chat_stream': ChatStream
                 }
         """
+        should_force_flush = False
         async with self._lock:
             self.pending_messages.append(message_data)
 
-            # 如果达到批量大小，立即刷新
             if len(self.pending_messages) >= self.batch_size:
-                logger.debug(f"达到批量大小 {self.batch_size}，立即刷新")
-                await self.flush()
+                should_force_flush = True
 
-    async def flush(self):
-        """执行批量写入"""
-        async with self._lock:
-            if not self.pending_messages:
-                return
+        if should_force_flush:
+            logger.debug(f"达到批量大小 {self.batch_size}，立即触发数据库刷新")
+            await self.flush(force=True)
 
-            messages_to_store = list(self.pending_messages)
-            self.pending_messages.clear()
+    async def flush(self, force: bool = False):
+        """执行批量写入, 支持强制落库和延迟提交策略。"""
+        async with self._flush_barrier:
+            async with self._lock:
+                messages_to_store = list(self.pending_messages)
+                self.pending_messages.clear()
 
-        if not messages_to_store:
+            if messages_to_store:
+                prepared_messages: list[dict[str, Any]] = []
+                for msg_data in messages_to_store:
+                    try:
+                        message_dict = await self._prepare_message_dict(
+                            msg_data["message"],
+                            msg_data["chat_stream"],
+                        )
+                        if message_dict:
+                            prepared_messages.append(message_dict)
+                    except Exception as e:
+                        logger.error(f"准备消息数据失败: {e}")
+
+                if prepared_messages:
+                    self._prepared_buffer.extend(prepared_messages)
+
+            await self._maybe_commit_buffer(force=force)
+
+    async def _maybe_commit_buffer(self, *, force: bool = False) -> None:
+        """根据阈值/时间窗口判断是否需要真正写库。"""
+        if not self._prepared_buffer:
             return
 
+        now = time.monotonic()
+        enough_rows = len(self._prepared_buffer) >= self.commit_batch_size
+        waited_long_enough = (now - self._last_commit_ts) >= self.commit_interval
+
+        if not (force or enough_rows or waited_long_enough):
+            return
+
+        await self._write_buffer_to_database()
+
+    async def _write_buffer_to_database(self) -> None:
+        payload = self._prepared_buffer
+        if not payload:
+            return
+
+        self._prepared_buffer = []
         start_time = time.time()
-        success_count = 0
+        total = len(payload)
 
         try:
-            # 🔧 优化：准备字典数据而不是ORM对象，使用批量INSERT
-            messages_dicts = []
-
-            for msg_data in messages_to_store:
-                try:
-                    message_dict = await self._prepare_message_dict(
-                        msg_data["message"],
-                        msg_data["chat_stream"]
-                    )
-                    if message_dict:
-                        messages_dicts.append(message_dict)
-                except Exception as e:
-                    logger.error(f"准备消息数据失败: {e}")
-                    continue
-
-            # 批量写入数据库 - 使用高效的批量INSERT
-            if messages_dicts:
-                from sqlalchemy import insert
-                async with get_db_session() as session:
-                    stmt = insert(Messages).values(messages_dicts)
-                    await session.execute(stmt)
-                    await session.commit()
-                    success_count = len(messages_dicts)
+            async with get_db_session() as session:
+                for start in range(0, total, self.db_chunk_size):
+                    chunk = payload[start : start + self.db_chunk_size]
+                    if chunk:
+                        await session.execute(insert(Messages), chunk)
+                await session.commit()
 
             elapsed = time.time() - start_time
+            self._last_commit_ts = time.monotonic()
+            per_item = (elapsed / total) * 1000 if total else 0
             logger.info(
-                f"批量存储了 {success_count}/{len(messages_to_store)} 条消息 "
-                f"(耗时: {elapsed:.3f}秒, 平均 {elapsed/max(success_count,1)*1000:.2f}ms/条)"
+                f"批量存储了 {total} 条消息 (耗时 {elapsed:.3f} 秒, 平均 {per_item:.2f} ms/条, chunk={self.db_chunk_size})"
             )
-
         except Exception as e:
+            # 回滚到缓冲区, 等待下一次尝试
+            self._prepared_buffer = payload + self._prepared_buffer
             logger.error(f"批量存储消息失败: {e}")
 
     async def _prepare_message_dict(self, message, chat_stream):

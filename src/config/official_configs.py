@@ -803,16 +803,8 @@ class AffinityFlowConfig(ValidatedConfigBase):
     # 兴趣评分系统参数
     reply_action_interest_threshold: float = Field(default=0.4, description="回复动作兴趣阈值")
     non_reply_action_interest_threshold: float = Field(default=0.2, description="非回复动作兴趣阈值")
-    high_match_interest_threshold: float = Field(default=0.8, description="高匹配兴趣阈值")
-    medium_match_interest_threshold: float = Field(default=0.5, description="中匹配兴趣阈值")
-    low_match_interest_threshold: float = Field(default=0.2, description="低匹配兴趣阈值")
-    high_match_keyword_multiplier: float = Field(default=1.5, description="高匹配关键词兴趣倍率")
-    medium_match_keyword_multiplier: float = Field(default=1.2, description="中匹配关键词兴趣倍率")
-    low_match_keyword_multiplier: float = Field(default=1.0, description="低匹配关键词兴趣倍率")
-    match_count_bonus: float = Field(default=0.1, description="匹配数关键词加成值")
-    max_match_bonus: float = Field(default=0.5, description="最大匹配数加成值")
-    
-    # 语义兴趣度评分优化参数（2024.12 新增）
+
+    # 语义兴趣度评分优化参数
     use_batch_scoring: bool = Field(default=False, description="是否启用批处理评分模式，适合高频群聊场景")
     batch_size: int = Field(default=8, ge=1, le=64, description="批处理大小，达到后立即处理")
     batch_flush_interval_ms: float = Field(default=30.0, ge=10.0, le=200.0, description="批处理刷新间隔（毫秒），超过后强制处理")

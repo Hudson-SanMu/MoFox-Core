@@ -1,6 +1,7 @@
 # 使用基于时间戳的文件处理器，简单的轮转份数限制
 
 import logging
+import os
 import tarfile
 import threading
 import time
@@ -189,6 +190,10 @@ class TimestampedFileHandler(logging.Handler):
         self.backup_count = backup_count
         self.encoding = encoding
         self._lock = threading.Lock()
+        self._current_size = 0
+        self._bytes_since_check = 0
+        self._newline_bytes = len(os.linesep.encode(self.encoding or "utf-8"))
+        self._stat_refresh_threshold = max(self.max_bytes // 8, 256 * 1024)
 
         # 当前活跃的日志文件
         self.current_file = None
@@ -207,11 +212,29 @@ class TimestampedFileHandler(logging.Handler):
             # 极低概率碰撞，稍作等待
             time.sleep(0.001)
         self.current_stream = open(self.current_file, "a", encoding=self.encoding)
+        self._current_size = self.current_file.stat().st_size if self.current_file.exists() else 0
+        self._bytes_since_check = 0
 
-    def _should_rollover(self):
-        """检查是否需要轮转"""
-        if self.current_file and self.current_file.exists():
-            return self.current_file.stat().st_size >= self.max_bytes
+    def _should_rollover(self, incoming_size: int = 0) -> bool:
+        """检查是否需要轮转，使用内存缓存的大小信息减少磁盘stat次数。"""
+        if not self.current_file:
+            return False
+
+        projected = self._current_size + incoming_size
+        if projected >= self.max_bytes:
+            return True
+
+        self._bytes_since_check += incoming_size
+        if self._bytes_since_check >= self._stat_refresh_threshold:
+            try:
+                if self.current_file.exists():
+                    self._current_size = self.current_file.stat().st_size
+                else:
+                    self._current_size = 0
+            except OSError:
+                self._current_size = 0
+            finally:
+                self._bytes_since_check = 0
         return False
 
     def _do_rollover(self):
@@ -270,16 +293,17 @@ class TimestampedFileHandler(logging.Handler):
     def emit(self, record):
         """发出日志记录"""
         try:
+            message = self.format(record)
+            encoded_len = len(message.encode(self.encoding or "utf-8")) + self._newline_bytes
+
             with self._lock:
-                # 检查是否需要轮转
-                if self._should_rollover():
+                if self._should_rollover(encoded_len):
                     self._do_rollover()
 
-                # 写入日志
                 if self.current_stream:
-                    msg = self.format(record)
-                    self.current_stream.write(msg + "\n")
+                    self.current_stream.write(message + "\n")
                     self.current_stream.flush()
+                    self._current_size += encoded_len
 
         except Exception:
             self.handleError(record)
@@ -837,10 +861,6 @@ DEFAULT_MODULE_ALIASES = {
 }
 
 
-# 创建全局 Rich Console 实例用于颜色渲染
-_rich_console = Console(force_terminal=True, color_system="truecolor")
-
-
 class ModuleColoredConsoleRenderer:
     """自定义控制台渲染器，使用 Rich 库原生支持 hex 颜色"""
 
@@ -848,6 +868,7 @@ class ModuleColoredConsoleRenderer:
         # sourcery skip: merge-duplicate-blocks, remove-redundant-if
         self._colors = colors
         self._config = LOG_CONFIG
+        self._render_console = Console(force_terminal=True, color_system="truecolor", width=999)
 
         # 日志级别颜色 (#RRGGBB 格式)
         self._level_colors_hex = {
@@ -875,6 +896,22 @@ class ModuleColoredConsoleRenderer:
             self._enable_module_colors = True
             self._enable_level_colors = False
             self._enable_full_content_colors = False
+
+    @staticmethod
+    def _looks_like_markup(content: str) -> bool:
+        """快速判断内容里是否包含 Rich 标记，避免不必要的解析开销。"""
+        if not content:
+            return False
+        return "[" in content and "]" in content
+
+    def _render_content_text(self, content: str, *, style: str | None = None) -> Text:
+        """只在必要时解析 Rich 标记，降低CPU占用。"""
+        if self._looks_like_markup(content):
+            try:
+                return Text.from_markup(content, style=style)
+            except Exception:
+                return Text(content, style=style)
+        return Text(content, style=style)
 
     def __call__(self, logger, method_name, event_dict):
         # sourcery skip: merge-duplicate-blocks
@@ -966,9 +1003,9 @@ class ModuleColoredConsoleRenderer:
                 if prefix:
                     # 解析 prefix 中的 Rich 标记
                     if module_hex_color:
-                        content_text.append(Text.from_markup(prefix, style=module_hex_color))
+                        content_text.append(self._render_content_text(prefix, style=module_hex_color))
                     else:
-                        content_text.append(Text.from_markup(prefix))
+                        content_text.append(self._render_content_text(prefix))
 
                 # 与"内心思考"段落之间插入空行
                 if prefix:
@@ -983,24 +1020,12 @@ class ModuleColoredConsoleRenderer:
             else:
                 # 使用 Text.from_markup 解析 Rich 标记语言
                 if module_hex_color:
-                    try:
-                        parts.append(Text.from_markup(event_content, style=module_hex_color))
-                    except Exception:
-                        # 如果标记解析失败，回退到普通文本
-                        parts.append(Text(event_content, style=module_hex_color))
+                    parts.append(self._render_content_text(event_content, style=module_hex_color))
                 else:
-                    try:
-                        parts.append(Text.from_markup(event_content))
-                    except Exception:
-                        # 如果标记解析失败，回退到普通文本
-                        parts.append(Text(event_content))
+                    parts.append(self._render_content_text(event_content))
         else:
             # 即使在非 full 模式下，也尝试解析 Rich 标记（但不应用颜色）
-            try:
-                parts.append(Text.from_markup(event_content))
-            except Exception:
-                # 如果标记解析失败，使用普通文本
-                parts.append(Text(event_content))
+            parts.append(self._render_content_text(event_content))
 
         # 处理其他字段
         extras = []
@@ -1029,12 +1054,10 @@ class ModuleColoredConsoleRenderer:
 
         # 使用 Rich 拼接并返回字符串
         result = Text(" ").join(parts)
-        # 将 Rich Text 对象转换为带 ANSI 颜色码的字符串
-        from io import StringIO
-        string_io = StringIO()
-        temp_console = Console(file=string_io, force_terminal=True, color_system="truecolor", width=999)
-        temp_console.print(result, end="")
-        return string_io.getvalue()
+        # 使用持久化 Console + capture 避免每条日志重复实例化
+        with self._render_console.capture() as capture:
+            self._render_console.print(result, end="")
+        return capture.get()
 
 
 # 配置标准logging以支持文件输出和压缩

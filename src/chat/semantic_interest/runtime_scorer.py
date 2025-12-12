@@ -558,7 +558,7 @@ class ModelManager:
             trained, model_path = await self._auto_trainer.auto_train_if_needed(
                 persona_info=persona_info,
                 days=7,
-                max_samples=500,
+                max_samples=1000,  # 初始训练使用1000条消息
             )
             
             if trained and model_path:
@@ -607,30 +607,32 @@ class ModelManager:
             persona_info: 人设信息
             interval_hours: 检查间隔（小时）
         """
-        # 检查是否已经启动
-        if self._auto_training_started:
-            logger.debug(f"[模型管理器] 自动训练任务已启动，跳过")
-            return
-        
-        try:
-            from src.chat.semantic_interest.auto_trainer import get_auto_trainer
+        # 使用锁防止并发启动
+        async with self._lock:
+            # 检查是否已经启动
+            if self._auto_training_started:
+                logger.debug(f"[模型管理器] 自动训练任务已启动，跳过")
+                return
             
-            if self._auto_trainer is None:
-                self._auto_trainer = get_auto_trainer()
-            
-            logger.info(f"[模型管理器] 启动自动训练任务，间隔: {interval_hours}小时")
-            
-            # 标记为已启动
-            self._auto_training_started = True
-            
-            # 在后台任务中运行
-            asyncio.create_task(
-                self._auto_trainer.scheduled_train(persona_info, interval_hours)
-            )
-            
-        except Exception as e:
-            logger.error(f"[模型管理器] 启动自动训练失败: {e}")
-            self._auto_training_started = False  # 失败时重置标志
+            try:
+                from src.chat.semantic_interest.auto_trainer import get_auto_trainer
+                
+                if self._auto_trainer is None:
+                    self._auto_trainer = get_auto_trainer()
+                
+                logger.info(f"[模型管理器] 启动自动训练任务，间隔: {interval_hours}小时")
+                
+                # 标记为已启动
+                self._auto_training_started = True
+                
+                # 在后台任务中运行
+                asyncio.create_task(
+                    self._auto_trainer.scheduled_train(persona_info, interval_hours)
+                )
+                
+            except Exception as e:
+                logger.error(f"[模型管理器] 启动自动训练失败: {e}")
+                self._auto_training_started = False  # 失败时重置标志
 
 
 # 单例获取函数

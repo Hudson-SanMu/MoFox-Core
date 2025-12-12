@@ -47,14 +47,6 @@ class AffinityChatterPlugin(BasePlugin):
             logger.error(f"加载 AffinityChatter 时出错: {e}")
 
         try:
-            # 延迟导入 AffinityInterestCalculator（从 core 子模块）
-            from .core.affinity_interest_calculator import AffinityInterestCalculator
-
-            components.append((AffinityInterestCalculator.get_interest_calculator_info(), AffinityInterestCalculator))
-        except Exception as e:
-            logger.error(f"加载 AffinityInterestCalculator 时出错: {e}")
-
-        try:
             # 延迟导入 UserProfileTool（从 tools 子模块）
             from .tools.user_profile_tool import UserProfileTool
 

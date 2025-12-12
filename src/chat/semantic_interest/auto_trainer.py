@@ -116,6 +116,10 @@ class AutoTrainer:
             "interests": sorted(persona_info.get("interests", [])),
             "dislikes": sorted(persona_info.get("dislikes", [])),
             "personality": persona_info.get("personality", ""),
+            # 可选的更完整人设字段（存在则纳入哈希）
+            "personality_core": persona_info.get("personality_core", ""),
+            "personality_side": persona_info.get("personality_side", ""),
+            "identity": persona_info.get("identity", ""),
         }
         
         # 转为JSON并计算哈希
@@ -178,7 +182,7 @@ class AutoTrainer:
         self,
         persona_info: dict[str, Any],
         days: int = 7,
-        max_samples: int = 500,
+        max_samples: int = 1000,
         force: bool = False,
     ) -> tuple[bool, Path | None]:
         """自动训练（如果需要）
@@ -186,7 +190,7 @@ class AutoTrainer:
         Args:
             persona_info: 人设信息
             days: 采样天数
-            max_samples: 最大采样数
+            max_samples: 最大采样数（默认1000条）
             force: 强制训练
             
         Returns:
@@ -279,11 +283,12 @@ class AutoTrainer:
         """
         # 检查是否已经有任务在运行
         if self._scheduled_task_running:
-            logger.debug(f"[自动训练器] 定时任务已在运行，跳过")
+            logger.info(f"[自动训练器] 定时任务已在运行，跳过重复启动")
             return
         
         self._scheduled_task_running = True
         logger.info(f"[自动训练器] 启动定时训练任务，间隔: {interval_hours}小时")
+        logger.info(f"[自动训练器] 当前人设哈希: {self._calculate_persona_hash(persona_info)[:8]}")
 
         while True:
             try:

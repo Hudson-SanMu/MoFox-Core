@@ -22,6 +22,9 @@ class DatasetGenerator:
     从历史消息中采样并使用 LLM 进行标注
     """
 
+    # 采样消息时的硬上限，避免一次采样过大导致内存/耗时问题
+    HARD_MAX_SAMPLES = 2000
+
     # 标注提示词模板（单条）
     ANNOTATION_PROMPT = """你是一个帮助标注消息兴趣度的专家。你需要根据人格设定判断该消息是否会引起角色的兴趣。
 
@@ -107,7 +110,7 @@ class DatasetGenerator:
         max_samples: int = 1000,
         priority_ranges: list[tuple[float, float]] | None = None,
     ) -> list[dict[str, Any]]:
-        """从数据库采样消息
+        """从数据库采样消息（优化版：减少查询量和内存使用）
         
         Args:
             days: 采样最近 N 天的消息
@@ -120,40 +123,75 @@ class DatasetGenerator:
         """
         from src.common.database.api.query import QueryBuilder
         from src.common.database.core.models import Messages
+        from sqlalchemy import func, or_
 
-        logger.info(f"开始采样消息，时间范围: 最近 {days} 天")
+        logger.info(f"开始采样消息，时间范围: 最近 {days} 天，目标数量: {max_samples}")
+
+        # 限制采样数量硬上限
+        requested_max_samples = max_samples
+        if max_samples is None:
+            max_samples = self.HARD_MAX_SAMPLES
+        else:
+            max_samples = int(max_samples)
+        if max_samples <= 0:
+            logger.warning(f"max_samples={requested_max_samples} 非法，返回空样本")
+            return []
+        if max_samples > self.HARD_MAX_SAMPLES:
+            logger.warning(
+                f"max_samples={requested_max_samples} 超过硬上限 {self.HARD_MAX_SAMPLES}，"
+                f"已截断为 {self.HARD_MAX_SAMPLES}"
+            )
+            max_samples = self.HARD_MAX_SAMPLES
 
         # 查询条件
         cutoff_time = datetime.now() - timedelta(days=days)
         cutoff_ts = cutoff_time.timestamp()
+        
+        # 优化策略：为了过滤掉长度不足的消息，预取 max_samples * 1.5 条
+        # 这样可以在保证足够样本的同时减少查询量
+        prefetch_limit = int(max_samples * 1.5)
+        
+        # 构建优化查询：在数据库层面限制数量并按时间倒序（最新消息优先）
         query_builder = QueryBuilder(Messages)
-
-        # 获取所有符合条件的消息（使用 as_dict 方便访问字段）
+        
+        # 过滤条件：时间范围 + 消息文本不为空
         messages = await query_builder.filter(
             time__gte=cutoff_ts,
+        ).order_by(
+            "-time"  # 按时间倒序，优先采样最新消息
+        ).limit(
+            prefetch_limit  # 限制预取数量
         ).all(as_dict=True)
 
-        logger.info(f"查询到 {len(messages)} 条消息")
+        logger.info(f"预取 {len(messages)} 条消息（限制: {prefetch_limit}）")
 
-        # 过滤消息长度
+        # 过滤消息长度和提取文本
         filtered = []
         for msg in messages:
             text = msg.get("processed_plain_text") or msg.get("display_message") or ""
-            if text and len(text.strip()) >= min_length:
+            text = text.strip()
+            if text and len(text) >= min_length:
                 filtered.append({**msg, "message_text": text})
+                # 达到目标数量即可停止
+                if len(filtered) >= max_samples:
+                    break
 
-        logger.info(f"过滤后剩余 {len(filtered)} 条消息")
+        logger.info(f"过滤后得到 {len(filtered)} 条有效消息（目标: {max_samples}）")
 
-        # 优先采样策略
-        if priority_ranges and len(filtered) > max_samples:
-            # 随机采样
-            samples = random.sample(filtered, max_samples)
-        else:
-            samples = filtered[:max_samples]
+        # 如果过滤后数量不足，记录警告
+        if len(filtered) < max_samples:
+            logger.warning(
+                f"过滤后消息数量 ({len(filtered)}) 少于目标 ({max_samples})，"
+                f"可能需要扩大采样范围（增加 days 参数或降低 min_length）"
+            )
 
-        # 转换为字典格式
+        # 随机打乱样本顺序（避免时间偏向）
+        if len(filtered) > 0:
+            random.shuffle(filtered)
+
+        # 转换为标准格式
         result = []
-        for msg in samples:
+        for msg in filtered:
             result.append({
                 "message_id": msg.get("message_id"),
                 "user_id": msg.get("user_id"),
@@ -335,19 +373,50 @@ class DatasetGenerator:
         Returns:
             格式化后的人格描述
         """
-        parts = []
+        def _stringify(value: Any) -> str:
+            if value is None:
+                return ""
+            if isinstance(value, (list, tuple, set)):
+                return "、".join([str(v) for v in value if v is not None and str(v).strip()])
+            if isinstance(value, dict):
+                try:
+                    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+                except Exception:
+                    return str(value)
+            return str(value).strip()
 
-        if "name" in persona_info:
-            parts.append(f"角色名称: {persona_info['name']}")
+        parts: list[str] = []
 
-        if "interests" in persona_info:
-            parts.append(f"兴趣点: {', '.join(persona_info['interests'])}")
+        name = _stringify(persona_info.get("name"))
+        if name:
+            parts.append(f"角色名称: {name}")
 
-        if "dislikes" in persona_info:
-            parts.append(f"厌恶点: {', '.join(persona_info['dislikes'])}")
+        # 核心/侧面/身份等完整人设信息
+        personality_core = _stringify(persona_info.get("personality_core"))
+        if personality_core:
+            parts.append(f"核心人设: {personality_core}")
 
-        if "personality" in persona_info:
-            parts.append(f"性格特点: {persona_info['personality']}")
+        personality_side = _stringify(persona_info.get("personality_side"))
+        if personality_side:
+            parts.append(f"侧面特质: {personality_side}")
+
+        identity = _stringify(persona_info.get("identity"))
+        if identity:
+            parts.append(f"身份特征: {identity}")
+
+        # 追加其他未覆盖字段（保持信息完整）
+        known_keys = {
+            "name",
+            "personality_core",
+            "personality_side",
+            "identity",
+        }
+        for key, value in persona_info.items():
+            if key in known_keys:
+                continue
+            value_str = _stringify(value)
+            if value_str:
+                parts.append(f"{key}: {value_str}")
 
         return "\n".join(parts) if parts else "无特定人格设定"
 

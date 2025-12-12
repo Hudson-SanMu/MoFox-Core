@@ -26,7 +26,7 @@ class TfidfFeatureExtractor:
     def __init__(
         self,
         analyzer: str = "char",  # type: ignore
-        ngram_range: tuple[int, int] = (2, 3),  # 优化：缩小 n-gram 范围
+        ngram_range: tuple[int, int] = (2, 4),  # 优化：缩小 n-gram 范围
         max_features: int = 10000,  # 优化：减少特征数量，矩阵大小和 dot product 减半
         min_df: int = 3,  # 优化：过滤低频 n-gram
         max_df: float = 0.95,

@@ -539,14 +539,11 @@ enable_normal_mode = true # 是否启用 Normal 聊天模式。启用后，在�
 # 兴趣评分系统参数
 reply_action_interest_threshold = 0.75 # 回复动作兴趣阈值
 non_reply_action_interest_threshold = 0.65 # 非回复动作兴趣阈值
-high_match_interest_threshold = 0.6 # 高匹配兴趣阈值
-medium_match_interest_threshold = 0.4 # 中匹配兴趣阈值
-low_match_interest_threshold = 0.2 # 低匹配兴趣阈值
-high_match_keyword_multiplier = 4 # 高匹配关键词兴趣倍率
-medium_match_keyword_multiplier = 2.5 # 中匹配关键词兴趣倍率
-low_match_keyword_multiplier = 1.15 # 低匹配关键词兴趣倍率
-match_count_bonus = 0.01 # 匹配数关键词加成值
-max_match_bonus = 0.1 # 最大匹配数加成值
+
+# 语义兴趣度评分优化参数
+use_batch_scoring = true # 是否启用批处理评分模式，适合高频群聊场景
+batch_size = 3 # 批处理大小，达到后立即处理
+batch_flush_interval_ms = 30.0 # 批处理刷新间隔（毫秒），超过后强制处理
 
 # 回复决策系统参数
 no_reply_threshold_adjustment = 0.02 # 不回复兴趣阈值调整值

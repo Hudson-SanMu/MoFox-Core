@@ -298,80 +298,105 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             logger.debug("[语义评分] 未启用语义兴趣度评分")
             return
 
-        try:
-            from src.chat.semantic_interest import get_semantic_scorer
-            from src.chat.semantic_interest.runtime_scorer import ModelManager
+        # 防止并发初始化（使用锁）
+        if not hasattr(self, '_init_lock'):
+            self._init_lock = asyncio.Lock()
+        
+        async with self._init_lock:
+            # 双重检查
+            if self._semantic_initialized:
+                logger.debug("[语义评分] 评分器已在其他任务中初始化，跳过")
+                return
 
-            # 查找最新的模型文件
-            model_dir = Path("data/semantic_interest/models")
-            if not model_dir.exists():
-                logger.warning(f"[语义评分] 模型目录不存在，已创建: {model_dir}")
-                model_dir.mkdir(parents=True, exist_ok=True)
-
-            # 使用模型管理器（支持人设感知）
-            self.model_manager = ModelManager(model_dir)
-            
-            # 获取人设信息
-            persona_info = self._get_current_persona_info()
-            
-            # 加载模型（自动选择合适的版本，使用单例 + FastScorer）
             try:
-                scorer = await self.model_manager.load_model(
-                    version="auto",  # 自动选择或训练
-                    persona_info=persona_info
-                )
-                self.semantic_scorer = scorer
+                from src.chat.semantic_interest import get_semantic_scorer
+                from src.chat.semantic_interest.runtime_scorer import ModelManager
+
+                # 查找最新的模型文件
+                model_dir = Path("data/semantic_interest/models")
+                if not model_dir.exists():
+                    logger.info(f"[语义评分] 模型目录不存在，已创建: {model_dir}")
+                    model_dir.mkdir(parents=True, exist_ok=True)
+
+                # 使用模型管理器（支持人设感知）
+                if self.model_manager is None:
+                    self.model_manager = ModelManager(model_dir)
+                    logger.debug("[语义评分] 模型管理器已创建")
+            
+                # 获取人设信息
+                persona_info = self._get_current_persona_info()
                 
-                # 如果启用批处理队列模式
-                if self._use_batch_queue:
-                    from src.chat.semantic_interest.optimized_scorer import BatchScoringQueue
-                    
-                    # 确保 scorer 有 FastScorer
-                    if scorer._fast_scorer is not None:
-                        self._batch_queue = BatchScoringQueue(
-                            scorer=scorer._fast_scorer,
-                            batch_size=self._batch_size,
-                            flush_interval_ms=self._batch_flush_interval_ms
-                        )
-                        await self._batch_queue.start()
-                        logger.info(f"[语义评分] 批处理队列已启动 (batch_size={self._batch_size}, interval={self._batch_flush_interval_ms}ms)")
-                
-                logger.info("[语义评分] 语义兴趣度评分器初始化成功（FastScorer优化 + 单例）")
-                
-                # 设置初始化标志
-                self._semantic_initialized = True
-                
-                # 启动自动训练任务（每24小时检查一次）
-                await self.model_manager.start_auto_training(
-                    persona_info=persona_info,
-                    interval_hours=24
-                )
-                
-            except FileNotFoundError:
-                logger.warning(f"[语义评分] 未找到训练模型，将自动训练...")
-                # 触发首次训练
+                # 先检查是否已有可用模型
                 from src.chat.semantic_interest.auto_trainer import get_auto_trainer
                 auto_trainer = get_auto_trainer()
-                trained, model_path = await auto_trainer.auto_train_if_needed(
-                    persona_info=persona_info,
-                    force=True  # 强制训练
-                )
-                if trained and model_path:
-                    # 使用单例获取评分器（默认启用 FastScorer）
-                    self.semantic_scorer = await get_semantic_scorer(model_path)
-                    logger.info("[语义评分] 首次训练完成，模型已加载（FastScorer优化 + 单例）")
+                existing_model = auto_trainer.get_model_for_persona(persona_info)
+                
+                # 加载模型（自动选择合适的版本，使用单例 + FastScorer）
+                try:
+                    if existing_model and existing_model.exists():
+                        # 直接加载已有模型
+                        logger.info(f"[语义评分] 使用已有模型: {existing_model.name}")
+                        scorer = await get_semantic_scorer(existing_model, use_async=True)
+                    else:
+                        # 使用 ModelManager 自动选择或训练
+                        scorer = await self.model_manager.load_model(
+                            version="auto",  # 自动选择或训练
+                            persona_info=persona_info
+                        )
+                    
+                    self.semantic_scorer = scorer
+                    
+                    # 如果启用批处理队列模式
+                    if self._use_batch_queue:
+                        from src.chat.semantic_interest.optimized_scorer import BatchScoringQueue
+                        
+                        # 确保 scorer 有 FastScorer
+                        if scorer._fast_scorer is not None:
+                            self._batch_queue = BatchScoringQueue(
+                                scorer=scorer._fast_scorer,
+                                batch_size=self._batch_size,
+                                flush_interval_ms=self._batch_flush_interval_ms
+                            )
+                            await self._batch_queue.start()
+                            logger.info(f"[语义评分] 批处理队列已启动 (batch_size={self._batch_size}, interval={self._batch_flush_interval_ms}ms)")
+                    
+                    logger.info("[语义评分] 语义兴趣度评分器初始化成功（FastScorer优化 + 单例）")
+                    
                     # 设置初始化标志
                     self._semantic_initialized = True
-                else:
-                    logger.error("[语义评分] 首次训练失败")
-                    self.use_semantic_scoring = False
+                    
+                    # 启动自动训练任务（每24小时检查一次）- 只在没有模型时或明确需要时启动
+                    if not existing_model or not existing_model.exists():
+                        await self.model_manager.start_auto_training(
+                            persona_info=persona_info,
+                            interval_hours=24
+                        )
+                    else:
+                        logger.debug("[语义评分] 已有模型，跳过自动训练启动")
+                    
+                except FileNotFoundError:
+                    logger.warning(f"[语义评分] 未找到训练模型，将自动训练...")
+                    # 触发首次训练
+                    trained, model_path = await auto_trainer.auto_train_if_needed(
+                        persona_info=persona_info,
+                        force=True  # 强制训练
+                    )
+                    if trained and model_path:
+                        # 使用单例获取评分器（默认启用 FastScorer）
+                        self.semantic_scorer = await get_semantic_scorer(model_path)
+                        logger.info("[语义评分] 首次训练完成，模型已加载（FastScorer优化 + 单例）")
+                        # 设置初始化标志
+                        self._semantic_initialized = True
+                    else:
+                        logger.error("[语义评分] 首次训练失败")
+                        self.use_semantic_scoring = False
 
-        except ImportError:
-            logger.warning("[语义评分] 无法导入语义兴趣度模块，将禁用语义评分")
-            self.use_semantic_scoring = False
-        except Exception as e:
-            logger.error(f"[语义评分] 初始化失败: {e}")
-            self.use_semantic_scoring = False
+            except ImportError:
+                logger.warning("[语义评分] 无法导入语义兴趣度模块，将禁用语义评分")
+                self.use_semantic_scoring = False
+            except Exception as e:
+                logger.error(f"[语义评分] 初始化失败: {e}")
+                self.use_semantic_scoring = False
 
     def _get_current_persona_info(self) -> dict[str, Any]:
         """获取当前人设信息
@@ -539,3 +564,5 @@ class AffinityInterestCalculator(BaseInterestCalculator):
                 logger.debug(
                     f"[回复后机制] 未回复消息，剩余降低次数: {self.post_reply_boost_remaining}"
                 )
+
+afc_interest_calculator = AffinityInterestCalculator()

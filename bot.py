@@ -567,6 +567,7 @@ class MaiBotMain:
 
     def __init__(self):
         self.main_system = None
+        self._typo_prewarm_task = None
 
     def setup_timezone(self):
         """设置时区"""
@@ -662,6 +663,25 @@ class MaiBotMain:
 
     async def run_async_init(self, main_system):
         """执行异步初始化步骤"""
+
+        # 后台预热中文错别字生成器，避免首次使用阻塞主流程
+        try:
+            from src.chat.utils.typo_generator import get_typo_generator
+
+            typo_cfg = getattr(global_config, "chinese_typo", None)
+            self._typo_prewarm_task = asyncio.create_task(
+                asyncio.to_thread(
+                    get_typo_generator,
+                    error_rate=getattr(typo_cfg, "error_rate", 0.3),
+                    min_freq=getattr(typo_cfg, "min_freq", 5),
+                    tone_error_rate=getattr(typo_cfg, "tone_error_rate", 0.2),
+                    word_replace_rate=getattr(typo_cfg, "word_replace_rate", 0.3),
+                    max_freq_diff=getattr(typo_cfg, "max_freq_diff", 200),
+                )
+            )
+            logger.debug("已启动 ChineseTypoGenerator 后台预热任务")
+        except Exception as e:
+            logger.debug(f"启动 ChineseTypoGenerator 预热失败（可忽略）: {e}")
 
         # 初始化数据库表结构
         await self.initialize_database_async()
