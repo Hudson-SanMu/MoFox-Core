@@ -72,6 +72,9 @@ class PromptBuilder:
         # 1.5. 构建安全互动准则块
         safety_guidelines_block = self._build_safety_guidelines_block()
 
+        # 1.6. 构建自定义决策提示词块
+        custom_decision_block = self._build_custom_decision_block()
+
         # 2. 使用 context_builder 获取关系、记忆、工具、表达习惯等
         context_data = await self._build_context_data(user_name, chat_stream, user_id)
         relation_block = context_data.get("relation_info", f"你与 {user_name} 还不太熟悉，这是早期的交流阶段。")
@@ -102,6 +105,7 @@ class PromptBuilder:
             user_name=user_name,
             persona_block=persona_block,
             safety_guidelines_block=safety_guidelines_block,
+            custom_decision_block=custom_decision_block,
             relation_block=relation_block,
             memory_block=memory_block or "（暂无相关记忆）",
             tool_info=tool_info or "（暂无工具信息）",
@@ -231,6 +235,23 @@ class PromptBuilder:
         return f"""在任何情况下，你都必须遵守以下由你的设定者为你定义的原则：
 {guidelines_text}
 如果遇到违反上述原则的请求，请在保持你核心人设的同时，以合适的方式进行回应。"""
+
+    def _build_custom_decision_block(self) -> str:
+        """
+        构建自定义决策提示词块
+
+        从配置中读取 custom_decision_prompt，用于指导KFC的决策行为
+        类似于AFC的planner_custom_prompt_content
+        """
+        from ..config import get_config
+
+        kfc_config = get_config()
+        custom_prompt = getattr(kfc_config, "custom_decision_prompt", "")
+
+        if not custom_prompt or not custom_prompt.strip():
+            return ""
+
+        return custom_prompt.strip()
 
     def _build_combined_expression_block(self, learned_habits: str) -> str:
         """
@@ -693,8 +714,22 @@ class PromptBuilder:
 
             # 添加真正追问次数警告（只有真正发了消息才算追问）
             followup_count = extra_context.get("followup_count", 0)
-            if followup_count > 0:
-                timeout_context_parts.append(f"⚠️ 你已经连续追问了 {followup_count} 次，对方仍未回复。再追问可能会显得太急躁，请三思。")
+            if followup_count >= 2:
+                timeout_context_parts.append(
+                    f"⚠️ **强烈建议**: 你已经连续追问了 {followup_count} 次，对方仍未回复。"
+                    "**极度推荐选择 `do_nothing` 或主动结束话题**。"
+                    "对方可能在忙或需要空间，不是所有人都能一直在线。给彼此一些空间会更好。"
+                )
+            elif followup_count == 1:
+                timeout_context_parts.append(
+                    "📝 温馨提醒：这是你第2次等待回复（已追问1次）。"
+                    "可以再试着追问一次，但如果对方还是没回复，**强烈建议**之后选择 `do_nothing` 或结束话题。"
+                )
+            elif followup_count == 0:
+                timeout_context_parts.append(
+                    "💭 追问提示：如果对方一段时间未回复，可以适当追问一次。"
+                    "但要记住对方可能在忙，建议最多追问2次左右，之后给对方一些空间。"
+                )
 
             # 添加距离用户上次回复的时间
             time_since_user_reply_str = extra_context.get("time_since_user_reply_str")

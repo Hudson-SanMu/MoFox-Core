@@ -24,6 +24,9 @@ kfc_MAIN_PROMPT = Prompt(
 # 安全互动准则
 {safety_guidelines_block}
 
+# 决策指导
+{custom_decision_block}
+
 # 相关信息
 {memory_block}
 

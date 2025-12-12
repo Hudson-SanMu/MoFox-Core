@@ -631,6 +631,13 @@ mode = "split"
 max_wait_seconds_default = 300 # 默认的最大等待秒数（AI发送消息后愿意等待用户回复的时间）
 enable_continuous_thinking = true # 是否在等待期间启用心理活动更新
 
+# --- 自定义决策提示词 ---
+# 类似于AFC的planner_custom_prompt_content，允许用户自定义KFC的决策行为指导
+# 在unified模式下：会插入到完整提示词中，影响整体思考和回复生成
+# 在split模式下：只会插入到planner提示词中，影响决策规划，不影响replyer的回复生成
+# 留空则不生效
+custom_decision_prompt = ""
+
 # --- 等待策略 ---
 [kokoro_flow_chatter.waiting]
 default_max_wait_seconds = 300 # LLM 未给出等待时间时的默认值
