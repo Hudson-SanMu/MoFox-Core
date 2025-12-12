@@ -1,3 +1,6 @@
+# ruff: noqa: G004, BLE001
+# pylint: disable=logging-fstring-interpolation,broad-except,unused-argument
+# pyright: reportOptionalMemberAccess=false
 """
 记忆管理器 - Phase 3
 
@@ -218,7 +221,7 @@ class MemoryManager:
         subject: str,
         memory_type: str,
         topic: str,
-        object: str | None = None,
+        obj: str | None = None,
         attributes: dict[str, str] | None = None,
         importance: float = 0.5,
         **kwargs,
@@ -230,7 +233,7 @@ class MemoryManager:
             subject: 主体（谁）
             memory_type: 记忆类型（事件/观点/事实/关系）
             topic: 主题（做什么/想什么）
-            object: 客体（对谁/对什么）
+            obj: 客体（对谁/对什么）
             attributes: 属性字典（时间、地点、原因等）
             importance: 重要性 (0.0-1.0)
             **kwargs: 其他参数
@@ -246,7 +249,7 @@ class MemoryManager:
                 subject=subject,
                 memory_type=memory_type,
                 topic=topic,
-                object=object,
+                object=obj,
                 attributes=attributes,
                 importance=importance,
                 **kwargs,
@@ -775,6 +778,8 @@ class MemoryManager:
                             logger.debug(f"传播激活到相关记忆 {related_id[:8]} 失败: {e}")
 
                 # 再次保存传播后的更新
+                assert self.persistence is not None
+                assert self.graph_store is not None
                 await self.persistence.save_graph_store(self.graph_store)
 
             logger.debug(f"后台保存激活更新完成，处理了 {len(memories)} 条记忆")
@@ -811,7 +816,6 @@ class MemoryManager:
 
             # 批量执行传播任务
             if propagation_tasks:
-                import asyncio
                 try:
                     await asyncio.wait_for(
                         asyncio.gather(*propagation_tasks, return_exceptions=True),
@@ -837,6 +841,8 @@ class MemoryManager:
         Returns:
             相关记忆 ID 列表
         """
+        _ = max_depth  # 保留参数以兼容旧调用
+
         memory = self.graph_store.get_memory_by_id(memory_id)
         if not memory:
             return []
@@ -997,7 +1003,7 @@ class MemoryManager:
             if memories_to_forget:
                 logger.info(f"开始批量遗忘 {len(memories_to_forget)} 条记忆...")
 
-                for memory_id, activation in memories_to_forget:
+                for memory_id, _ in memories_to_forget:
                     # cleanup_orphans=False：暂不清理孤立节点
                     success = await self.forget_memory(memory_id, cleanup_orphans=False)
                     if success:
@@ -1008,6 +1014,8 @@ class MemoryManager:
                 orphan_nodes, orphan_edges = await self._cleanup_orphan_nodes_and_edges()
 
                 # 保存最终更新
+                assert self.persistence is not None
+                assert self.graph_store is not None
                 await self.persistence.save_graph_store(self.graph_store)
 
                 logger.info(
@@ -1059,7 +1067,7 @@ class MemoryManager:
             # 2. 清理孤立边（指向已删除节点的边）
             edges_to_remove = []
 
-            for source, target, edge_id in self.graph_store.graph.edges(data="edge_id"):
+            for source, target, _ in self.graph_store.graph.edges(data="edge_id"):
                 # 检查边的源节点和目标节点是否还存在于node_to_memories中
                 if source not in self.graph_store.node_to_memories or \
                    target not in self.graph_store.node_to_memories:
@@ -1096,7 +1104,7 @@ class MemoryManager:
         if not self._initialized or not self.graph_store:
             return {}
 
-        stats = self.graph_store.get_statistics()
+        stats: dict[str, Any] = self.graph_store.get_statistics()
 
         # 添加激活度统计
         all_memories = self.graph_store.get_all_memories()
@@ -1152,7 +1160,7 @@ class MemoryManager:
             logger.info("开始记忆整理：检查遗忘 + 清理孤立节点...")
 
             # 步骤1: 自动遗忘低激活度的记忆
-            forgotten_count = await self.auto_forget()
+            forgotten_count = await self.auto_forget_memories()
 
             # 步骤2: 清理孤立节点和边（auto_forget内部已执行，这里再次确保）
             orphan_nodes, orphan_edges = await self._cleanup_orphan_nodes_and_edges()
@@ -1292,6 +1300,8 @@ class MemoryManager:
                 result["orphan_edges_cleaned"] = consolidate_result.get("orphan_edges_cleaned", 0)
 
             # 2. 保存数据
+            assert self.persistence is not None
+            assert self.graph_store is not None
             await self.persistence.save_graph_store(self.graph_store)
             result["saved"] = True
 
