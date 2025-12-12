@@ -2,6 +2,12 @@
 
 基于原有的 AffinityFlow 兴趣度评分系统，提供标准化的兴趣值计算功能
 集成了语义兴趣度计算（TF-IDF + Logistic Regression）
+
+2024.12 优化更新：
+- 使用 FastScorer 优化评分（绕过 sklearn，纯 Python 字典计算）
+- 支持批处理队列模式（高频群聊场景）
+- 全局线程池避免重复创建 executor
+- 更短的超时时间（2秒）
 """
 
 import asyncio
@@ -45,6 +51,14 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         # 语义兴趣度评分器（替代原有的 embedding 兴趣匹配）
         self.semantic_scorer = None
         self.use_semantic_scoring = True  # 必须启用
+        self._semantic_initialized = False  # 防止重复初始化
+        self.model_manager = None
+        
+        # 批处理队列（高频场景优化）
+        self._batch_queue = None
+        self._use_batch_queue = getattr(global_config.affinity_flow, 'use_batch_scoring', False)
+        self._batch_size = getattr(global_config.affinity_flow, 'batch_size', 8)
+        self._batch_flush_interval_ms = getattr(global_config.affinity_flow, 'batch_flush_interval_ms', 30.0)
 
         # 评分阈值
         self.reply_threshold = affinity_config.reply_action_interest_threshold  # 回复动作兴趣阈值
@@ -74,7 +88,8 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         logger.info("[Affinity兴趣计算器] 初始化完成（基于语义兴趣度 TF-IDF+LR）:")
         logger.info(f"  - 权重配置: {self.score_weights}")
         logger.info(f"  - 回复阈值: {self.reply_threshold}")
-        logger.info(f"  - 语义评分: {self.use_semantic_scoring} (TF-IDF + Logistic Regression)")
+        logger.info(f"  - 语义评分: {self.use_semantic_scoring} (TF-IDF + Logistic Regression + FastScorer优化)")
+        logger.info(f"  - 批处理队列: {self._use_batch_queue}")
         logger.info(f"  - 回复后连续对话: {self.enable_post_reply_boost}")
         logger.info(f"  - 回复冷却减少: {self.reply_cooldown_reduction}")
         logger.info(f"  - 最大不回复计数: {self.max_no_reply_count}")
@@ -273,13 +288,18 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         return adjusted_reply_threshold, adjusted_action_threshold
 
     async def _initialize_semantic_scorer(self):
-        """异步初始化语义兴趣度评分器"""
+        """异步初始化语义兴趣度评分器（使用单例 + FastScorer优化）"""
+        # 检查是否已初始化
+        if self._semantic_initialized:
+            logger.debug("[语义评分] 评分器已初始化，跳过")
+            return
+        
         if not self.use_semantic_scoring:
             logger.debug("[语义评分] 未启用语义兴趣度评分")
             return
 
         try:
-            from src.chat.semantic_interest import SemanticInterestScorer
+            from src.chat.semantic_interest import get_semantic_scorer
             from src.chat.semantic_interest.runtime_scorer import ModelManager
 
             # 查找最新的模型文件
@@ -294,14 +314,32 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             # 获取人设信息
             persona_info = self._get_current_persona_info()
             
-            # 加载模型（自动选择合适的版本）
+            # 加载模型（自动选择合适的版本，使用单例 + FastScorer）
             try:
                 scorer = await self.model_manager.load_model(
                     version="auto",  # 自动选择或训练
                     persona_info=persona_info
                 )
                 self.semantic_scorer = scorer
-                logger.info("[语义评分] 语义兴趣度评分器初始化成功（人设感知）")
+                
+                # 如果启用批处理队列模式
+                if self._use_batch_queue:
+                    from src.chat.semantic_interest.optimized_scorer import BatchScoringQueue
+                    
+                    # 确保 scorer 有 FastScorer
+                    if scorer._fast_scorer is not None:
+                        self._batch_queue = BatchScoringQueue(
+                            scorer=scorer._fast_scorer,
+                            batch_size=self._batch_size,
+                            flush_interval_ms=self._batch_flush_interval_ms
+                        )
+                        await self._batch_queue.start()
+                        logger.info(f"[语义评分] 批处理队列已启动 (batch_size={self._batch_size}, interval={self._batch_flush_interval_ms}ms)")
+                
+                logger.info("[语义评分] 语义兴趣度评分器初始化成功（FastScorer优化 + 单例）")
+                
+                # 设置初始化标志
+                self._semantic_initialized = True
                 
                 # 启动自动训练任务（每24小时检查一次）
                 await self.model_manager.start_auto_training(
@@ -319,9 +357,11 @@ class AffinityInterestCalculator(BaseInterestCalculator):
                     force=True  # 强制训练
                 )
                 if trained and model_path:
-                    self.semantic_scorer = SemanticInterestScorer(model_path)
-                    self.semantic_scorer.load()
-                    logger.info("[语义评分] 首次训练完成，模型已加载")
+                    # 使用单例获取评分器（默认启用 FastScorer）
+                    self.semantic_scorer = await get_semantic_scorer(model_path)
+                    logger.info("[语义评分] 首次训练完成，模型已加载（FastScorer优化 + 单例）")
+                    # 设置初始化标志
+                    self._semantic_initialized = True
                 else:
                     logger.error("[语义评分] 首次训练失败")
                     self.use_semantic_scoring = False
@@ -381,7 +421,7 @@ class AffinityInterestCalculator(BaseInterestCalculator):
         return persona_info
 
     async def _calculate_semantic_score(self, content: str) -> float:
-        """计算语义兴趣度分数
+        """计算语义兴趣度分数（优化版：FastScorer + 可选批处理 + 超时保护）
 
         Args:
             content: 消息文本
@@ -402,9 +442,13 @@ class AffinityInterestCalculator(BaseInterestCalculator):
             return 0.0
 
         try:
-            # 调用评分器（异步 + 线程池，避免CPU密集阻塞事件循环）
-            loop = asyncio.get_running_loop()
-            score = await loop.run_in_executor(None, self.semantic_scorer.score, content)
+            # 优先使用批处理队列（高频场景优化）
+            if self._batch_queue is not None:
+                score = await self._batch_queue.score(content)
+            else:
+                # 使用优化后的异步评分方法（FastScorer + 超时保护）
+                score = await self.semantic_scorer.score_async(content, timeout=2.0)
+            
             logger.debug(f"[语义评分] 内容: '{content[:50]}...' -> 分数: {score:.3f}")
             return score
 
@@ -420,17 +464,34 @@ class AffinityInterestCalculator(BaseInterestCalculator):
 
         logger.info("[语义评分] 开始重新加载模型...")
         
+        # 停止旧的批处理队列
+        if self._batch_queue is not None:
+            await self._batch_queue.stop()
+            self._batch_queue = None
+        
         # 检查人设是否变化
         if hasattr(self, 'model_manager') and self.model_manager:
             persona_info = self._get_current_persona_info()
             reloaded = await self.model_manager.check_and_reload_for_persona(persona_info)
             if reloaded:
                 self.semantic_scorer = self.model_manager.get_scorer()
+                
+                # 重新创建批处理队列
+                if self._use_batch_queue and self.semantic_scorer._fast_scorer is not None:
+                    from src.chat.semantic_interest.optimized_scorer import BatchScoringQueue
+                    self._batch_queue = BatchScoringQueue(
+                        scorer=self.semantic_scorer._fast_scorer,
+                        batch_size=self._batch_size,
+                        flush_interval_ms=self._batch_flush_interval_ms
+                    )
+                    await self._batch_queue.start()
+                
                 logger.info("[语义评分] 模型重载完成（人设已更新）")
             else:
                 logger.info("[语义评分] 人设未变化，无需重载")
         else:
             # 降级：简单重新初始化
+            self._semantic_initialized = False
             await self._initialize_semantic_scorer()
             logger.info("[语义评分] 模型重载完成")
 

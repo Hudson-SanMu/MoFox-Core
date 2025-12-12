@@ -16,14 +16,19 @@ class TfidfFeatureExtractor:
     """TF-IDF 特征提取器
     
     使用字符级 n-gram 策略，适合中文/多语言场景
+    
+    优化说明（2024.12）：
+    - max_features 从 20000 降到 10000，减少计算量
+    - ngram_range 默认 (2, 3)，对于兴趣任务足够
+    - min_df 提高到 3，过滤低频噪声
     """
 
     def __init__(
         self,
         analyzer: str = "char",  # type: ignore
-        ngram_range: tuple[int, int] = (2, 4),
-        max_features: int = 20000,
-        min_df: int = 5,
+        ngram_range: tuple[int, int] = (2, 3),  # 优化：缩小 n-gram 范围
+        max_features: int = 10000,  # 优化：减少特征数量，矩阵大小和 dot product 减半
+        min_df: int = 3,  # 优化：过滤低频 n-gram
         max_df: float = 0.95,
     ):
         """初始化特征提取器

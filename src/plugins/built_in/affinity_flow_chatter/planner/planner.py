@@ -7,8 +7,6 @@ import asyncio
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
-from src.chat.interest_system import bot_interest_manager
-from src.chat.interest_system.interest_manager import get_interest_manager
 from src.chat.message_receive.storage import MessageStorage
 from src.common.logger import get_logger
 from src.config.config import global_config
@@ -52,6 +50,8 @@ class ChatterActionPlanner:
         self.action_manager = action_manager
         self.generator = ChatterPlanGenerator(chat_id, action_manager)
         self.executor = ChatterPlanExecutor(action_manager)
+        self._interest_calculator = None
+        self._interest_calculator_lock = asyncio.Lock()
 
         # 使用新的统一兴趣度管理系统
 
@@ -130,66 +130,64 @@ class ChatterActionPlanner:
         if not pending_messages:
             return
 
+        calculator = await self._get_interest_calculator()
+        if not calculator:
+            logger.debug("未获取到兴趣计算器，跳过批量兴趣计算")
+            return
+
         logger.debug(f"批量兴趣值计算：待处理 {len(pending_messages)} 条消息")
-
-        if not bot_interest_manager.is_initialized:
-            logger.debug("bot_interest_manager 未初始化，跳过批量兴趣计算")
-            return
-
-        try:
-            interest_manager = get_interest_manager()
-        except Exception as exc:
-            logger.warning(f"获取兴趣管理器失败: {exc}")
-            return
-
-        if not interest_manager or not interest_manager.has_calculator():
-            logger.debug("当前无可用兴趣计算器，跳过批量兴趣计算")
-            return
-
-        text_map: dict[str, str] = {}
-        for message in pending_messages:
-            text = getattr(message, "processed_plain_text", None) or getattr(message, "display_message", "") or ""
-            text_map[str(message.message_id)] = text
-
-        try:
-            embeddings = await bot_interest_manager.generate_embeddings_for_texts(text_map)
-        except Exception as exc:
-            logger.error(f"批量获取消息embedding失败: {exc}")
-            embeddings = {}
 
         interest_updates: dict[str, float] = {}
         reply_updates: dict[str, bool] = {}
 
         for message in pending_messages:
-            message_id = str(message.message_id)
-            if message_id in embeddings:
-                message.semantic_embedding = embeddings[message_id]
-
             try:
-                result = await interest_manager.calculate_interest(message)
+                result = await calculator._safe_execute(message)  # 使用带统计的安全执行
             except Exception as exc:
                 logger.error(f"批量计算消息兴趣失败: {exc}")
                 continue
 
-            if result.success:
-                message.interest_value = result.interest_value
-                message.should_reply = result.should_reply
-                message.should_act = result.should_act
-                message.interest_calculated = True
+            message.interest_value = result.interest_value
+            message.should_reply = result.should_reply
+            message.should_act = result.should_act
+            message.interest_calculated = result.success
+
+            message_id = str(getattr(message, "message_id", ""))
+            if message_id:
                 interest_updates[message_id] = result.interest_value
                 reply_updates[message_id] = result.should_reply
-        
-                # 批量处理后清理 embeddings 字典
-                embeddings.clear()
-                text_map.clear()
-            else:
-                message.interest_calculated = False
 
         if interest_updates:
             try:
                 await MessageStorage.bulk_update_interest_values(interest_updates, reply_updates)
             except Exception as exc:
                 logger.error(f"批量更新消息兴趣值失败: {exc}")
+
+    async def _get_interest_calculator(self):
+        """懒加载兴趣计算器，直接使用计算器实例进行兴趣计算"""
+        if self._interest_calculator and getattr(self._interest_calculator, "is_enabled", False):
+            return self._interest_calculator
+
+        async with self._interest_calculator_lock:
+            if self._interest_calculator and getattr(self._interest_calculator, "is_enabled", False):
+                return self._interest_calculator
+
+            try:
+                from src.plugins.built_in.affinity_flow_chatter.core.affinity_interest_calculator import (
+                    AffinityInterestCalculator,
+                )
+
+                calculator = AffinityInterestCalculator()
+                if not await calculator.initialize():
+                    logger.warning("AffinityInterestCalculator 初始化失败")
+                    return None
+
+                self._interest_calculator = calculator
+                logger.debug("AffinityInterestCalculator 已就绪")
+                return self._interest_calculator
+            except Exception as exc:
+                logger.warning(f"创建 AffinityInterestCalculator 失败: {exc}")
+                return None
 
     async def _focus_mode_flow(self, context: "StreamContext | None") -> tuple[list[dict[str, Any]], Any | None]:
         """Focus模式下的完整plan流程
@@ -589,13 +587,11 @@ class ChatterActionPlanner:
             replied: 是否回复了消息
         """
         try:
-            from src.chat.interest_system.interest_manager import get_interest_manager
             from src.plugins.built_in.affinity_flow_chatter.core.affinity_interest_calculator import (
                 AffinityInterestCalculator,
             )
 
-            interest_manager = get_interest_manager()
-            calculator = interest_manager.get_current_calculator()
+            calculator = await self._get_interest_calculator()
 
             if calculator and isinstance(calculator, AffinityInterestCalculator):
                 calculator.on_message_processed(replied)

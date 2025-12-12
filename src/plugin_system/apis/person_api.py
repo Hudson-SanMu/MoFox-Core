@@ -12,7 +12,6 @@ from typing import Any
 
 from src.common.logger import get_logger
 from src.person_info.person_info import PersonInfoManager, get_person_info_manager
-from src.plugin_system.services.interest_service import interest_service
 from src.plugin_system.services.relationship_service import relationship_service
 
 logger = get_logger("person_api")
@@ -170,37 +169,6 @@ async def update_user_relationship(user_id: str, relationship_score: float, rela
 
 
 # =============================================================================
-# 兴趣系统API
-# =============================================================================
-
-
-async def initialize_smart_interests(personality_description: str, personality_id: str = "default"):
-    """
-    初始化智能兴趣系统
-
-    Args:
-        personality_description: 机器人性格描述
-        personality_id: 性格ID
-    """
-    await interest_service.initialize_smart_interests(personality_description, personality_id)
-
-
-async def calculate_interest_match(
-    content: str, keywords: list[str] | None = None, message_embedding: list[float] | None = None
-):
-    """计算消息兴趣匹配，返回匹配结果"""
-    if not content:
-        logger.warning("[PersonAPI] 请求兴趣匹配时 content 为空")
-        return None
-
-    try:
-        return await interest_service.calculate_interest_match(content, keywords, message_embedding)
-    except Exception as e:
-        logger.error(f"[PersonAPI] 计算消息兴趣匹配失败: {e}")
-        return None
-
-
-# =============================================================================
 # 系统状态与缓存API
 # =============================================================================
 
@@ -214,7 +182,6 @@ def get_system_stats() -> dict[str, Any]:
     """
     return {
         "relationship_service": relationship_service.get_cache_stats(),
-        "interest_service": interest_service.get_interest_stats(),
     }
 
 

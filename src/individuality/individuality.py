@@ -79,9 +79,6 @@ class Individuality:
         else:
             logger.error("人设构建失败")
 
-        # 初始化智能兴趣系统
-        await self._initialize_smart_interest_system(personality_result, identity_result)
-
         # 如果任何一个发生变化，都需要清空数据库中的info_list（因为这影响整体人设）
         if personality_changed or identity_changed:
             logger.info("将清空数据库中原有的关键词缓存")
@@ -92,20 +89,6 @@ class Individuality:
                 "nickname": self.name,
             }
             await person_info_manager.update_one_field(self.bot_person_id, "info_list", [], data=update_data)
-
-    async def _initialize_smart_interest_system(self, personality_result: str, identity_result: str):
-        """初始化智能兴趣系统"""
-        # 组合完整的人设描述
-        full_personality = f"{personality_result}，{identity_result}"
-
-        # 使用统一的评分API初始化智能兴趣系统
-        from src.plugin_system.apis import person_api
-
-        await person_api.initialize_smart_interests(
-            personality_description=full_personality, personality_id=self.bot_person_id
-        )
-
-        logger.info("智能兴趣系统初始化完成")
 
     async def get_personality_block(self) -> str:
         bot_name = global_config.bot.nickname

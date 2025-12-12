@@ -64,6 +64,10 @@ class AutoTrainer:
 
         # 加载缓存的人设状态
         self._load_persona_cache()
+        
+        # 定时任务标志（防止重复启动）
+        self._scheduled_task_running = False
+        self._scheduled_task = None
 
         logger.info("[自动训练器] 初始化完成")
         logger.info(f"  - 数据目录: {self.data_dir}")
@@ -211,7 +215,7 @@ class AutoTrainer:
                 tfidf_config={
                     "analyzer": "char",
                     "ngram_range": (2, 4),
-                    "max_features": 15000,
+                    "max_features": 10000,
                     "min_df": 3,
                 },
                 model_config={
@@ -273,6 +277,12 @@ class AutoTrainer:
             persona_info: 人设信息
             interval_hours: 检查间隔（小时）
         """
+        # 检查是否已经有任务在运行
+        if self._scheduled_task_running:
+            logger.debug(f"[自动训练器] 定时任务已在运行，跳过")
+            return
+        
+        self._scheduled_task_running = True
         logger.info(f"[自动训练器] 启动定时训练任务，间隔: {interval_hours}小时")
 
         while True:

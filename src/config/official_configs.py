@@ -811,6 +811,11 @@ class AffinityFlowConfig(ValidatedConfigBase):
     low_match_keyword_multiplier: float = Field(default=1.0, description="低匹配关键词兴趣倍率")
     match_count_bonus: float = Field(default=0.1, description="匹配数关键词加成值")
     max_match_bonus: float = Field(default=0.5, description="最大匹配数加成值")
+    
+    # 语义兴趣度评分优化参数（2024.12 新增）
+    use_batch_scoring: bool = Field(default=False, description="是否启用批处理评分模式，适合高频群聊场景")
+    batch_size: int = Field(default=8, ge=1, le=64, description="批处理大小，达到后立即处理")
+    batch_flush_interval_ms: float = Field(default=30.0, ge=10.0, le=200.0, description="批处理刷新间隔（毫秒），超过后强制处理")
 
     # 回复决策系统参数
     no_reply_threshold_adjustment: float = Field(default=0.1, description="不回复兴趣阈值调整值")
