@@ -655,72 +655,6 @@ async def activate_expression(expression_id: int, increment: float = 0.1) -> boo
 
 # ==================== 学习管理接口 ====================
 
-
-async def trigger_learning(
-    chat_id: str, type: Literal["style", "grammar", "both"] = "both", force: bool = False
-) -> dict[str, Any]:
-    """
-    手动触发学习
-
-    Args:
-        chat_id: 聊天流ID，支持两种格式：
-            - 哈希值格式（如: "abc123def456..."）
-            - platform:raw_id:type 格式（如: "QQ:12345:group" 或 "QQ:67890:private"）
-        type: 学习类型
-        force: 是否强制学习（忽略时间和消息数量限制）
-
-    Returns:
-        {
-            "success": true,
-            "style_learned": 5,
-            "grammar_learned": 3,
-            "total": 8
-        }
-    """
-    try:
-        # 解析并转换chat_id
-        chat_id_hash = parse_chat_id_input(chat_id)
-
-        learner = ExpressionLearner(chat_id_hash)
-        await learner._initialize_chat_name()
-
-        # 检查是否允许学习
-        if not learner.can_learn_for_chat():
-            raise ValueError(f"聊天流 {chat_id} 不允许学习表达方式")
-
-        style_learned = 0
-        grammar_learned = 0
-
-        # 学习style
-        if type in ["style", "both"]:
-            if force or await learner.should_trigger_learning():
-                result = await learner.learn_and_store(type="style", num=25)
-                if result:
-                    style_learned = len(result)
-                    logger.info(f"学习style成功: {style_learned}个")
-
-        # 学习grammar
-        if type in ["grammar", "both"]:
-            if force or await learner.should_trigger_learning():
-                result = await learner.learn_and_store(type="grammar", num=10)
-                if result:
-                    grammar_learned = len(result)
-                    logger.info(f"学习grammar成功: {grammar_learned}个")
-
-        return {
-            "success": True,
-            "style_learned": style_learned,
-            "grammar_learned": grammar_learned,
-            "total": style_learned + grammar_learned,
-        }
-
-    except ValueError:
-        raise
-    except Exception as e:
-        logger.error(f"触发学习失败: {e}")
-        raise
-
-
 async def get_learning_status(chat_id: str) -> dict[str, Any]:
     """
     获取学习状态
@@ -787,63 +721,6 @@ async def get_learning_status(chat_id: str) -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"获取学习状态失败: {e}")
-        raise
-
-
-async def cleanup_expired_expressions(chat_id: str | None = None, expiration_days: int | None = None) -> int:
-    """
-    清理过期表达方式
-
-    Args:
-        chat_id: 指定聊天流，None表示清理所有
-        expiration_days: 过期天数，None使用配置值
-
-    Returns:
-        清理的数量
-    """
-    try:
-        if chat_id:
-            # 清理指定聊天流
-            learner = ExpressionLearner(chat_id)
-            return await learner.cleanup_expired_expressions(expiration_days)
-        else:
-            # 清理所有聊天流
-            if expiration_days is None:
-                if global_config is None:
-                    expiration_days = 30
-                else:
-                    expiration_days = global_config.expression.expiration_days
-
-            current_time = time.time()
-            expiration_threshold = current_time - (expiration_days * 24 * 3600)
-
-            deleted_count = 0
-            affected_chat_ids = set()
-
-            async with get_db_session() as session:
-                query = await session.execute(
-                    select(Expression).where(Expression.last_active_time < expiration_threshold)
-                )
-                expired_expressions = list(query.scalars())
-
-                if expired_expressions:
-                    for expr in expired_expressions:
-                        affected_chat_ids.add(expr.chat_id)
-                        await session.delete(expr)
-                        deleted_count += 1
-
-                    await session.commit()
-                    logger.info(f"清理了 {deleted_count} 个过期表达方式（超过 {expiration_days} 天未使用）")
-
-                    # 清除缓存
-                    cache = await get_cache()
-                    for cid in affected_chat_ids:
-                        await cache.delete(generate_cache_key("chat_expressions", cid))
-
-            return deleted_count
-
-    except Exception as e:
-        logger.error(f"清理过期表达方式失败: {e}")
         raise
 
 
