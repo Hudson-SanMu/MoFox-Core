@@ -242,7 +242,6 @@ class PersonInfoManager:
         return person_id
 
     @staticmethod
-    @staticmethod
     async def first_knowing_some_one(platform: str, user_id: str, user_nickname: str, user_cardname: str):
         """判断是否认识某人"""
         person_id = PersonInfoManager.get_person_id(platform, user_id)
@@ -697,6 +696,18 @@ class PersonInfoManager:
             try:
                 value = getattr(record, field_name)
                 if value is not None:
+                    # 对 JSON 序列化字段进行反序列化
+                    if field_name in JSON_SERIALIZED_FIELDS:
+                        try:
+                            # 确保 value 是字符串类型
+                            if isinstance(value, str):
+                                return orjson.loads(value)
+                            else:
+                                # 如果不是字符串,可能已经是解析后的数据,直接返回
+                                return value
+                        except Exception as e:
+                            logger.warning(f"反序列化字段 {field_name} 失败: {e}, value={value}, 使用默认值")
+                            return copy.deepcopy(person_info_default.get(field_name))
                     return value
                 else:
                     return copy.deepcopy(person_info_default.get(field_name))
@@ -737,7 +748,20 @@ class PersonInfoManager:
                 try:
                     value = getattr(record, field_name)
                     if value is not None:
-                        result[field_name] = value
+                        # 对 JSON 序列化字段进行反序列化
+                        if field_name in JSON_SERIALIZED_FIELDS:
+                            try:
+                                # 确保 value 是字符串类型
+                                if isinstance(value, str):
+                                    result[field_name] = orjson.loads(value)
+                                else:
+                                    # 如果不是字符串,可能已经是解析后的数据,直接使用
+                                    result[field_name] = value
+                            except Exception as e:
+                                logger.warning(f"反序列化字段 {field_name} 失败: {e}, value={value}, 使用默认值")
+                                result[field_name] = copy.deepcopy(person_info_default.get(field_name))
+                        else:
+                            result[field_name] = value
                     else:
                         result[field_name] = copy.deepcopy(person_info_default.get(field_name))
                 except Exception as e:

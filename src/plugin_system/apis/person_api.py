@@ -116,8 +116,24 @@ async def get_person_points(person_id: str, limit: int = 5) -> list[tuple]:
         if not points:
             return []
 
+        # 验证 points 是列表类型
+        if not isinstance(points, list):
+            logger.warning(f"[PersonAPI] 用户记忆点数据类型错误: person_id={person_id}, type={type(points)}, value={points}")
+            return []
+
+        # 过滤掉格式不正确的记忆点 (应该是包含至少3个元素的元组或列表)
+        valid_points = []
+        for point in points:
+            if isinstance(point, list | tuple) and len(point) >= 3:
+                valid_points.append(point)
+            else:
+                logger.warning(f"[PersonAPI] 跳过格式错误的记忆点: person_id={person_id}, point={point}")
+
+        if not valid_points:
+            return []
+
         # 按权重和时间排序，返回最重要的几个点
-        sorted_points = sorted(points, key=lambda x: (x[1], x[2]), reverse=True)
+        sorted_points = sorted(valid_points, key=lambda x: (x[1], x[2]), reverse=True)
         return sorted_points[:limit]
     except Exception as e:
         logger.error(f"[PersonAPI] 获取用户记忆点失败: person_id={person_id}, error={e}")
